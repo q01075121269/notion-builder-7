@@ -43,6 +43,7 @@ import {
   removeTaskFromQuickCapture 
 } from '../../services/quickCaptureStorage';
 import { ScheduleView } from '../../components/life/ScheduleView';
+import { TodoManagerView } from '../../components/life/TodoManagerView';
 
 // 사용자 동선 우선순위 재배치: 1. 스마트일정 -> 2. 스마트할일 -> 3. 가계부 -> 4. 이메일 요약
 type LifeHubTab = 'schedule' | 'todo' | 'expense' | 'email';
@@ -126,10 +127,52 @@ const INITIAL_DEMO_SCHEDULES: LifeScheduleItem[] = [
 ];
 
 const INITIAL_DEMO_TODOS: LifeTodoItem[] = [
-  { id: 't1', title: 'v2.0 라우트 분리 작업 완료 및 배포', done: true, priority: '🔥 긴급' },
-  { id: 't2', title: '주간 업무 결산 리포트 작성', done: false, priority: '⭐ 보통' },
-  { id: 't3', title: '헬스장 하체 운동 40분', done: false, priority: '☕ 여유' },
-  { id: 't4', title: '전기세 및 공과금 자동이체 확인', done: true, priority: '⭐ 보통' }
+  { 
+    id: 't1', 
+    title: 'v2.0 라우트 분리 작업 완료 및 배포', 
+    done: true, 
+    priority: '🔥 긴급/중요', 
+    eisenhower: 'P1',
+    dueDate: '2026-09-18', 
+    reminder: 'before_30m',
+    subtasks: [
+      { id: 'st-t1-1', title: '1단계: 변경 모듈 단위 테스트 및 번들 빌드 검증 (`npm run build`)', done: true },
+      { id: 'st-t1-2', title: '2단계: Vercel 서버리스 프록시 환경변수 및 CORS 연동 확인', done: true },
+      { id: 'st-t1-3', title: '3단계: GitHub main 브랜치 커밋/푸시 및 프로덕션 배포 완료 점검', done: true }
+    ]
+  },
+  { 
+    id: 't2', 
+    title: '주간 업무 결산 리포트 작성', 
+    done: false, 
+    priority: '⭐ 중요/계획', 
+    eisenhower: 'P2',
+    dueDate: '2026-09-19', 
+    reminder: 'day_9am',
+    subtasks: [
+      { id: 'st-t2-1', title: '1단계: 이번 주 주요 추진 성과 및 지표 데이터 취합', done: true },
+      { id: 'st-t2-2', title: '2단계: 노션 주간 업무 보고 템플릿에 핵심 요약 초안 작성', done: false },
+      { id: 'st-t2-3', title: '3단계: 팀 슬랙 공유 및 차주 우선순위 안건 등록', done: false }
+    ]
+  },
+  { 
+    id: 't3', 
+    title: '헬스장 하체 운동 40분', 
+    done: false, 
+    priority: '☕ 여유/보관', 
+    eisenhower: 'P4',
+    dueDate: '2026-09-20', 
+    reminder: 'none' 
+  },
+  { 
+    id: 't4', 
+    title: '전기세 및 공과금 자동이체 확인', 
+    done: true, 
+    priority: '⚡ 긴급/위임', 
+    eisenhower: 'P3',
+    dueDate: '2026-09-17', 
+    reminder: 'none' 
+  }
 ];
 
 const INITIAL_DEMO_EXPENSES: LifeExpenseItem[] = [
@@ -394,102 +437,19 @@ export const LifePage: React.FC = () => {
   );
 
   // 2. 스마트 할 일 모듈 렌더러
-  const renderTodoModule = (isCompact = false) => {
-    const doneCount = todoItems.filter(t => t.done).length;
-    const progressRate = todoItems.length > 0 ? Math.round((doneCount / todoItems.length) * 100) : 0;
-
-    return (
-      <ErrorBoundary fallbackTitle="스마트 할 일 모듈 로드 중 오류가 발생했습니다.">
-        <div className={`space-y-4 ${isCompact ? 'p-1' : ''}`}>
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-2 border-b border-slate-200/80 dark:border-neutral-800">
-            <div>
-              <h2 className="text-base sm:text-lg font-bold flex items-center space-x-2 text-slate-900 dark:text-white whitespace-nowrap">
-                <CheckSquare className="w-4 h-4 sm:w-5 sm:h-5 text-amber-600 dark:text-amber-400 shrink-0" />
-                <span className="whitespace-nowrap">2. 🎯 스마트할일 (Task Manager)</span>
-                <span className="text-xs px-2 py-0.5 rounded-full bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 font-semibold border border-amber-200/60 dark:border-amber-800/40 whitespace-nowrap">
-                  {doneCount}/{todoItems.length} 완료
-                </span>
-              </h2>
-              <p className="text-xs text-slate-500 dark:text-neutral-400 mt-0.5 whitespace-nowrap">
-                노션 데이터베이스 및 퀵 캡처로 연동된 실시간 체크리스트
-              </p>
-            </div>
-            <div className="flex items-center space-x-2 shrink-0">
-              <div className="flex items-center space-x-1.5 px-3 py-1 rounded-xl bg-slate-100 dark:bg-neutral-800 text-xs text-slate-600 dark:text-neutral-300 font-semibold whitespace-nowrap">
-                <span>진행률</span>
-                <span className="text-amber-600 dark:text-amber-400 font-bold">{progressRate}%</span>
-              </div>
-              <button 
-                onClick={() => setCurrentView('quick_capture')}
-                className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-white text-white dark:text-slate-900 text-xs font-semibold shadow-xs transition cursor-pointer active:scale-95 whitespace-nowrap"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span className="whitespace-nowrap">할 일 추가</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Empty State vs 데이터 목록 */}
-          {todoItems.length === 0 ? (
-            <div className="py-12 px-4 text-center border-2 border-dashed border-slate-200 dark:border-neutral-800 rounded-2xl bg-slate-50/70 dark:bg-neutral-900/30">
-              <CheckSquare className="w-10 h-10 mx-auto mb-2 text-slate-400 dark:text-neutral-500 opacity-70" />
-              <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200 whitespace-nowrap">
-                등록된 스마트 할 일이 없습니다.
-              </h4>
-              <p className="text-xs text-slate-500 dark:text-neutral-400 mt-1 max-w-sm mx-auto">
-                오늘 집중해서 완수할 우선순위 태스크를 퀵 캡처나 음성으로 빠르게 등록해 보세요.
-              </p>
-              <button
-                onClick={() => setCurrentView('quick_capture')}
-                className="mt-3.5 inline-flex items-center space-x-1.5 px-3.5 py-1.5 rounded-xl bg-white dark:bg-neutral-800 border border-slate-200 dark:border-neutral-700 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 transition shadow-xs whitespace-nowrap"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>새 태스크 추가하기</span>
-              </button>
-            </div>
-          ) : (
-            <div className="space-y-2.5">
-              {todoItems.map((todo) => (
-                <div
-                  key={todo.id}
-                  onClick={() => toggleTodo(todo.id)}
-                  className={`p-3.5 rounded-xl border transition flex items-center justify-between cursor-pointer group shadow-xs ${
-                    todo.done
-                      ? 'bg-slate-100/60 dark:bg-neutral-900/30 border-slate-200/60 dark:border-neutral-800/50 opacity-60'
-                      : 'bg-white dark:bg-neutral-900/70 border-slate-200 dark:border-neutral-800 hover:border-amber-400/80'
-                  }`}
-                >
-                  <div className="flex items-center space-x-3 min-w-0">
-                    <input
-                      type="checkbox"
-                      checked={todo.done}
-                      onChange={() => {}}
-                      className="w-4 h-4 rounded text-amber-600 focus:ring-amber-500 cursor-pointer border-slate-300 shrink-0"
-                    />
-                    <span className={`text-xs sm:text-sm font-medium truncate ${todo.done ? 'line-through text-slate-400 dark:text-neutral-500' : 'text-slate-800 dark:text-slate-200'}`}>
-                      {todo.title}
-                    </span>
-                  </div>
-                  <div className="flex items-center space-x-2 shrink-0 ml-3">
-                    <span className="text-[11px] px-2 py-0.5 rounded-md bg-slate-100 dark:bg-neutral-800 text-slate-600 dark:text-neutral-300 font-medium whitespace-nowrap border border-slate-200/60 dark:border-neutral-700/60">
-                      {todo.priority}
-                    </span>
-                    <button
-                      onClick={(e) => handleDeleteTodo(e, todo)}
-                      title="할 일 삭제"
-                      className="p-1 rounded-md text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-slate-100 dark:hover:bg-neutral-800 transition cursor-pointer"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </ErrorBoundary>
-    );
-  };
+  // 2. 스마트 할 일 모듈 렌더러 (정밀 D-Day 엔진, 브라우저 푸시 알림, AI 서브태스크 분해기, 아이젠하워 4분면)
+  const renderTodoModule = (isCompact = false) => (
+    <ErrorBoundary fallbackTitle="스마트 할 일 모듈 로드 중 오류가 발생했습니다.">
+      <TodoManagerView
+        todoItems={todoItems}
+        setTodoItems={setTodoItems}
+        onToggleTodo={toggleTodo}
+        onDeleteTodo={handleDeleteTodo}
+        onQuickCapture={() => setCurrentView('quick_capture')}
+        isCompact={isCompact}
+      />
+    </ErrorBoundary>
+  );
 
   // 3. 가계부 & 지출 모듈 렌더러
   const renderExpenseModule = (isCompact = false) => (

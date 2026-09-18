@@ -40,11 +40,26 @@ export interface LifeExpenseItem {
   icon?: string;
 }
 
+export interface LifeSubTask {
+  id: string;
+  title: string;
+  done: boolean;
+}
+
+export type ReminderType = 'none' | 'before_30m' | 'day_9am';
+export type EisenhowerPriority = 'P1' | 'P2' | 'P3' | 'P4';
+
 export interface LifeTodoItem {
   id: string;
   title: string;
   done: boolean;
   priority: string;
+  dueDate?: string;
+  dday?: string;
+  reminder?: ReminderType;
+  subtasks?: LifeSubTask[];
+  eisenhower?: EisenhowerPriority;
+  notionPageId?: string;
 }
 
 export function calculateDDay(dateStr?: string): string {
