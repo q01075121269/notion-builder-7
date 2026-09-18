@@ -4,7 +4,7 @@ import {
   Home,
   Sparkles, 
   Leaf,
-  Terminal,
+  FileText,
   Palette,
   Layers, 
   Settings, 
@@ -122,7 +122,7 @@ export const Navbar: React.FC = () => {
               }`}
               title="제3챕터: 오피스 스튜디오"
             >
-              <Terminal className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+              <FileText className="w-3.5 h-3.5 text-blue-500 shrink-0" />
               <span className="whitespace-nowrap">3. 📄 오피스 스튜디오</span>
             </button>
 
