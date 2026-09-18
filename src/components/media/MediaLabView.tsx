@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Palette, HardDrive, Trash2, RefreshCw, Film, Wand2, Music } from 'lucide-react';
+import { Palette, HardDrive, Trash2, RefreshCw, Film, Wand2, Music, FolderOpen } from 'lucide-react';
 import { getRecentMediaItems, deleteMediaItem } from '../../lib/mediaStorage';
 import type { MediaItem } from '../../lib/mediaStorage';
 import { ImageStudioView } from './ImageStudioView';
 import { VideoStudioView } from './VideoStudioView';
 import { AudioStudioView } from './AudioStudioView';
+import { MediaVaultDrawer } from './MediaVaultDrawer';
 import { useApp } from '../../context/AppContext';
 
 export type MediaSubTab = 'IMAGE' | 'VIDEO' | 'AUDIO';
@@ -14,6 +15,7 @@ export const MediaLabView: React.FC = () => {
   const [activeSubTab, setActiveSubTab] = useState<MediaSubTab>('IMAGE');
   const [mediaList, setMediaList] = useState<MediaItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isVaultOpen, setIsVaultOpen] = useState(false);
 
   // 체인 파이프라인 데이터
   const [videoFirstFrame, setVideoFirstFrame] = useState<{ url: string; prompt: string } | null>(null);
@@ -60,8 +62,15 @@ export const MediaLabView: React.FC = () => {
   };
 
   return (
-    <div className="flex-1 flex flex-col h-full w-full overflow-y-auto bg-neutral-50 dark:bg-notion-dark-bg p-4 sm:p-6 select-none">
+    <div className="flex-1 flex flex-col h-full w-full overflow-y-auto bg-neutral-50 dark:bg-notion-dark-bg p-4 sm:p-6 select-none relative">
       
+      {/* 우측 슬라이드-오버 보관함 서랍 UI */}
+      <MediaVaultDrawer
+        isOpen={isVaultOpen}
+        onClose={() => setIsVaultOpen(false)}
+        onRestoreSettings={() => loadMedia()}
+      />
+
       {/* 제4챕터 AI 미디어 랩 메인 컨테이너 (Slate-50 배경, Slate-200 보더) */}
       <div className="max-w-6xl mx-auto w-full bg-slate-50 dark:bg-neutral-900 border border-slate-200 dark:border-neutral-800 rounded-3xl p-5 sm:p-8 shadow-sm space-y-6">
         
@@ -87,54 +96,65 @@ export const MediaLabView: React.FC = () => {
             </div>
           </div>
 
-          {/* Sub Tab Switcher */}
-          <div className="flex items-center bg-slate-200/70 dark:bg-neutral-800 p-1 rounded-2xl border border-slate-300/60 dark:border-neutral-700/60 shrink-0 overflow-x-auto no-scrollbar">
-            <button
-              onClick={() => setActiveSubTab('IMAGE')}
-              className={`
-                flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer whitespace-nowrap
-                ${activeSubTab === 'IMAGE'
-                  ? 'bg-white dark:bg-neutral-900 text-purple-700 dark:text-purple-300 shadow-sm'
-                  : 'text-slate-600 dark:text-neutral-400 hover:text-slate-900 dark:hover:text-white'
-                }
-              `}
-            >
-              <Wand2 className="w-3.5 h-3.5 text-purple-500" />
-              <span className="whitespace-nowrap">1. 이미지 스튜디오</span>
-            </button>
+          <div className="flex items-center space-x-3 shrink-0">
+            {/* Sub Tab Switcher */}
+            <div className="flex items-center bg-slate-200/70 dark:bg-neutral-800 p-1 rounded-2xl border border-slate-300/60 dark:border-neutral-700/60 overflow-x-auto no-scrollbar">
+              <button
+                onClick={() => setActiveSubTab('IMAGE')}
+                className={`
+                  flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer whitespace-nowrap
+                  ${activeSubTab === 'IMAGE'
+                    ? 'bg-white dark:bg-neutral-900 text-purple-700 dark:text-purple-300 shadow-sm'
+                    : 'text-slate-600 dark:text-neutral-400 hover:text-slate-900 dark:hover:text-white'
+                  }
+                `}
+              >
+                <Wand2 className="w-3.5 h-3.5 text-purple-500" />
+                <span className="whitespace-nowrap">1. 이미지 스튜디오</span>
+              </button>
 
-            <button
-              onClick={() => setActiveSubTab('VIDEO')}
-              className={`
-                flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer whitespace-nowrap
-                ${activeSubTab === 'VIDEO'
-                  ? 'bg-white dark:bg-neutral-900 text-indigo-700 dark:text-indigo-300 shadow-sm'
-                  : 'text-slate-600 dark:text-neutral-400 hover:text-slate-900 dark:hover:text-white'
-                }
-              `}
-            >
-              <Film className="w-3.5 h-3.5 text-indigo-500" />
-              <span className="whitespace-nowrap">2. 5초 영상 스튜디오</span>
-              {videoFirstFrame && (
-                <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
-              )}
-            </button>
+              <button
+                onClick={() => setActiveSubTab('VIDEO')}
+                className={`
+                  flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer whitespace-nowrap
+                  ${activeSubTab === 'VIDEO'
+                    ? 'bg-white dark:bg-neutral-900 text-indigo-700 dark:text-indigo-300 shadow-sm'
+                    : 'text-slate-600 dark:text-neutral-400 hover:text-slate-900 dark:hover:text-white'
+                  }
+                `}
+              >
+                <Film className="w-3.5 h-3.5 text-indigo-500" />
+                <span className="whitespace-nowrap">2. 5초 영상 스튜디오</span>
+                {videoFirstFrame && (
+                  <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
+                )}
+              </button>
 
+              <button
+                onClick={() => setActiveSubTab('AUDIO')}
+                className={`
+                  flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer whitespace-nowrap
+                  ${activeSubTab === 'AUDIO'
+                    ? 'bg-white dark:bg-neutral-900 text-pink-700 dark:text-pink-300 shadow-sm'
+                    : 'text-slate-600 dark:text-neutral-400 hover:text-slate-900 dark:hover:text-white'
+                  }
+                `}
+              >
+                <Music className="w-3.5 h-3.5 text-pink-500" />
+                <span className="whitespace-nowrap">3. BGM & 사운드</span>
+                {audioTargetVideo && (
+                  <span className="w-2 h-2 rounded-full bg-pink-500 animate-pulse" />
+                )}
+              </button>
+            </div>
+
+            {/* 상단 우측 [🗂️ 미디어 보관함] 버튼 */}
             <button
-              onClick={() => setActiveSubTab('AUDIO')}
-              className={`
-                flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer whitespace-nowrap
-                ${activeSubTab === 'AUDIO'
-                  ? 'bg-white dark:bg-neutral-900 text-pink-700 dark:text-pink-300 shadow-sm'
-                  : 'text-slate-600 dark:text-neutral-400 hover:text-slate-900 dark:hover:text-white'
-                }
-              `}
+              onClick={() => setIsVaultOpen(true)}
+              className="flex items-center space-x-2 px-3.5 py-2 rounded-2xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-extrabold shadow-sm hover:shadow transition cursor-pointer whitespace-nowrap"
             >
-              <Music className="w-3.5 h-3.5 text-pink-500" />
-              <span className="whitespace-nowrap">3. BGM & 사운드</span>
-              {audioTargetVideo && (
-                <span className="w-2 h-2 rounded-full bg-pink-500 animate-pulse" />
-              )}
+              <FolderOpen className="w-4 h-4 text-purple-200" />
+              <span>🗂️ 미디어 보관함</span>
             </button>
           </div>
 
@@ -162,13 +182,21 @@ export const MediaLabView: React.FC = () => {
               <HardDrive className="w-4 h-4 text-purple-500" />
               <span>💾 1계층 IndexedDB 캐시 에셋 보관함 ({mediaList.length})</span>
             </h3>
-            <button
-              onClick={loadMedia}
-              className="flex items-center space-x-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-white dark:bg-neutral-800 border border-slate-200 dark:border-neutral-700 hover:bg-slate-100 text-slate-600 dark:text-neutral-300 transition cursor-pointer"
-            >
-              <RefreshCw className={`w-3 h-3 ${isLoading ? 'animate-spin' : ''}`} />
-              <span>캐시 갱신</span>
-            </button>
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={() => setIsVaultOpen(true)}
+                className="text-[11px] font-bold text-purple-600 dark:text-purple-400 hover:underline"
+              >
+                전체 서랍 열기 →
+              </button>
+              <button
+                onClick={loadMedia}
+                className="flex items-center space-x-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-white dark:bg-neutral-800 border border-slate-200 dark:border-neutral-700 hover:bg-slate-100 text-slate-600 dark:text-neutral-300 transition cursor-pointer"
+              >
+                <RefreshCw className={`w-3 h-3 ${isLoading ? 'animate-spin' : ''}`} />
+                <span>캐시 갱신</span>
+              </button>
+            </div>
           </div>
 
           {mediaList.length > 0 && (
@@ -207,4 +235,5 @@ export const MediaLabView: React.FC = () => {
     </div>
   );
 };
+
 
