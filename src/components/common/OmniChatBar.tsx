@@ -1,4 +1,4 @@
-﻿// src/components/common/OmniChatBar.tsx
+// src/components/common/OmniChatBar.tsx
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 //  중앙 통합 옴니 챗바 (Omni Chat Bar)
 //  - 화면 하단 중앙 플로팅 고정 배치
@@ -204,8 +204,9 @@ export const OmniChatBar: React.FC = () => {
 
         // 토스트 피드백
         showToast(`${meta.icon} ${meta.label}`, "success");
-      } catch {
-        showToast("오케스트레이터 연결에 실패했습니다.", "error" as any);
+      } catch (err) {
+        console.error('[OmniChatBar] Error sending message:', err);
+        showToast("요청 처리 중 오류가 발생했습니다. 다시 시도해 주세요.", "error" as any);
       } finally {
         setIsLoading(false);
         isLoadingRef.current = false;
@@ -360,13 +361,26 @@ export const OmniChatBar: React.FC = () => {
         {/* ── 메인 입력 바 ── */}
         <div className="flex items-center space-x-2 bg-slate-50 dark:bg-neutral-900 border border-slate-200 dark:border-neutral-700/80 rounded-2xl shadow-sm px-3 py-2">
 
+          {/* 상태 인디케이터 (대기 중: 녹색 닷 ●, 작업 중: 오렌지 스피너 + "요청 처리 중..." 뱃지) */}
+          {isLoading ? (
+            <div className="flex items-center space-x-1.5 px-2 py-0.5 rounded-full bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-800 shrink-0">
+              <Loader2 className="w-3.5 h-3.5 text-amber-500 animate-spin" />
+              <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400">요청 처리 중...</span>
+            </div>
+          ) : (
+            <div className="flex items-center space-x-1 px-1 shrink-0" title="대기 중">
+              <span className="block w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-xs" />
+            </div>
+          )}
+
           {/* 마이크 버튼 (인라인 STT — 탭 전환 없음) */}
           <button
             type="button"
             id="omni-mic-btn"
             onClick={toggleMic}
+            disabled={isLoading}
             title={isListening ? "음성 인식 중... 클릭하여 중지" : "음성 입력 (한국어)"}
-            className={`w-9 h-9 min-w-[36px] flex items-center justify-center rounded-xl transition shrink-0 ${
+            className={`w-9 h-9 min-w-[36px] flex items-center justify-center rounded-xl transition shrink-0 disabled:opacity-40 disabled:cursor-not-allowed ${
               isListening
                 ? "bg-rose-500 text-white animate-pulse ring-2 ring-rose-300 dark:ring-rose-700"
                 : "bg-neutral-100 dark:bg-neutral-800 text-neutral-500 dark:text-neutral-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 hover:text-rose-500"
@@ -389,16 +403,18 @@ export const OmniChatBar: React.FC = () => {
             onKeyDown={handleKeyDown}
             onFocus={() => setIsExpanded(true)}
             placeholder={
-              isListening
+              isLoading
+                ? "🧠 Gemini가 요청을 분석하고 화면을 업데이트하고 있습니다..."
+                : isListening
                 ? "🎙️ 지금 말씀하세요..."
                 : "비서에게 말하거나 타이핑하세요 (일정, 지출, 템플릿, 에러 등)"
             }
             disabled={isLoading}
-            className="flex-1 min-w-0 bg-transparent text-xs sm:text-sm text-neutral-800 dark:text-neutral-100 placeholder:text-neutral-400 dark:placeholder:text-neutral-500 focus:outline-none"
+            className="flex-1 min-w-0 bg-transparent text-xs sm:text-sm text-neutral-800 dark:text-neutral-100 placeholder:text-neutral-400 dark:placeholder:text-neutral-500 focus:outline-none disabled:opacity-60 disabled:cursor-not-allowed"
           />
 
           {/* 입력 지우기 버튼 */}
-          {text && (
+          {text && !isLoading && (
             <button
               type="button"
               onClick={() => setText("")}
@@ -422,7 +438,7 @@ export const OmniChatBar: React.FC = () => {
             title="전송"
           >
             {isLoading ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
+              <Loader2 className="w-4 h-4 animate-spin text-amber-500" />
             ) : (
               <Send className="w-4 h-4" />
             )}

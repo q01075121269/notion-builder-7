@@ -49,19 +49,25 @@ export async function sendToOrchestrator(
     })),
   };
 
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 15000);
+
   try {
     const response = await fetch('/api/orchestrator', {
       method: 'POST',
       headers,
       body: JSON.stringify(payload),
+      signal: controller.signal,
     });
+    clearTimeout(timeoutId);
 
     if (response.ok) {
       const data = await response.json();
       return data as OrchestratorResponse;
     }
   } catch (err) {
-    console.warn('[Orchestrator] Direct API call error, trying fallback:', err);
+    clearTimeout(timeoutId);
+    console.warn('[Orchestrator] Direct API call error or timeout, trying fallback:', err);
   }
 
   // 로컬 Vite dev server에서 API 라우트 프록시가 없는 경우 /api/gemini 프록시 활용 폴백

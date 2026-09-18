@@ -412,7 +412,9 @@ export const OmniChatBar: React.FC = () => {
       };
 
       setMessages(prev => [...prev, aiMsg]);
-    } catch {
+    } catch (err) {
+      console.error('[OmniChatBar] Error sending message:', err);
+      showToast('요청 처리 중 오류가 발생했습니다. 다시 시도해 주세요.', 'error');
       setMessages(prev => [...prev, {
         id: `omni-err-${Date.now()}`,
         role: 'assistant',
@@ -712,14 +714,21 @@ export const OmniChatBar: React.FC = () => {
         )}
 
         <div className="flex items-center gap-2">
-          {/* 노션 연동 상태 점 (클릭하면 설정 열기) */}
-          <button
-            onClick={() => setIsNotionSettingsModalOpen(true)}
-            title={notionApiKey ? '노션 연동됨' : '노션 미연동 — 클릭하여 설정'}
-            className="shrink-0"
-          >
-            <span className={`block w-2 h-2 rounded-full ${notionApiKey ? 'bg-emerald-500' : 'bg-amber-400 animate-pulse'}`} />
-          </button>
+          {/* 상태 인디케이터 (대기 중: 녹색 닷 ●, 작업 중: 오렌지 스피너 + "요청 처리 중..." 뱃지) */}
+          {isLoading ? (
+            <div className="flex items-center space-x-1.5 px-2 py-1 rounded-full bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-800 shrink-0">
+              <Loader2 className="w-3.5 h-3.5 text-amber-500 animate-spin" />
+              <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400">요청 처리 중...</span>
+            </div>
+          ) : (
+            <button
+              onClick={() => setIsNotionSettingsModalOpen(true)}
+              title={notionApiKey ? '노션 연동됨' : '노션 미연동 — 클릭하여 설정'}
+              className="shrink-0 flex items-center"
+            >
+              <span className={`block w-2.5 h-2.5 rounded-full ${notionApiKey ? 'bg-emerald-500 shadow-xs' : 'bg-amber-400 animate-pulse'}`} />
+            </button>
+          )}
 
           {/* 클립(📎) 파일/링크 첨부 버튼 */}
           <div className="relative group shrink-0">
@@ -730,6 +739,7 @@ export const OmniChatBar: React.FC = () => {
                 e.preventDefault();
                 setShowLinkModal(true);
               }}
+              disabled={isLoading}
               title="파일 드래그/선택 (우클릭: 웹 링크 첨부)"
               className="
                 w-9 h-9 flex items-center justify-center
@@ -738,6 +748,7 @@ export const OmniChatBar: React.FC = () => {
                 text-neutral-500 dark:text-neutral-400
                 hover:bg-slate-200 dark:hover:bg-neutral-700
                 transition
+                disabled:opacity-40 disabled:cursor-not-allowed
               "
             >
               <Paperclip className="w-4 h-4" />
@@ -753,7 +764,9 @@ export const OmniChatBar: React.FC = () => {
             onKeyDown={handleKeyDown}
             onFocus={() => hasMessages && setIsExpanded(true)}
             placeholder={
-              isListening
+              isLoading
+                ? '🧠 Gemini가 요청을 분석하고 화면을 업데이트하고 있습니다...'
+                : isListening
                 ? '🎙️ 단방향 음성 인식 중... (말을 멈춰도 유지됨, 전송 또는 마이크 재클릭)'
                 : '무엇이든 물어보세요 — 일정·지출·템플릿·개발 등 (Enter 전송)'
             }
@@ -768,7 +781,7 @@ export const OmniChatBar: React.FC = () => {
               focus:outline-none focus:ring-2 focus:ring-amber-400/40 dark:focus:ring-amber-500/30
               placeholder:text-neutral-400 dark:placeholder:text-neutral-500
               transition
-              disabled:opacity-60
+              disabled:opacity-60 disabled:cursor-not-allowed
             "
           />
 
@@ -782,6 +795,7 @@ export const OmniChatBar: React.FC = () => {
               w-10 h-10 min-w-[40px] shrink-0
               flex items-center justify-center
               rounded-xl transition
+              disabled:opacity-40 disabled:cursor-not-allowed
               ${isListening
                 ? 'bg-rose-500 text-white animate-pulse ring-4 ring-rose-200 dark:ring-rose-900/50 shadow-lg shadow-rose-500/30'
                 : 'bg-slate-100 dark:bg-neutral-800 text-neutral-500 dark:text-neutral-400 hover:bg-slate-200 dark:hover:bg-neutral-700'
@@ -813,7 +827,7 @@ export const OmniChatBar: React.FC = () => {
             title="전송"
           >
             {isLoading ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
+              <Loader2 className="w-4 h-4 animate-spin text-amber-500" />
             ) : (
               <Send className="w-4 h-4" />
             )}
