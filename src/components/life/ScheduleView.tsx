@@ -13,7 +13,8 @@ import {
   Trash2, 
   MapPin,
   ListOrdered,
-  CalendarDays
+  CalendarDays,
+  Sparkles
 } from 'lucide-react';
 import type { LifeScheduleItem } from '../../services/notionLifeHubSync';
 import { ScheduleDrawer } from './ScheduleDrawer';
@@ -26,6 +27,7 @@ interface ScheduleViewProps {
   onDeleteItem: (item: LifeScheduleItem) => void;
   onQuickCapture: () => void;
   onAddScheduleFromTodo?: (todoData: any, targetDate: string, targetTime: string) => void;
+  onRescheduleNaturalLanguage?: (query: string) => Promise<boolean>;
   isCompact?: boolean;
 }
 
@@ -35,10 +37,38 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
   onDeleteItem,
   onQuickCapture,
   onAddScheduleFromTodo,
+  onRescheduleNaturalLanguage,
   isCompact = false
 }) => {
   // 1. 뷰 모드: 월간, 주간, 일일
   const [viewMode, setViewMode] = useState<ScheduleViewMode>('month');
+
+  // AI 자연어 리스케줄 입력 상태
+  const [rescheduleText, setRescheduleText] = useState('');
+  const [isRescheduling, setIsRescheduling] = useState(false);
+  const [rescheduleResult, setRescheduleResult] = useState<{ success: boolean; message: string } | null>(null);
+
+  const handleTriggerReschedule = async (customText?: string) => {
+    const textToRun = (customText || rescheduleText).trim();
+    if (!textToRun || !onRescheduleNaturalLanguage) return;
+
+    setIsRescheduling(true);
+    setRescheduleResult(null);
+    try {
+      const ok = await onRescheduleNaturalLanguage(textToRun);
+      if (ok) {
+        setRescheduleResult({ success: true, message: '일정이 성공적으로 이동되었습니다.' });
+        setRescheduleText('');
+      } else {
+        setRescheduleResult({ success: false, message: '일치하는 일정을 찾지 못했거나 이동할 수 없습니다.' });
+      }
+    } catch (e: any) {
+      setRescheduleResult({ success: false, message: e.message || '일정 이동 중 오류가 발생했습니다.' });
+    } finally {
+      setIsRescheduling(false);
+      setTimeout(() => setRescheduleResult(null), 4000);
+    }
+  };
 
   // 기준 날짜 (2026-09-18)
   const [currentDate, setCurrentDate] = useState<Date>(() => new Date(2026, 8, 18)); // 2026년 9월 18일
@@ -671,6 +701,76 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
           <span className="whitespace-nowrap">{isCompact ? '등록' : '새 일정 등록'}</span>
         </button>
       </div>
+
+      {/* 1.5. AI 자연어 일정 연기 및 변경 바 */}
+      {onRescheduleNaturalLanguage && (
+        <div className="p-2 sm:p-2.5 rounded-2xl bg-gradient-to-r from-amber-500/10 via-orange-500/5 to-transparent border border-amber-200/80 dark:border-amber-900/40 space-y-1.5">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+            <div className="flex items-center space-x-1.5 text-xs font-bold text-amber-800 dark:text-amber-400 shrink-0">
+              <Sparkles className="w-4 h-4 text-amber-500 shrink-0" />
+              <span className="whitespace-nowrap">AI 자연어 일정 변경</span>
+            </div>
+
+            <div className="flex-1 flex items-center gap-1.5 bg-white dark:bg-neutral-900 border border-slate-200 dark:border-neutral-700 rounded-xl px-2.5 py-1.5 shadow-2xs">
+              <input
+                type="text"
+                value={rescheduleText}
+                onChange={(e) => setRescheduleText(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleTriggerReschedule();
+                }}
+                placeholder='예: "21일 일정을 28일로 연기해줘" 또는 "내일 일정을 다음주 월요일로 미뤄줘"'
+                className="w-full text-xs bg-transparent text-slate-800 dark:text-neutral-100 placeholder:text-slate-400 dark:placeholder:text-neutral-500 focus:outline-none"
+              />
+              <button
+                type="button"
+                onClick={() => handleTriggerReschedule()}
+                disabled={isRescheduling || !rescheduleText.trim()}
+                className="px-3 py-1 rounded-lg bg-amber-500 hover:bg-amber-600 disabled:opacity-40 text-white font-bold text-xs transition cursor-pointer whitespace-nowrap shadow-2xs shrink-0"
+              >
+                {isRescheduling ? '변경 중...' : '일정 이동'}
+              </button>
+            </div>
+          </div>
+
+          {/* 퀵 프리셋 칩 & 피드백 메시지 */}
+          <div className="flex items-center justify-between flex-wrap gap-1 text-[11px]">
+            <div className="flex items-center space-x-1.5 flex-wrap gap-y-1">
+              <span className="text-slate-500 dark:text-neutral-400 text-[10px] font-medium whitespace-nowrap">퀵 실행 예시:</span>
+              <button
+                type="button"
+                onClick={() => {
+                  setRescheduleText('21일 일정을 28일로 연기해줘');
+                  handleTriggerReschedule('21일 일정을 28일로 연기해줘');
+                }}
+                className="px-2 py-0.5 rounded-md bg-white dark:bg-neutral-800 hover:bg-amber-50 dark:hover:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800/60 font-medium transition cursor-pointer whitespace-nowrap"
+              >
+                💡 "21일 일정을 28일로 연기해줘"
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setRescheduleText('내일 일정을 다음주 월요일로 미뤄줘');
+                  handleTriggerReschedule('내일 일정을 다음주 월요일로 미뤄줘');
+                }}
+                className="px-2 py-0.5 rounded-md bg-white dark:bg-neutral-800 hover:bg-slate-100 dark:hover:bg-neutral-700 text-slate-600 dark:text-neutral-300 border border-slate-200 dark:border-neutral-700 font-medium transition cursor-pointer whitespace-nowrap"
+              >
+                "내일 일정을 다음주 월요일로 미뤄줘"
+              </button>
+            </div>
+
+            {rescheduleResult && (
+              <span className={`text-[11px] font-bold px-2 py-0.5 rounded-md whitespace-nowrap ${
+                rescheduleResult.success 
+                  ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300' 
+                  : 'bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300'
+              }`}>
+                {rescheduleResult.message}
+              </span>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* 2. 뷰 본문 렌더링 */}
       {viewMode === 'month' && renderMonthView()}

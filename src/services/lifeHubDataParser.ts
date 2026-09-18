@@ -114,7 +114,34 @@ export function extractQuickCaptureLifeItems(): {
       } else if (!dateStr) {
         dateStr = new Date(rec.timestamp).toISOString().split('T')[0];
       }
-      
+
+      // 일정 연기/변경(Reschedule) 액션 처리: 중복 생성 차단 및 기존 일정 날짜 갱신
+      if (task.properties?.['액션'] === 'reschedule') {
+        const srcDate = String(task.properties?.['기존날짜'] || '');
+        const tgtDate = String(task.properties?.['변경날짜'] || dateStr);
+        const kw = String(task.properties?.['키워드'] || '');
+
+        // 1. 이미 추출된 일정 목록에서 소스 날짜 일정을 찾아 날짜 갱신
+        const existingIdx = schedules.findIndex(s => 
+          (s.date.startsWith(srcDate) || (srcDate.length <= 2 && s.date.split('-')[2]?.startsWith(srcDate))) &&
+          (!kw || s.title.includes(kw) || s.category.includes(kw))
+        );
+
+        if (existingIdx !== -1) {
+          const prevTime = schedules[existingIdx].date.split(' ')[1] || '10:00';
+          const updatedDate = `${tgtDate} ${prevTime}`;
+          schedules[existingIdx] = {
+            ...schedules[existingIdx],
+            date: updatedDate,
+            start: `${tgtDate}T${prevTime}:00`,
+            end: `${tgtDate}T${parseInt(prevTime.split(':')[0], 10) + 1}:00:00`,
+            dday: calculateDDay(updatedDate)
+          };
+        }
+        // 신규 중복 일정으로 등록되지 않도록 반환
+        return;
+      }
+
       if (task.intent === 'expense' || task.properties?.['금액']) {
         const amt = Number(String(task.properties?.['금액'] || 0).replace(/[^0-9.-]+/g, '')) || 0;
         const cat = task.properties?.['분류'] || (/식사|식비|점심|저녁|카페|커피|간식/.test(taskTitle) ? '식비' : /택시|지하철|버스|주유/.test(taskTitle) ? '교통' : '기타');

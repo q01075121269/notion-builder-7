@@ -170,3 +170,66 @@ export function removeTaskFromQuickCapture(taskIdOrKey: string, title?: string):
     console.error('Failed to remove task from quick capture storage:', e);
   }
 }
+
+/**
+ * 퀵 캡처 저장소 내부의 특정 일정 날짜를 새로운 날짜로 연기/변경(Reschedule)
+ * 기존 일정 ID의 날짜를 갱신하며, 중복 일정이 새로 생성되지 않도록 처리
+ */
+export function rescheduleTaskInQuickCapture(
+  sourceDate: string, 
+  targetDate: string, 
+  keyword?: string
+): { success: boolean; updatedTitle?: string; updatedPageId?: string } {
+  try {
+    const records = getQuickCaptureRecords();
+    let isChanged = false;
+    let updatedTitle = '';
+    let updatedPageId = '';
+
+    const updated = records.map(rec => {
+      const updatedTasks = rec.tasks.map(task => {
+        const taskDate = String(task.properties?.['일정'] || task.properties?.['날짜'] || '');
+        const taskTitle = task.title || '';
+        
+        // 날짜 매칭 확인 (예: sourceDate가 "2026-09-21"이거나 "21")
+        const isDateMatch = taskDate.includes(sourceDate) || (sourceDate.length <= 2 && taskDate.split('-')[2]?.startsWith(sourceDate));
+        const isKeywordMatch = !keyword || taskTitle.includes(keyword) || (task.properties?.['분류'] || '').includes(keyword);
+
+        if (isDateMatch && isKeywordMatch && !isChanged) {
+          isChanged = true;
+          updatedTitle = taskTitle;
+          const prevTime = taskDate.includes(' ') ? taskDate.split(' ')[1] : '';
+          const newDateWithTime = prevTime ? `${targetDate} ${prevTime}` : targetDate;
+          
+          const pUrl = rec.notionPageUrls?.[0];
+          if (pUrl) {
+            updatedPageId = pUrl.split('/').pop()?.split('?')[0]?.replace(/-/g, '') || '';
+          }
+
+          return {
+            ...task,
+            properties: {
+              ...task.properties,
+              '일정': newDateWithTime,
+              '날짜': newDateWithTime
+            }
+          };
+        }
+        return task;
+      });
+
+      return {
+        ...rec,
+        tasks: updatedTasks
+      };
+    });
+
+    if (isChanged) {
+      localStorage.setItem(QUICK_CAPTURE_STORAGE_KEY, JSON.stringify(updated));
+    }
+    return { success: isChanged, updatedTitle, updatedPageId };
+  } catch (e) {
+    console.error('Failed to reschedule task in quick capture storage:', e);
+    return { success: false };
+  }
+}

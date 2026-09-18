@@ -38,8 +38,10 @@ import {
 import { 
   getDeletedLifeItemIds, 
   markLifeItemAsDeleted, 
-  removeTaskFromQuickCapture 
+  removeTaskFromQuickCapture,
+  rescheduleTaskInQuickCapture 
 } from '../../services/quickCaptureStorage';
+import { detectReschedulePattern } from '../../services/quickCaptureLocalParser';
 import { ScheduleView } from '../../components/life/ScheduleView';
 import { TodoManagerView } from '../../components/life/TodoManagerView';
 import { ExpenseAnalyticsView } from '../../components/life/ExpenseAnalyticsView';
@@ -48,6 +50,13 @@ import { EmailManagerView, type LifeEmailItem } from '../../components/life/Emai
 // 사용자 동선 우선순위 재배치: 1. 스마트일정 -> 2. 스마트할일 -> 3. 가계부 -> 4. 이메일 요약
 type LifeHubTab = 'schedule' | 'todo' | 'expense' | 'email';
 type ViewMode = 'tabs' | 'grid';
+
+// 15분 단위 시간 셀렉터 옵션 목록 (총 96개 슬롯)
+const TIME_PICKER_OPTIONS = Array.from({ length: 96 }, (_, i) => {
+  const h = Math.floor(i / 4);
+  const m = (i % 4) * 15;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+});
 
 const INITIAL_DEMO_SCHEDULES: LifeScheduleItem[] = [
   { 
@@ -465,10 +474,13 @@ export const LifePage: React.FC = () => {
   const [isLoadingNotion, setIsLoadingNotion] = useState<boolean>(false);
   const [lastSyncTime, setLastSyncTime] = useState<string>('');
 
-  // 일정 수정 팝업 상태
+  // 일정 수정 팝업 상태 (모던 Date & Time Picker)
   const [editingItem, setEditingItem] = useState<LifeScheduleItem | null>(null);
   const [editTitle, setEditTitle] = useState<string>('');
-  const [editDate, setEditDate] = useState<string>('');
+  const [editDateOnly, setEditDateOnly] = useState<string>('2026-09-18');
+  const [editStartTime, setEditStartTime] = useState<string>('10:00');
+  const [editEndTime, setEditEndTime] = useState<string>('11:00');
+  const [editIsAllDay, setEditIsAllDay] = useState<boolean>(false);
   const [editCategory, setEditCategory] = useState<string>('일정');
   const [editStatus, setEditStatus] = useState<string>('미완료');
   const [isSavingEdit, setIsSavingEdit] = useState<boolean>(false);
@@ -476,19 +488,43 @@ export const LifePage: React.FC = () => {
   const handleOpenEditModal = (item: LifeScheduleItem) => {
     setEditingItem(item);
     setEditTitle(item.title);
-    setEditDate(item.date);
     setEditCategory(item.category || '일정');
     setEditStatus(item.status || '미완료');
+
+    // 날짜 및 시작/종료 시각 파싱
+    const rawDate = item.date || item.start || '2026-09-18';
+    const datePart = rawDate.split('T')[0].split(' ')[0].trim();
+    setEditDateOnly(datePart);
+
+    const hasTime = rawDate.includes(' ') || rawDate.includes('T');
+    if (hasTime) {
+      const timePart = rawDate.includes(' ') ? rawDate.split(' ')[1] : rawDate.split('T')[1]?.slice(0, 5);
+      setEditStartTime(timePart || '10:00');
+      const startH = parseInt((timePart || '10').split(':')[0], 10);
+      const endH = String(Math.min(23, startH + 1)).padStart(2, '0');
+      const endM = (timePart || '10:00').split(':')[1] || '00';
+      setEditEndTime(item.end ? item.end.split('T')[1]?.slice(0, 5) || `${endH}:${endM}` : `${endH}:${endM}`);
+      setEditIsAllDay(false);
+    } else {
+      setEditStartTime('10:00');
+      setEditEndTime('11:00');
+      setEditIsAllDay(true);
+    }
   };
 
   const handleSaveEdit = async () => {
     if (!editingItem || !editTitle.trim()) return;
     setIsSavingEdit(true);
+
+    const finalDate = editIsAllDay ? editDateOnly : `${editDateOnly} ${editStartTime}`;
+    const finalStart = `${editDateOnly}T${editStartTime}:00`;
+    const finalEnd = `${editDateOnly}T${editEndTime}:00`;
+
     try {
       if (notionApiKey && editingItem.notionPageId) {
         await updateNotionPage(notionApiKey, editingItem.notionPageId, {
           title: editTitle.trim(),
-          date: editDate,
+          date: finalDate,
           category: editCategory,
           status: editStatus
         });
@@ -499,8 +535,10 @@ export const LifePage: React.FC = () => {
           return {
             ...item,
             title: editTitle.trim(),
-            date: editDate,
-            dday: calculateDDay(editDate),
+            date: finalDate,
+            start: finalStart,
+            end: finalEnd,
+            dday: calculateDDay(finalDate),
             category: editCategory,
             status: editStatus
           };
@@ -515,13 +553,76 @@ export const LifePage: React.FC = () => {
         return t;
       }));
 
+      showToast(`'${editTitle.trim()}' 일정이 성공적으로 수정되었습니다.`, 'success');
       setEditingItem(null);
     } catch (e) {
       console.error('일정 수정 실패:', e);
-      alert('일정 수정 중 오류가 발생했습니다.');
+      showToast('일정 수정 중 오류가 발생했습니다.', 'error');
     } finally {
       setIsSavingEdit(false);
     }
+  };
+
+  // AI 자연어 일정 변경/연기(Reschedule) 핸들러
+  // 예: "21일 일정을 28일로 연기해줘" 입력 시 기존 일정 날짜를 2026-09-28로 정확히 갱신
+  const handleRescheduleNaturalLanguage = async (inputQuery: string): Promise<boolean> => {
+    const match = detectReschedulePattern(inputQuery);
+    if (!match) {
+      showToast('변경 대상 일정과 변경할 날짜를 감지하지 못했습니다. (예: "21일 일정을 28일로 연기해줘")', 'info');
+      return false;
+    }
+
+    const { sourceDateQuery, targetDateStr, keyword } = match;
+
+    // 기존 일정 목록에서 대상 일정 탐색
+    const targetIdx = scheduleItems.findIndex(s => 
+      (s.date.startsWith(sourceDateQuery) || (sourceDateQuery.length <= 2 && s.date.split('-')[2]?.startsWith(sourceDateQuery))) &&
+      (!keyword || s.title.includes(keyword) || s.category.includes(keyword))
+    );
+
+    if (targetIdx === -1) {
+      showToast(`'${sourceDateQuery}'에 예정된 일정을 찾을 수 없습니다.`, 'info');
+      return false;
+    }
+
+    const targetItem = scheduleItems[targetIdx];
+    const prevTime = targetItem.date.includes(' ') ? targetItem.date.split(' ')[1] : '10:00';
+    const newDateWithTime = `${targetDateStr} ${prevTime}`;
+    const newStart = `${targetDateStr}T${prevTime}:00`;
+    const newEnd = `${targetDateStr}T${parseInt(prevTime.split(':')[0], 10) + 1}:00:00`;
+
+    // 1. 상태 갱신 (중복 생성 없이 기존 일정의 날짜 값 갱신)
+    setScheduleItems(prev => {
+      const copy = [...prev];
+      copy[targetIdx] = {
+        ...targetItem,
+        date: newDateWithTime,
+        start: newStart,
+        end: newEnd,
+        dday: calculateDDay(newDateWithTime)
+      };
+      return copy;
+    });
+
+    // 2. 로컬 퀵 캡처 저장소 갱신
+    rescheduleTaskInQuickCapture(sourceDateQuery, targetDateStr, keyword);
+
+    // 3. 노션 원격 클라우드 페이지 갱신
+    try {
+      if (notionApiKey && targetItem.notionPageId) {
+        await updateNotionPage(notionApiKey, targetItem.notionPageId, {
+          title: targetItem.title,
+          date: targetDateStr,
+          category: targetItem.category,
+          status: targetItem.status || '미완료'
+        });
+      }
+    } catch (e) {
+      console.warn('노션 원격 일정 날짜 갱신 중 경고:', e);
+    }
+
+    showToast(`'${targetItem.title}' 일정이 ${targetDateStr}로 성공적으로 연기되었습니다! (ID 유지, 중복 방지)`, 'success');
+    return true;
   };
 
   // 일정 영구 삭제 처리 (로컬 스토리지 + 퀵 캡처 저장소 + 노션 클라우드 동시 파기)
@@ -676,6 +777,7 @@ export const LifePage: React.FC = () => {
         onDeleteItem={handleDeleteItem}
         onQuickCapture={() => setCurrentView('quick_capture')}
         onAddScheduleFromTodo={handleScheduleTodoFromTask}
+        onRescheduleNaturalLanguage={handleRescheduleNaturalLanguage}
         isCompact={isCompact}
       />
     </ErrorBoundary>
@@ -951,17 +1053,107 @@ export const LifePage: React.FC = () => {
                   />
                 </div>
 
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-neutral-300 mb-1 whitespace-nowrap">
-                    날짜 및 시간
-                  </label>
+                {/* 1. 날짜 피커 (미니 달력 팝업 + 퀵 프리셋) */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-neutral-300 whitespace-nowrap">
+                      날짜 선택
+                    </label>
+                    <div className="flex items-center space-x-1">
+                      <button
+                        type="button"
+                        onClick={() => setEditDateOnly('2026-09-18')}
+                        className="px-1.5 py-0.5 text-[10px] rounded bg-slate-100 dark:bg-neutral-800 hover:bg-slate-200 text-slate-600 dark:text-neutral-400 font-semibold transition"
+                      >
+                        오늘
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEditDateOnly('2026-09-19')}
+                        className="px-1.5 py-0.5 text-[10px] rounded bg-slate-100 dark:bg-neutral-800 hover:bg-slate-200 text-slate-600 dark:text-neutral-400 font-semibold transition"
+                      >
+                        내일
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEditDateOnly('2026-09-21')}
+                        className="px-1.5 py-0.5 text-[10px] rounded bg-slate-100 dark:bg-neutral-800 hover:bg-slate-200 text-slate-600 dark:text-neutral-400 font-semibold transition"
+                      >
+                        21일
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEditDateOnly('2026-09-28')}
+                        className="px-1.5 py-0.5 text-[10px] rounded bg-blue-50 dark:bg-blue-950/50 hover:bg-blue-100 text-blue-600 dark:text-blue-400 font-semibold transition"
+                      >
+                        28일(연기)
+                      </button>
+                    </div>
+                  </div>
                   <input
-                    type="text"
-                    value={editDate}
-                    onChange={(e) => setEditDate(e.target.value)}
-                    className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-neutral-800 border border-slate-300 dark:border-neutral-700 rounded-xl font-medium focus:outline-none focus:ring-2 focus:ring-amber-500"
-                    placeholder="2026-09-21"
+                    type="date"
+                    value={editDateOnly}
+                    onChange={(e) => setEditDateOnly(e.target.value)}
+                    className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-neutral-800 border border-slate-300 dark:border-neutral-700 rounded-xl font-medium focus:outline-none focus:ring-2 focus:ring-amber-500 cursor-pointer"
                   />
+                </div>
+
+                {/* 2. 시간 선택 (15분/30분 단위 셀렉터 & 종일 토글) */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-neutral-300 whitespace-nowrap">
+                      시간 설정
+                    </label>
+                    <label className="flex items-center space-x-1.5 text-xs text-slate-600 dark:text-neutral-400 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={editIsAllDay}
+                        onChange={(e) => setEditIsAllDay(e.target.checked)}
+                        className="rounded border-slate-300 text-amber-500 focus:ring-amber-500 w-3.5 h-3.5"
+                      />
+                      <span className="text-[11px] font-medium whitespace-nowrap">종일(All Day)</span>
+                    </label>
+                  </div>
+
+                  {!editIsAllDay ? (
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <span className="block text-[10px] text-slate-500 dark:text-neutral-400 mb-0.5">시작 시각</span>
+                        <select
+                          value={editStartTime}
+                          onChange={(e) => {
+                            setEditStartTime(e.target.value);
+                            if (e.target.value >= editEndTime) {
+                              const [h, m] = e.target.value.split(':').map(Number);
+                              const newEndH = (h + 1) % 24;
+                              setEditEndTime(`${String(newEndH).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
+                            }
+                          }}
+                          className="w-full px-2.5 py-1.5 text-xs bg-slate-50 dark:bg-neutral-800 border border-slate-300 dark:border-neutral-700 rounded-xl font-medium focus:outline-none focus:ring-2 focus:ring-amber-500 cursor-pointer"
+                        >
+                          {TIME_PICKER_OPTIONS.map(time => (
+                            <option key={time} value={time}>{time}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] text-slate-500 dark:text-neutral-400 mb-0.5">종료 시각</span>
+                        <select
+                          value={editEndTime}
+                          onChange={(e) => setEditEndTime(e.target.value)}
+                          className="w-full px-2.5 py-1.5 text-xs bg-slate-50 dark:bg-neutral-800 border border-slate-300 dark:border-neutral-700 rounded-xl font-medium focus:outline-none focus:ring-2 focus:ring-amber-500 cursor-pointer"
+                        >
+                          {TIME_PICKER_OPTIONS.map(time => (
+                            <option key={time} value={time}>{time}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="p-2 rounded-xl bg-slate-100 dark:bg-neutral-800/60 text-slate-500 dark:text-neutral-400 text-[11px] text-center font-medium">
+                      ☀️ 종일 일정으로 등록됩니다 (시간 미지정)
+                    </div>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">

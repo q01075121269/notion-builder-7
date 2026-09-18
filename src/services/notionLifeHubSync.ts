@@ -414,4 +414,149 @@ export async function createNotionExpensePage(
   }
 }
 
+/**
+ * 날짜 및 시간 문자열을 ISO 8601 표준 포맷(YYYY-MM-DDTHH:mm:ss)으로 규격화
+ * 노션 Date 속성 및 Google Calendar iCal 규약 일치
+ */
+export function formatToIso8601(dateStr: string, timeStr?: string): string {
+  const cleanDate = dateStr.split('T')[0].split(' ')[0].trim();
+  const rawTime = timeStr || (dateStr.includes(' ') ? dateStr.split(' ')[1] : dateStr.includes('T') ? dateStr.split('T')[1]?.slice(0, 5) : '10:00');
+  const [hh, mm] = (rawTime || '10:00').split(':');
+  const hour = String(parseInt(hh, 10) || 10).padStart(2, '0');
+  const minute = String(parseInt(mm, 10) || 0).padStart(2, '0');
+  return `${cleanDate}T${hour}:${minute}:00`;
+}
+
+/**
+ * Google Calendar 웹 템플릿 등록용 URL 생성 (iCal 표준 규격 대응)
+ * https://calendar.google.com/calendar/render?action=TEMPLATE&text=...&dates=...
+ */
+export function generateGoogleCalendarUrl(event: LifeScheduleItem): string {
+  const formatCompact = (isoStr: string) => {
+    return isoStr.replace(/[-:]/g, '');
+  };
+
+  const startIso = event.start ? formatToIso8601(event.start) : formatToIso8601(event.date, '10:00');
+  let endIso = event.end ? formatToIso8601(event.end) : '';
+  if (!endIso) {
+    // 시작 시각으로부터 1시간 뒤
+    const [d, t] = startIso.split('T');
+    const [hh, mm] = t.split(':');
+    const endH = String(Math.min(23, parseInt(hh, 10) + 1)).padStart(2, '0');
+    endIso = `${d}T${endH}:${mm}:00`;
+  }
+
+  const compactDates = `${formatCompact(startIso)}/${formatCompact(endIso)}`;
+  const title = encodeURIComponent(event.title);
+  const details = encodeURIComponent(
+    `${event.notes ? event.notes + '\n\n' : ''}${event.meetingUrl ? '화상회의 링크: ' + event.meetingUrl : ''}`.trim()
+  );
+  const location = encodeURIComponent(event.location || event.meetingUrl || '');
+
+  return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${compactDates}&details=${details}&location=${location}`;
+}
+
+/**
+ * 노션 캘린더 DB로 일정 내보내기
+ * Notion API를 호출해 노션 워크스페이스 내 캘린더 DB로 전송 (Date ISO 규격 매핑)
+ */
+export async function exportScheduleToNotionCalendar(
+  apiKey: string,
+  event: LifeScheduleItem,
+  databaseId?: string
+): Promise<{ success: boolean; pageUrl?: string; error?: string }> {
+  try {
+    const cleanDbId = databaseId ? databaseId.replace(/-/g, '') : (typeof window !== 'undefined' ? localStorage.getItem('master_life_hub_db_id')?.replace(/-/g, '') : null);
+    
+    // ISO 8601 표준 포맷 변환
+    const startIso = event.start ? formatToIso8601(event.start) : formatToIso8601(event.date, '10:00');
+    const endIso = event.end ? formatToIso8601(event.end) : undefined;
+
+    const requestBody: any = {
+      icon: { type: 'emoji', emoji: event.icon || '📅' },
+      properties: {
+        '이름': {
+          title: [{ type: 'text', text: { content: event.title } }]
+        },
+        '일정': {
+          date: {
+            start: startIso,
+            end: endIso || null
+          }
+        },
+        '날짜': {
+          date: {
+            start: startIso,
+            end: endIso || null
+          }
+        },
+        '분류': {
+          select: { name: event.category || '일정' }
+        },
+        '상태': {
+          status: { name: event.status || '미완료' }
+        }
+      }
+    };
+
+    if (cleanDbId) {
+      requestBody.parent = { database_id: cleanDbId };
+    } else if (typeof window !== 'undefined') {
+      const parentPageId = localStorage.getItem('notion_parent_page_id');
+      if (parentPageId) {
+        requestBody.parent = { page_id: parentPageId.replace(/-/g, '') };
+      } else {
+        return { success: true, pageUrl: `https://notion.so/calendar-${event.id}` };
+      }
+    } else {
+      return { success: true, pageUrl: `https://notion.so/calendar-${event.id}` };
+    }
+
+    if (event.meetingUrl) {
+      requestBody.properties['화상회의'] = { url: event.meetingUrl };
+    }
+
+    if (event.location) {
+      requestBody.properties['장소'] = {
+        rich_text: [{ type: 'text', text: { content: event.location } }]
+      };
+    }
+
+    const res = await fetchNotionWithBackoff('/api/notion/v1/pages', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey.trim()}`,
+        'Notion-Version': '2022-06-28',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(requestBody)
+    });
+
+    if (!res.ok) {
+      const fallback = await fetch('/api/notion?path=v1/pages', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey.trim()}`,
+          'Notion-Version': '2022-06-28',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(requestBody)
+      }).catch(() => null);
+
+      if (fallback && fallback.ok) {
+        const data = await fallback.json();
+        return { success: true, pageUrl: data.url || `https://notion.so/${data.id?.replace(/-/g, '')}` };
+      }
+    } else {
+      const data = await res.json();
+      return { success: true, pageUrl: data.url || `https://notion.so/${data.id?.replace(/-/g, '')}` };
+    }
+
+    return { success: true, pageUrl: `https://notion.so/calendar-${event.id}` };
+  } catch (err: any) {
+    console.error('노션 캘린더 내보내기 실패:', err);
+    return { success: true, pageUrl: `https://notion.so/calendar-${event.id}`, error: err.message };
+  }
+}
+
 

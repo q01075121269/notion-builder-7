@@ -135,9 +135,103 @@ export function extractDateFromKoreanText(text: string, baseDate = new Date()): 
   return { dateStr, timeStr, isExplicitDate };
 }
 
+export interface RescheduleMatch {
+  isReschedule: boolean;
+  sourceDateQuery: string; // 예: "2026-09-21"
+  targetDateStr: string;   // 예: "2026-09-28"
+  keyword?: string;        // 예: "회의", "치과", "일정"
+  originalText: string;
+}
+
+/**
+ * 한국어 자연어 일정 변경/연기(Reschedule) 패턴 감지
+ * 예: "21일 일정을 28일로 연기해줘", "21일 회의 28일로 변경해줘", "내일 일정을 28일로 미뤄줘"
+ */
+export function detectReschedulePattern(text: string, baseDate = new Date()): RescheduleMatch | null {
+  const clean = text.trim();
+  const rescheduleVerbs = /(연기|미뤄|변경|이동|옮겨|미루|바꿔)/;
+  if (!rescheduleVerbs.test(clean)) return null;
+
+  const y = baseDate.getFullYear();
+
+  // 패턴 1: "21일 ... 28일로 (연기|변경|...)"
+  const m1 = clean.match(/(?:(\d{1,2})월\s*)?(\d{1,2})일(?:\s*([가-힣a-zA-Z0-9]+))?(?:을|를|에서)?\s*(?:(?:(\d{1,2})월\s*)?(\d{1,2})일)(?:로|에)?\s*(?:연기|미뤄|변경|이동|옮겨|미루|바꿔)/);
+  if (m1) {
+    const srcMonth = m1[1] ? parseInt(m1[1], 10) - 1 : baseDate.getMonth();
+    const srcDay = parseInt(m1[2], 10);
+    const keyword = (m1[3] || '').replace(/(일정|약속)/g, '').trim();
+    const tgtMonth = m1[4] ? parseInt(m1[4], 10) - 1 : (m1[1] ? srcMonth : baseDate.getMonth());
+    const tgtDay = parseInt(m1[5], 10);
+
+    const srcDateStr = `${y}-${String(srcMonth + 1).padStart(2, '0')}-${String(srcDay).padStart(2, '0')}`;
+    const tgtDateStr = `${y}-${String(tgtMonth + 1).padStart(2, '0')}-${String(tgtDay).padStart(2, '0')}`;
+
+    return {
+      isReschedule: true,
+      sourceDateQuery: srcDateStr,
+      targetDateStr: tgtDateStr,
+      keyword,
+      originalText: clean
+    };
+  }
+
+  // 패턴 2: "내일 일정을 28일로 연기"
+  if (clean.includes('내일')) {
+    const dayMatch = clean.match(/(\d{1,2})일(?:로|에)?\s*(?:연기|미뤄|변경|이동|옮겨|미루|바꿔)/);
+    if (dayMatch) {
+      const tomorrow = new Date(baseDate);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const srcDateStr = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}`;
+      const tgtDay = parseInt(dayMatch[1], 10);
+      const tgtDateStr = `${y}-${String(baseDate.getMonth() + 1).padStart(2, '0')}-${String(tgtDay).padStart(2, '0')}`;
+
+      return {
+        isReschedule: true,
+        sourceDateQuery: srcDateStr,
+        targetDateStr: tgtDateStr,
+        keyword: '',
+        originalText: clean
+      };
+    }
+  }
+
+  return null;
+}
+
 export function parseQuickTextLocally(rawText: string): QuickCaptureAnalysisResult {
   const text = rawText.trim();
   const tasks: RoutedNotionTask[] = [];
+
+  // 0. 일정 연기/변경(Reschedule) 패턴 우선 탐지
+  const reschedule = detectReschedulePattern(text);
+  if (reschedule) {
+    tasks.push({
+      id: `task-resched-${Date.now()}`,
+      intent: 'schedule',
+      targetDbHint: '일정/캘린더 DB (일정 변경)',
+      title: `일정 변경: ${reschedule.sourceDateQuery} ➔ ${reschedule.targetDateStr}`,
+      suggestedIcon: '🔄',
+      summary: `${reschedule.sourceDateQuery} 일정을 ${reschedule.targetDateStr}로 정상 연기/변경합니다.`,
+      properties: {
+        '이름': `일정 변경: ${reschedule.targetDateStr}`,
+        '일정': reschedule.targetDateStr,
+        '날짜': reschedule.targetDateStr,
+        '액션': 'reschedule',
+        '기존날짜': reschedule.sourceDateQuery,
+        '변경날짜': reschedule.targetDateStr,
+        '키워드': reschedule.keyword || '',
+        '상태': '미완료',
+        '분류': '일정'
+      }
+    });
+
+    return {
+      rawInput: text,
+      correctedText: text,
+      detectedType: 'general_text',
+      tasks
+    };
+  }
 
   // 1. 날짜 및 시간 지능형 추출
   const { dateStr, timeStr, isExplicitDate } = extractDateFromKoreanText(text);

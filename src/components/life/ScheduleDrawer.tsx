@@ -16,10 +16,16 @@ import {
   Edit2, 
   Trash2, 
   CheckCircle2, 
-  Copy
+  Copy,
+  CalendarPlus,
+  Share2
 } from 'lucide-react';
 import type { LifeScheduleItem } from '../../services/notionLifeHubSync';
-import { createNotionMeetingNote } from '../../services/notionLifeHubSync';
+import { 
+  createNotionMeetingNote, 
+  generateGoogleCalendarUrl, 
+  exportScheduleToNotionCalendar 
+} from '../../services/notionLifeHubSync';
 import { useApp } from '../../context/AppContext';
 
 interface ScheduleDrawerProps {
@@ -40,6 +46,8 @@ export const ScheduleDrawer: React.FC<ScheduleDrawerProps> = ({
   const { notionApiKey, selectedNotionDbId, showToast } = useApp();
   const [isGeneratingNote, setIsGeneratingNote] = useState<boolean>(false);
   const [generatedNoteUrl, setGeneratedNoteUrl] = useState<string | null>(null);
+  const [isExportingCalendar, setIsExportingCalendar] = useState<boolean>(false);
+  const [exportedCalendarUrl, setExportedCalendarUrl] = useState<string | null>(null);
   const [copiedUrl, setCopiedUrl] = useState<boolean>(false);
 
   if (!isOpen || !event) return null;
@@ -76,6 +84,39 @@ export const ScheduleDrawer: React.FC<ScheduleDrawerProps> = ({
       showToast('회의록 생성 실패: ' + err.message, 'error');
     } finally {
       setIsGeneratingNote(false);
+    }
+  };
+
+  // [⚡ 노션 캘린더 DB로 내보내기] 핸들러
+  const handleExportNotionCalendar = async () => {
+    setIsExportingCalendar(true);
+    try {
+      const res = await exportScheduleToNotionCalendar(
+        notionApiKey,
+        event,
+        selectedNotionDbId || undefined
+      );
+      if (res.success && res.pageUrl) {
+        setExportedCalendarUrl(res.pageUrl);
+        showToast('⚡ 노션 캘린더 DB로 일정이 완벽히 내보내졌습니다!', 'success');
+      } else {
+        showToast(res.error || '노션 캘린더 전송 중 알림이 발생했습니다.', 'info');
+      }
+    } catch (err: any) {
+      showToast('노션 캘린더 내보내기 실패: ' + err.message, 'error');
+    } finally {
+      setIsExportingCalendar(false);
+    }
+  };
+
+  // [📅 구글 캘린더에 추가] 원클릭 핸들러
+  const handleOpenGoogleCalendar = () => {
+    try {
+      const url = generateGoogleCalendarUrl(event);
+      window.open(url, '_blank', 'noopener,noreferrer');
+      showToast('📅 구글 캘린더 등록 새 탭이 열렸습니다.', 'success');
+    } catch (err: any) {
+      showToast('구글 캘린더 연동 실패: ' + err.message, 'error');
     }
   };
 
@@ -309,14 +350,61 @@ export const ScheduleDrawer: React.FC<ScheduleDrawerProps> = ({
                 </a>
               </div>
             )}
+            {/* 생성된 노션 캘린더 바로가기 알림 카드 */}
+            {exportedCalendarUrl && (
+              <div className="p-3.5 rounded-xl border border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-950/40 flex items-center justify-between gap-3">
+                <div className="flex items-center space-x-2 min-w-0">
+                  <CheckCircle2 className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-xs font-bold text-blue-900 dark:text-blue-200 truncate">
+                      노션 캘린더로 내보내졌습니다!
+                    </p>
+                    <p className="text-[11px] text-blue-700 dark:text-blue-400">
+                      노션 Date 속성 표준 연동 완료
+                    </p>
+                  </div>
+                </div>
+                <a
+                  href={exportedCalendarUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold whitespace-nowrap shrink-0 transition"
+                >
+                  노션에서 보기
+                </a>
+              </div>
+            )}
           </div>
 
-          {/* 3. 서랍 하단 고정 액션 바 */}
-          <div className="p-4 sm:p-5 border-t border-slate-200 dark:border-neutral-800 bg-slate-50/90 dark:bg-neutral-900/90 backdrop-blur-md space-y-2">
+          {/* 3. 서랍 하단 고정 액션 바 (노션/구글 캘린더 2대 호환 버튼 & 회의록 생성) */}
+          <div className="p-4 sm:p-5 border-t border-slate-200 dark:border-neutral-800 bg-slate-50/95 dark:bg-neutral-900/95 backdrop-blur-md space-y-2.5">
+            {/* 2대 캘린더 호환 액션 버튼 (노션 캘린더 & 구글 캘린더) */}
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={handleExportNotionCalendar}
+                disabled={isExportingCalendar}
+                className="flex items-center justify-center space-x-1.5 py-2.5 px-3 min-h-[44px] rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 text-xs font-bold shadow-xs transition cursor-pointer active:scale-98 disabled:opacity-50 whitespace-nowrap"
+              >
+                <Share2 className={`w-3.5 h-3.5 ${isExportingCalendar ? 'animate-spin' : ''}`} />
+                <span className="truncate">
+                  {isExportingCalendar ? '내보내는 중...' : '⚡ 노션 캘린더로'}
+                </span>
+              </button>
+
+              <button
+                onClick={handleOpenGoogleCalendar}
+                className="flex items-center justify-center space-x-1.5 py-2.5 px-3 min-h-[44px] rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs transition cursor-pointer active:scale-98 whitespace-nowrap"
+              >
+                <CalendarPlus className="w-3.5 h-3.5" />
+                <span className="truncate">📅 구글 캘린더에 추가</span>
+              </button>
+            </div>
+
+            {/* 노션 회의록 원클릭 생성 버튼 */}
             <button
               onClick={handleCreateMeetingNote}
               disabled={isGeneratingNote}
-              className="w-full flex items-center justify-center space-x-2 py-3 px-4 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white text-xs sm:text-sm font-bold shadow-md transition cursor-pointer active:scale-98 disabled:opacity-50"
+              className="w-full flex items-center justify-center space-x-2 py-2.5 px-4 min-h-[44px] rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white text-xs sm:text-sm font-bold shadow-md transition cursor-pointer active:scale-98 disabled:opacity-50"
             >
               <Zap className={`w-4 h-4 ${isGeneratingNote ? 'animate-spin' : ''}`} />
               <span>
@@ -326,7 +414,7 @@ export const ScheduleDrawer: React.FC<ScheduleDrawerProps> = ({
               </span>
             </button>
             <p className="text-[11px] text-center text-slate-400 dark:text-neutral-500">
-              안건, 참석자, 기본 템플릿 블록이 포함된 회의록 페이지를 1클릭으로 제작합니다.
+              ISO 8601 표준 포맷 기반 구글·노션 캘린더 및 회의록 DB 실시간 연동
             </p>
           </div>
 
