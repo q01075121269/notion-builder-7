@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Palette, HardDrive, Trash2, RefreshCw, Film, Wand2 } from 'lucide-react';
+import { Palette, HardDrive, Trash2, RefreshCw, Film, Wand2, Music } from 'lucide-react';
 import { getRecentMediaItems, deleteMediaItem } from '../../lib/mediaStorage';
 import type { MediaItem } from '../../lib/mediaStorage';
 import { ImageStudioView } from './ImageStudioView';
+import { VideoStudioView } from './VideoStudioView';
 import { useApp } from '../../context/AppContext';
 
-export type MediaSubTab = 'IMAGE' | 'VIDEO';
+export type MediaSubTab = 'IMAGE' | 'VIDEO' | 'AUDIO';
 
 export const MediaLabView: React.FC = () => {
   const { showToast } = useApp();
@@ -13,8 +14,9 @@ export const MediaLabView: React.FC = () => {
   const [mediaList, setMediaList] = useState<MediaItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // 체인 파이프라인으로 전달될 비디오 시작 프레임
+  // 체인 파이프라인 데이터
   const [videoFirstFrame, setVideoFirstFrame] = useState<{ url: string; prompt: string } | null>(null);
+  const [audioTargetVideo, setAudioTargetVideo] = useState<{ title: string; duration: number } | null>(null);
 
   const loadMedia = async () => {
     setIsLoading(true);
@@ -42,11 +44,18 @@ export const MediaLabView: React.FC = () => {
     }
   };
 
-  // 이미지 캔버스 -> 비디오 체인 전송 핸들러
+  // 1단계 이미지 -> 2단계 비디오 체인 전송
   const handleTransferToVideo = (imageDataUrl: string, prompt: string) => {
     setVideoFirstFrame({ url: imageDataUrl, prompt });
     setActiveSubTab('VIDEO');
     showToast('🎬 캔버스 이미지가 제2단계 모션 영상 시작 프레임으로 연결되었습니다!', 'success');
+  };
+
+  // 2단계 비디오 -> 3단계 오디오 BGM 체인 전송
+  const handleTransferToAudio = (videoData: { title: string; scenesCount: number; totalDuration: number }) => {
+    setAudioTargetVideo({ title: videoData.title, duration: videoData.totalDuration });
+    setActiveSubTab('AUDIO');
+    showToast('🎵 완성된 모션 영상에 맞춤형 BGM을 입히는 3단계 모듈로 연결되었습니다!', 'success');
   };
 
   return (
@@ -72,41 +81,58 @@ export const MediaLabView: React.FC = () => {
                 </span>
               </div>
               <p className="text-xs text-slate-500 dark:text-neutral-400 mt-0.5 whitespace-nowrap">
-                스마트 이미지 캔버스 • 모션 영상 체인 파이프라인 • 1계층 IndexedDB 캐시
+                1단계 이미지 • 2단계 모션 영상 • 3단계 오디오 BGM 파이프라인
               </p>
             </div>
           </div>
 
-          {/* Sub Tab Switcher: [🖼️ 1단계 스마트 이미지 스튜디오 | 🎬 2단계 5초 모션 영상] */}
-          <div className="flex items-center bg-slate-200/70 dark:bg-neutral-800 p-1 rounded-2xl border border-slate-300/60 dark:border-neutral-700/60 shrink-0">
+          {/* Sub Tab Switcher */}
+          <div className="flex items-center bg-slate-200/70 dark:bg-neutral-800 p-1 rounded-2xl border border-slate-300/60 dark:border-neutral-700/60 shrink-0 overflow-x-auto no-scrollbar">
             <button
               onClick={() => setActiveSubTab('IMAGE')}
               className={`
-                flex items-center space-x-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition cursor-pointer whitespace-nowrap
+                flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer whitespace-nowrap
                 ${activeSubTab === 'IMAGE'
                   ? 'bg-white dark:bg-neutral-900 text-purple-700 dark:text-purple-300 shadow-sm'
                   : 'text-slate-600 dark:text-neutral-400 hover:text-slate-900 dark:hover:text-white'
                 }
               `}
             >
-              <Wand2 className="w-4 h-4 text-purple-500" />
-              <span className="whitespace-nowrap">1단계: 스마트 이미지 스튜디오</span>
+              <Wand2 className="w-3.5 h-3.5 text-purple-500" />
+              <span className="whitespace-nowrap">1. 이미지 스튜디오</span>
             </button>
 
             <button
               onClick={() => setActiveSubTab('VIDEO')}
               className={`
-                flex items-center space-x-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition cursor-pointer whitespace-nowrap
+                flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer whitespace-nowrap
                 ${activeSubTab === 'VIDEO'
                   ? 'bg-white dark:bg-neutral-900 text-indigo-700 dark:text-indigo-300 shadow-sm'
                   : 'text-slate-600 dark:text-neutral-400 hover:text-slate-900 dark:hover:text-white'
                 }
               `}
             >
-              <Film className="w-4 h-4 text-indigo-500" />
-              <span className="whitespace-nowrap">2단계: 5초 모션 영상 모듈</span>
+              <Film className="w-3.5 h-3.5 text-indigo-500" />
+              <span className="whitespace-nowrap">2. 5초 영상 스튜디오</span>
               {videoFirstFrame && (
                 <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
+              )}
+            </button>
+
+            <button
+              onClick={() => setActiveSubTab('AUDIO')}
+              className={`
+                flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer whitespace-nowrap
+                ${activeSubTab === 'AUDIO'
+                  ? 'bg-white dark:bg-neutral-900 text-pink-700 dark:text-pink-300 shadow-sm'
+                  : 'text-slate-600 dark:text-neutral-400 hover:text-slate-900 dark:hover:text-white'
+                }
+              `}
+            >
+              <Music className="w-3.5 h-3.5 text-pink-500" />
+              <span className="whitespace-nowrap">3. BGM & 사운드</span>
+              {audioTargetVideo && (
+                <span className="w-2 h-2 rounded-full bg-pink-500 animate-pulse" />
               )}
             </button>
           </div>
@@ -116,49 +142,30 @@ export const MediaLabView: React.FC = () => {
         {/* 탭 렌더링 */}
         {activeSubTab === 'IMAGE' ? (
           <ImageStudioView onTransferToVideo={handleTransferToVideo} />
+        ) : activeSubTab === 'VIDEO' ? (
+          <VideoStudioView
+            firstFrame={videoFirstFrame}
+            onTransferToAudio={handleTransferToAudio}
+          />
         ) : (
-          <div className="bg-white dark:bg-neutral-800 rounded-3xl p-6 sm:p-8 border border-slate-200 dark:border-neutral-700 space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 dark:border-neutral-700 pb-3">
-              <h3 className="text-base font-bold text-slate-800 dark:text-white flex items-center space-x-2">
-                <Film className="w-5 h-5 text-indigo-500" />
-                <span>🎬 제2단계: 5초 모션 영상 생성 모듈</span>
-              </h3>
-              <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
-                체인 연동 준비완료
-              </span>
-            </div>
-
-            {videoFirstFrame ? (
-              <div className="space-y-4">
-                <div className="p-4 rounded-2xl bg-indigo-50/60 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-900/50 flex flex-col sm:flex-row items-center gap-4">
-                  <img
-                    src={videoFirstFrame.url}
-                    alt="시작 키프레임"
-                    className="w-32 h-20 object-cover rounded-xl border border-indigo-300 dark:border-indigo-700 shadow-sm"
-                  />
-                  <div className="space-y-1 text-xs">
-                    <span className="px-2 py-0.5 rounded-md font-bold bg-indigo-600 text-white text-[10px]">
-                      First Frame 키프레임 로드됨
-                    </span>
-                    <p className="font-semibold text-slate-800 dark:text-neutral-200">
-                      프롬프트: {videoFirstFrame.prompt || '1단계 스마트 이미지 스튜디오 연동 에셋'}
-                    </p>
-                    <p className="text-[11px] text-slate-500 dark:text-neutral-400">
-                      이미지 캔버스에서 선택한 그래픽이 시네마틱 모션 영상의 0초 시작 프레임으로 전달되었습니다.
-                    </p>
-                  </div>
-                </div>
+          <div className="bg-white dark:bg-neutral-800 rounded-3xl p-6 sm:p-8 border border-slate-200 dark:border-neutral-700 space-y-4 text-center">
+            <Music className="w-10 h-10 mx-auto text-pink-500 animate-pulse" />
+            <h3 className="text-base font-bold text-slate-800 dark:text-white">
+              🎵 제3단계: BGM & 사운드 입히기 모듈
+            </h3>
+            {audioTargetVideo ? (
+              <div className="p-4 rounded-2xl bg-pink-50 dark:bg-pink-950/40 border border-pink-200 dark:border-pink-900/50 max-w-md mx-auto space-y-1 text-xs">
+                <span className="font-bold text-pink-700 dark:text-pink-300">
+                  타깃 영상: {audioTargetVideo.title} ({audioTargetVideo.duration}초)
+                </span>
+                <p className="text-slate-500 dark:text-neutral-400">
+                  2단계 모션 영상이 로드되었습니다. 어울리는 분위기의 BGM과 음향 효과를 생성하세요.
+                </p>
               </div>
             ) : (
-              <div className="py-12 text-center space-y-2 border-2 border-dashed border-slate-200 dark:border-neutral-700 rounded-2xl">
-                <Film className="w-10 h-10 mx-auto text-slate-300 dark:text-neutral-600 animate-bounce" />
-                <p className="text-xs font-bold text-slate-600 dark:text-neutral-400">
-                  전달된 시작 키프레임 이미지가 없습니다.
-                </p>
-                <p className="text-[11px] text-slate-400">
-                  1단계 스마트 이미지 스튜디오에서 <b>[🎬 이 이미지로 5초 모션 영상 만들기]</b> 버튼을 누르면 시작 이미지가 자동으로 채워집니다.
-                </p>
-              </div>
+              <p className="text-xs text-slate-400">
+                2단계 영상 스튜디오에서 <b>[🎵 3단계: BGM 입히기]</b> 버튼을 누르면 영상 정보가 이 탭으로 연결됩니다.
+              </p>
             )}
           </div>
         )}
