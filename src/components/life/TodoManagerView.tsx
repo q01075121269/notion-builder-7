@@ -287,63 +287,65 @@ export const TodoManagerView: React.FC<TodoManagerViewProps> = ({
   const progressRate = todoItems.length > 0 ? Math.round((doneCount / todoItems.length) * 100) : 0;
 
   return (
-    <div className={`space-y-4 ${isCompact ? 'p-1' : ''}`}>
+    <div className={isCompact ? 'space-y-2.5' : 'space-y-4'}>
       {/* 1. 상단 타이틀 및 메트릭스 헤더 */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200/80 dark:border-neutral-800">
-        <div>
-          <h2 className="text-base sm:text-lg font-bold flex items-center space-x-2 text-slate-900 dark:text-white whitespace-nowrap">
-            <CheckSquare className="w-4 h-4 sm:w-5 sm:h-5 text-amber-600 dark:text-amber-400 shrink-0" />
-            <span className="whitespace-nowrap">2. 🎯 스마트할일 (Task Manager)</span>
-            <span className="text-xs px-2 py-0.5 rounded-full bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 font-semibold border border-amber-200/60 dark:border-amber-800/40 whitespace-nowrap">
-              {doneCount}/{todoItems.length} 완료
+      <div className={`flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-slate-200/80 dark:border-neutral-800`}>
+        <div className="min-w-0">
+          <h2 className={`${isCompact ? 'text-sm' : 'text-base sm:text-lg'} font-bold flex items-center space-x-1.5 text-slate-900 dark:text-white whitespace-nowrap`}>
+            <CheckSquare className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+            <span className="whitespace-nowrap">2. 🎯 스마트할일</span>
+            <span className="text-[11px] px-1.5 py-0.2 rounded-full bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 font-semibold border border-amber-200/60 dark:border-amber-800/40 whitespace-nowrap">
+              {doneCount}/{todoItems.length}
             </span>
           </h2>
-          <p className="text-xs text-slate-500 dark:text-neutral-400 mt-0.5 whitespace-nowrap">
-            정밀 D-Day 엔진 · 브라우저 푸시 알림 · AI 3단계 서브태스크 분해
-          </p>
+          {!isCompact && (
+            <p className="text-xs text-slate-500 dark:text-neutral-400 mt-0.5 whitespace-nowrap">
+              정밀 D-Day 엔진 · 브라우저 푸시 알림 · AI 3단계 서브태스크 분해
+            </p>
+          )}
         </div>
 
         {/* 우측 진행률 및 푸시 알림 버튼 */}
-        <div className="flex items-center space-x-2 shrink-0">
+        <div className="flex items-center space-x-1.5 shrink-0">
           <button
             onClick={handleRequestNotification}
             title={notificationGranted ? '브라우저 푸시 알림 활성화됨' : '브라우저 푸시 알림 켜기'}
-            className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition cursor-pointer whitespace-nowrap shadow-xs ${
+            className={`flex items-center space-x-1 ${isCompact ? 'p-1.5 rounded-lg' : 'px-3 py-1.5 rounded-xl'} text-xs font-semibold border transition cursor-pointer whitespace-nowrap shadow-xs ${
               notificationGranted
                 ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
                 : 'bg-slate-100 text-slate-600 dark:bg-neutral-800 dark:text-slate-300 border-slate-200 dark:border-neutral-700 hover:bg-slate-200'
             }`}
           >
             {notificationGranted ? <BellRing className="w-3.5 h-3.5 text-emerald-600" /> : <Bell className="w-3.5 h-3.5" />}
-            <span className="whitespace-nowrap">{notificationGranted ? '알림 켜짐' : '푸시 알림 켜기'}</span>
+            {!isCompact && <span className="whitespace-nowrap">{notificationGranted ? '알림 켜짐' : '푸시 알림'}</span>}
           </button>
 
-          <div className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-neutral-800 text-xs text-slate-600 dark:text-neutral-300 font-semibold whitespace-nowrap border border-slate-200/60 dark:border-neutral-700/60">
-            <span>달성률</span>
+          <div className={`flex items-center space-x-1 ${isCompact ? 'px-2 py-1 text-[11px]' : 'px-3 py-1.5 text-xs'} rounded-xl bg-slate-100 dark:bg-neutral-800 text-slate-600 dark:text-neutral-300 font-semibold whitespace-nowrap border border-slate-200/60 dark:border-neutral-700/60`}>
+            <span>달성</span>
             <span className="text-amber-600 dark:text-amber-400 font-bold">{progressRate}%</span>
           </div>
 
           <button
             onClick={() => setIsAddFormOpen(prev => !prev)}
-            className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-white text-white dark:text-slate-900 text-xs font-semibold shadow-xs transition cursor-pointer active:scale-95 whitespace-nowrap"
+            className={`flex items-center space-x-1 ${isCompact ? 'px-2.5 py-1' : 'px-3 py-1.5'} rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-white text-white dark:text-slate-900 text-xs font-semibold shadow-xs transition cursor-pointer active:scale-95 whitespace-nowrap`}
           >
             <Plus className="w-3.5 h-3.5" />
-            <span className="whitespace-nowrap">할 일 등록</span>
+            <span className="whitespace-nowrap">{isCompact ? '등록' : '할 일 등록'}</span>
           </button>
         </div>
       </div>
 
       {/* 2. 아이젠하워 4분면 우선순위 필터 바 */}
-      <div className="flex flex-wrap items-center justify-between gap-2 p-2 rounded-2xl bg-slate-100/90 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700/60 shadow-xs">
+      <div className={`flex flex-wrap items-center justify-between gap-1.5 ${isCompact ? 'p-1.5 rounded-xl' : 'p-2 rounded-2xl'} bg-slate-100/90 dark:bg-neutral-800/60 border border-slate-200 dark:border-neutral-700/60 shadow-xs`}>
         <div className="flex items-center space-x-1 overflow-x-auto scrollbar-none">
-          <span className="text-[11px] font-bold text-slate-500 dark:text-neutral-400 px-2 flex items-center space-x-1 whitespace-nowrap">
+          <span className="text-[11px] font-bold text-slate-500 dark:text-neutral-400 px-1.5 flex items-center space-x-1 whitespace-nowrap">
             <Filter className="w-3 h-3" />
-            <span>우선순위:</span>
+            {!isCompact && <span>우선순위:</span>}
           </span>
 
           <button
             onClick={() => setFilterPriority('ALL')}
-            className={`px-2.5 py-1 rounded-lg text-xs font-bold transition whitespace-nowrap cursor-pointer ${
+            className={`${isCompact ? 'px-2 py-0.5 text-[11px]' : 'px-2.5 py-1 text-xs'} rounded-lg font-bold transition whitespace-nowrap cursor-pointer ${
               filterPriority === 'ALL'
                 ? 'bg-white dark:bg-neutral-900 text-slate-900 dark:text-white shadow-xs'
                 : 'text-slate-600 dark:text-neutral-400 hover:text-slate-900'
@@ -354,14 +356,14 @@ export const TodoManagerView: React.FC<TodoManagerViewProps> = ({
 
           <button
             onClick={() => setFilterPriority('P1')}
-            className={`flex items-center space-x-1 px-2.5 py-1 rounded-lg text-xs font-bold transition whitespace-nowrap cursor-pointer ${
+            className={`flex items-center space-x-1 ${isCompact ? 'px-2 py-0.5 text-[11px]' : 'px-2.5 py-1 text-xs'} rounded-lg font-bold transition whitespace-nowrap cursor-pointer ${
               filterPriority === 'P1'
                 ? 'bg-rose-500 text-white shadow-xs'
                 : 'text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-neutral-900/50'
             }`}
           >
             <Flame className="w-3 h-3" />
-            <span>P1 긴급/중요</span>
+            <span>P1</span>
           </button>
 
           <button
@@ -566,21 +568,23 @@ export const TodoManagerView: React.FC<TodoManagerViewProps> = ({
                   }));
                   e.dataTransfer.effectAllowed = 'copyMove';
                 }}
-                className={`p-4 rounded-2xl border transition shadow-xs group ${
+                className={`${
+                  isCompact ? 'p-2.5 rounded-xl gap-2' : 'p-4 rounded-2xl gap-3'
+                } border transition shadow-xs group ${
                   todo.done
                     ? 'bg-slate-100/60 dark:bg-neutral-900/30 border-slate-200/60 dark:border-neutral-800/50 opacity-60'
                     : 'bg-white dark:bg-neutral-900/70 border-slate-200 dark:border-neutral-800 hover:border-amber-400/80 hover:shadow-md cursor-grab active:cursor-grabbing'
                 }`}
               >
                 {/* 상단 메인 라인: 드래그 핸들 + 체크박스 + 제목 + D-Day 뱃지 + AI 버튼 */}
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex items-center space-x-3 min-w-0 flex-1">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center space-x-2.5 min-w-0 flex-1">
                     {/* 드래그 핸들 */}
                     <div 
                       title="캘린더 일정으로 드래그 연동 가능"
                       className="text-slate-300 dark:text-neutral-600 group-hover:text-slate-500 cursor-grab shrink-0"
                     >
-                      <GripVertical className="w-4 h-4" />
+                      <GripVertical className="w-3.5 h-3.5" />
                     </div>
 
                     {/* 완료 체크박스 */}
@@ -593,7 +597,7 @@ export const TodoManagerView: React.FC<TodoManagerViewProps> = ({
 
                     {/* 할 일 제목 */}
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center space-x-2 flex-wrap gap-y-1">
+                      <div className="flex items-center space-x-1.5 flex-wrap gap-y-0.5">
                         <span 
                           onClick={() => onToggleTodo(todo.id)}
                           className={`text-xs sm:text-sm font-semibold cursor-pointer truncate ${

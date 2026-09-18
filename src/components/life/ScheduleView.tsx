@@ -35,7 +35,7 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
   onDeleteItem,
   onQuickCapture,
   onAddScheduleFromTodo,
-  isCompact: _isCompact = false
+  isCompact = false
 }) => {
   // 1. 뷰 모드: 월간, 주간, 일일
   const [viewMode, setViewMode] = useState<ScheduleViewMode>('month');
@@ -229,7 +229,9 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
                     handleOpenDrawer(daySchedules[0]);
                   }
                 }}
-                className={`min-h-[90px] sm:min-h-[110px] p-2 flex flex-col justify-between transition group cursor-pointer relative ${
+                className={`${
+                  isCompact ? 'min-h-[56px] sm:min-h-[64px] p-1' : 'min-h-[90px] sm:min-h-[110px] p-2'
+                } flex flex-col justify-between transition group cursor-pointer relative overflow-hidden ${
                   isCellDragOver
                     ? 'bg-blue-50/90 dark:bg-blue-950/60 ring-2 ring-blue-500 ring-dashed z-10'
                     : !cell.isCurrentMonth 
@@ -245,7 +247,9 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
 
                 {/* 상단 날짜 번호 및 밀집도 뱃지 */}
                 <div className="flex items-center justify-between">
-                  <span className={`text-xs font-bold w-6 h-6 flex items-center justify-center rounded-full whitespace-nowrap ${
+                  <span className={`${
+                    isCompact ? 'text-[11px] w-5 h-5' : 'text-xs w-6 h-6'
+                  } font-bold flex items-center justify-center rounded-full whitespace-nowrap ${
                     isToday 
                       ? 'bg-blue-600 text-white shadow-xs' 
                       : ''
@@ -254,22 +258,26 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
                   </span>
 
                   {daySchedules.length > 0 && (
-                    <span className="text-[10px] px-1.5 py-0.2 rounded-full font-bold bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 whitespace-nowrap">
+                    <span className={`${
+                      isCompact ? 'text-[9px] px-1 py-0' : 'text-[10px] px-1.5 py-0.2'
+                    } rounded-full font-bold bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 whitespace-nowrap`}>
                       {daySchedules.length}건
                     </span>
                   )}
                 </div>
 
                 {/* 일정 태그 리스트 */}
-                <div className="mt-1.5 space-y-1 flex-1 overflow-hidden">
-                  {daySchedules.slice(0, 2).map((item) => (
+                <div className="mt-1 space-y-0.5 flex-1 overflow-hidden">
+                  {daySchedules.slice(0, isCompact ? 1 : 2).map((item) => (
                     <div
                       key={item.id}
                       onClick={(e) => {
                         e.stopPropagation();
                         handleOpenDrawer(item);
                       }}
-                      className={`px-1.5 py-0.5 rounded text-[10px] font-semibold truncate border transition cursor-pointer flex items-center space-x-1 ${getCategoryColor(item.category)}`}
+                      className={`px-1 py-0.5 rounded ${
+                        isCompact ? 'text-[9px]' : 'text-[10px]'
+                      } font-semibold truncate border transition cursor-pointer flex items-center space-x-0.5 ${getCategoryColor(item.category)}`}
                       title={`${item.title} (${item.date})`}
                     >
                       <span className="shrink-0">{item.icon || '•'}</span>
@@ -277,9 +285,9 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
                     </div>
                   ))}
 
-                  {daySchedules.length > 2 && (
-                    <div className="text-[9px] font-bold text-slate-400 dark:text-neutral-500 pl-1 whitespace-nowrap">
-                      +{daySchedules.length - 2}개 더보기
+                  {daySchedules.length > (isCompact ? 1 : 2) && (
+                    <div className="text-[9px] font-bold text-slate-400 dark:text-neutral-500 pl-0.5 whitespace-nowrap">
+                      +{daySchedules.length - (isCompact ? 1 : 2)}
                     </div>
                   )}
                 </div>
@@ -448,35 +456,35 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
       });
 
     return (
-      <div className="space-y-4">
+      <div className={isCompact ? 'space-y-2.5' : 'space-y-4'}>
         {/* 일일 요약 헤더 */}
-        <div className="p-4 rounded-2xl border border-slate-200 dark:border-neutral-800 bg-gradient-to-r from-slate-50 to-blue-50/40 dark:from-neutral-900 dark:to-blue-950/20 flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex flex-col items-center justify-center font-bold shadow-xs shrink-0">
-              <span className="text-[10px] uppercase leading-none">{month + 1}월</span>
-              <span className="text-base leading-tight">{dateNum}</span>
+        <div className={`${isCompact ? 'p-2.5 rounded-xl' : 'p-4 rounded-2xl'} border border-slate-200 dark:border-neutral-800 bg-gradient-to-r from-slate-50 to-blue-50/40 dark:from-neutral-900 dark:to-blue-950/20 flex items-center justify-between`}>
+          <div className="flex items-center space-x-2.5">
+            <div className={`${isCompact ? 'w-8 h-8 rounded-lg text-xs' : 'w-10 h-10 rounded-xl'} bg-blue-600 text-white flex flex-col items-center justify-center font-bold shadow-xs shrink-0`}>
+              <span className="text-[9px] uppercase leading-none">{month + 1}월</span>
+              <span className={`${isCompact ? 'text-xs' : 'text-base'} leading-tight`}>{dateNum}</span>
             </div>
             <div>
-              <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white flex items-center space-x-2">
-                <span>{headerTitle}</span>
+              <h3 className={`${isCompact ? 'text-xs sm:text-sm' : 'text-sm sm:text-base'} font-bold text-slate-900 dark:text-white flex items-center space-x-1.5`}>
+                <span className="truncate">{headerTitle}</span>
                 {isToday && (
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-600 text-white">
+                  <span className="px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-blue-600 text-white whitespace-nowrap">
                     오늘
                   </span>
                 )}
               </h3>
-              <p className="text-xs text-slate-500 dark:text-neutral-400">
-                총 {daySchedules.length}개의 포커스 일정이 배정되어 있습니다.
+              <p className="text-[11px] text-slate-500 dark:text-neutral-400 truncate">
+                총 {daySchedules.length}개의 포커스 일정
               </p>
             </div>
           </div>
 
           <button
             onClick={onQuickCapture}
-            className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 text-xs font-bold transition shadow-xs whitespace-nowrap"
+            className={`flex items-center space-x-1 ${isCompact ? 'px-2 py-1 text-[11px]' : 'px-3 py-1.5 text-xs'} rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 font-bold transition shadow-xs whitespace-nowrap`}
           >
             <Plus className="w-3.5 h-3.5" />
-            <span>이 날짜에 등록</span>
+            <span>{isCompact ? '등록' : '이 날짜에 등록'}</span>
           </button>
         </div>
 
@@ -501,33 +509,33 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
                 <div 
                   key={item.id}
                   onClick={() => handleOpenDrawer(item)}
-                  className="relative z-10 pl-10 group cursor-pointer"
+                  className={`relative z-10 ${isCompact ? 'pl-7' : 'pl-10'} group cursor-pointer`}
                 >
                   {/* 타임라인 닷(Dot) */}
-                  <div className="absolute left-2.5 top-5 w-3.5 h-3.5 rounded-full border-2 border-white dark:border-neutral-900 bg-blue-600 shadow-xs -translate-x-1/2 group-hover:scale-125 transition" />
+                  <div className={`absolute ${isCompact ? 'left-2 top-4 w-2.5 h-2.5' : 'left-2.5 top-5 w-3.5 h-3.5'} rounded-full border-2 border-white dark:border-neutral-900 bg-blue-600 shadow-xs -translate-x-1/2 group-hover:scale-125 transition`} />
 
-                  <div className="p-4 rounded-xl border border-slate-200 dark:border-neutral-800 bg-white dark:bg-neutral-900/80 hover:border-blue-400 dark:hover:border-blue-600 hover:shadow-sm transition flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div className="space-y-1.5 min-w-0">
-                      <div className="flex items-center space-x-2">
+                  <div className={`${isCompact ? 'p-2.5 rounded-lg gap-2' : 'p-4 rounded-xl gap-3'} border border-slate-200 dark:border-neutral-800 bg-white dark:bg-neutral-900/80 hover:border-blue-400 dark:hover:border-blue-600 hover:shadow-sm transition flex flex-col sm:flex-row sm:items-center justify-between`}>
+                    <div className="space-y-1 min-w-0">
+                      <div className="flex items-center space-x-1.5 flex-wrap gap-y-1">
                         <span className="text-xs font-mono font-bold text-blue-600 dark:text-blue-400 whitespace-nowrap flex items-center space-x-1">
                           <Clock className="w-3.5 h-3.5" />
                           <span>{timeText}</span>
                         </span>
-                        <span className={`text-[10px] px-2 py-0.5 rounded-md font-bold border whitespace-nowrap ${getCategoryColor(item.category)}`}>
+                        <span className={`text-[10px] px-1.5 py-0.2 rounded-md font-bold border whitespace-nowrap ${getCategoryColor(item.category)}`}>
                           {item.category}
                         </span>
-                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 dark:bg-neutral-800 text-slate-600 dark:text-neutral-400 font-semibold whitespace-nowrap">
+                        <span className="text-[10px] px-1.5 py-0.2 rounded bg-slate-100 dark:bg-neutral-800 text-slate-600 dark:text-neutral-400 font-semibold whitespace-nowrap">
                           {item.dday}
                         </span>
                       </div>
 
-                      <h4 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white flex items-center space-x-2">
-                        <span>{item.icon || '📌'}</span>
+                      <h4 className={`${isCompact ? 'text-xs sm:text-sm' : 'text-sm sm:text-base'} font-bold text-slate-900 dark:text-white flex items-center space-x-1.5`}>
+                        <span className="shrink-0">{item.icon || '📌'}</span>
                         <span className="truncate">{item.title}</span>
                       </h4>
 
                       {item.location && (
-                        <div className="flex items-center space-x-1 text-xs text-slate-500 dark:text-neutral-400">
+                        <div className="flex items-center space-x-1 text-[11px] text-slate-500 dark:text-neutral-400">
                           <MapPin className="w-3 h-3 text-slate-400 shrink-0" />
                           <span className="truncate">{item.location}</span>
                         </div>
@@ -581,15 +589,15 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
   };
 
   return (
-    <div className="space-y-4">
+    <div className={isCompact ? 'space-y-2.5' : 'space-y-4'}>
       {/* 1. 상단 컨트롤 바 (3대 뷰 스위처 & 날짜 네비게이션) */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-3 border-b border-slate-200/80 dark:border-neutral-800">
+      <div className={`flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-slate-200/80 dark:border-neutral-800`}>
         
         {/* 좌측: [월간 | 주간 | 일일] 세그먼트 버튼 */}
-        <div className="flex items-center p-1 rounded-xl bg-slate-100 dark:bg-neutral-800/80 border border-slate-200 dark:border-neutral-700/60 shadow-xs self-start">
+        <div className={`flex items-center ${isCompact ? 'p-0.5' : 'p-1'} rounded-xl bg-slate-100 dark:bg-neutral-800/80 border border-slate-200 dark:border-neutral-700/60 shadow-xs`}>
           <button
             onClick={() => setViewMode('month')}
-            className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer whitespace-nowrap ${
+            className={`flex items-center space-x-1 ${isCompact ? 'px-2 py-1 text-[11px]' : 'px-3 py-1.5 text-xs'} rounded-lg font-bold transition cursor-pointer whitespace-nowrap ${
               viewMode === 'month'
                 ? 'bg-white dark:bg-neutral-900 text-blue-600 dark:text-blue-400 shadow-xs'
                 : 'text-slate-600 dark:text-neutral-400 hover:text-slate-900 dark:hover:text-white'
@@ -601,7 +609,7 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
           
           <button
             onClick={() => setViewMode('week')}
-            className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer whitespace-nowrap ${
+            className={`flex items-center space-x-1 ${isCompact ? 'px-2 py-1 text-[11px]' : 'px-3 py-1.5 text-xs'} rounded-lg font-bold transition cursor-pointer whitespace-nowrap ${
               viewMode === 'week'
                 ? 'bg-white dark:bg-neutral-900 text-blue-600 dark:text-blue-400 shadow-xs'
                 : 'text-slate-600 dark:text-neutral-400 hover:text-slate-900 dark:hover:text-white'
@@ -613,7 +621,7 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
 
           <button
             onClick={() => setViewMode('day')}
-            className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer whitespace-nowrap ${
+            className={`flex items-center space-x-1 ${isCompact ? 'px-2 py-1 text-[11px]' : 'px-3 py-1.5 text-xs'} rounded-lg font-bold transition cursor-pointer whitespace-nowrap ${
               viewMode === 'day'
                 ? 'bg-white dark:bg-neutral-900 text-blue-600 dark:text-blue-400 shadow-xs'
                 : 'text-slate-600 dark:text-neutral-400 hover:text-slate-900 dark:hover:text-white'
@@ -625,16 +633,16 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
         </div>
 
         {/* 중앙: 날짜 네비게이션 */}
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center space-x-1.5">
           <button
             onClick={handlePrev}
             title="이전 기간"
             className="p-1.5 rounded-xl border border-slate-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-slate-700 dark:text-neutral-200 hover:bg-slate-50 transition cursor-pointer shadow-xs"
           >
-            <ChevronLeft className="w-4 h-4" />
+            <ChevronLeft className="w-3.5 h-3.5" />
           </button>
 
-          <span className="text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-100 min-w-[140px] text-center whitespace-nowrap">
+          <span className={`text-xs font-bold text-slate-800 dark:text-slate-100 ${isCompact ? 'min-w-[100px]' : 'min-w-[130px] sm:text-sm'} text-center whitespace-nowrap`}>
             {headerTitle}
           </span>
 
@@ -643,12 +651,12 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
             title="다음 기간"
             className="p-1.5 rounded-xl border border-slate-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-slate-700 dark:text-neutral-200 hover:bg-slate-50 transition cursor-pointer shadow-xs"
           >
-            <ChevronRight className="w-4 h-4" />
+            <ChevronRight className="w-3.5 h-3.5" />
           </button>
 
           <button
             onClick={handleToday}
-            className="px-2.5 py-1 rounded-xl text-xs font-semibold bg-slate-100 dark:bg-neutral-800 hover:bg-slate-200 text-slate-700 dark:text-neutral-300 transition cursor-pointer whitespace-nowrap shadow-xs"
+            className="px-2 py-1 rounded-xl text-[11px] font-semibold bg-slate-100 dark:bg-neutral-800 hover:bg-slate-200 text-slate-700 dark:text-neutral-300 transition cursor-pointer whitespace-nowrap shadow-xs"
           >
             오늘
           </button>
@@ -657,10 +665,10 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
         {/* 우측 액션: 1초 퀵 캡처로 등록 */}
         <button
           onClick={onQuickCapture}
-          className="flex items-center space-x-1.5 px-3.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-white text-white dark:text-slate-900 text-xs font-bold shadow-xs transition cursor-pointer whitespace-nowrap self-start md:self-auto"
+          className={`flex items-center space-x-1 ${isCompact ? 'px-2.5 py-1' : 'px-3.5 py-1.5'} rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-white text-white dark:text-slate-900 text-xs font-bold shadow-xs transition cursor-pointer whitespace-nowrap`}
         >
           <Plus className="w-3.5 h-3.5" />
-          <span className="whitespace-nowrap">새 일정 등록</span>
+          <span className="whitespace-nowrap">{isCompact ? '등록' : '새 일정 등록'}</span>
         </button>
       </div>
 

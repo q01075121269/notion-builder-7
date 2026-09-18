@@ -896,17 +896,25 @@ export const LifePage: React.FC = () => {
         ) : (
           /* 4분할 그리드 뷰 (2x2 반응형으로 1 -> 2 -> 3 -> 4 모듈 순서 정렬) */
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-            <div className="bg-white dark:bg-notion-dark-card rounded-2xl border border-slate-200 dark:border-neutral-800 p-5 shadow-sm">
-              {renderScheduleModule(true)}
+            <div className="bg-white dark:bg-notion-dark-card rounded-2xl border border-slate-200 dark:border-neutral-800 p-4 sm:p-5 shadow-sm flex flex-col h-[600px] max-h-[600px] overflow-hidden">
+              <div className="flex-1 overflow-y-auto overflow-x-hidden pr-0.5 scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-neutral-700">
+                {renderScheduleModule(true)}
+              </div>
             </div>
-            <div className="bg-white dark:bg-notion-dark-card rounded-2xl border border-slate-200 dark:border-neutral-800 p-5 shadow-sm">
-              {renderTodoModule(true)}
+            <div className="bg-white dark:bg-notion-dark-card rounded-2xl border border-slate-200 dark:border-neutral-800 p-4 sm:p-5 shadow-sm flex flex-col h-[600px] max-h-[600px] overflow-hidden">
+              <div className="flex-1 overflow-y-auto overflow-x-hidden pr-0.5 scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-neutral-700">
+                {renderTodoModule(true)}
+              </div>
             </div>
-            <div className="bg-white dark:bg-notion-dark-card rounded-2xl border border-slate-200 dark:border-neutral-800 p-5 shadow-sm">
-              {renderExpenseModule(true)}
+            <div className="bg-white dark:bg-notion-dark-card rounded-2xl border border-slate-200 dark:border-neutral-800 p-4 sm:p-5 shadow-sm flex flex-col h-[600px] max-h-[600px] overflow-hidden">
+              <div className="flex-1 overflow-y-auto overflow-x-hidden pr-0.5 scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-neutral-700">
+                {renderExpenseModule(true)}
+              </div>
             </div>
-            <div className="bg-white dark:bg-notion-dark-card rounded-2xl border border-slate-200 dark:border-neutral-800 p-5 shadow-sm">
-              {renderEmailModule(true)}
+            <div className="bg-white dark:bg-notion-dark-card rounded-2xl border border-slate-200 dark:border-neutral-800 p-4 sm:p-5 shadow-sm flex flex-col h-[600px] max-h-[600px] overflow-hidden">
+              <div className="flex-1 overflow-y-auto overflow-x-hidden pr-0.5 scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-neutral-700">
+                {renderEmailModule(true)}
+              </div>
             </div>
           </div>
         )}

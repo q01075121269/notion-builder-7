@@ -276,44 +276,46 @@ export const ExpenseAnalyticsView: React.FC<ExpenseAnalyticsViewProps> = ({
   }, [currentMonthExpenses, showLeakItemsOnly, selectedCategoryFilter]);
 
   return (
-    <div className={`space-y-5 ${isCompact ? 'p-1' : ''}`}>
+    <div className={isCompact ? 'space-y-2.5' : 'space-y-5'}>
       {/* 1. 상단 월 선택기 & 핵심 액션 헤더 */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200/80 dark:border-neutral-800">
-        <div className="flex items-center space-x-3">
-          <div className="p-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/40 shadow-xs">
-            <CreditCard className="w-5 h-5 shrink-0" />
+      <div className={`flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-slate-200/80 dark:border-neutral-800`}>
+        <div className="flex items-center space-x-2 min-w-0">
+          <div className={`${isCompact ? 'p-1.5 rounded-lg' : 'p-2 rounded-xl'} bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/40 shadow-xs shrink-0`}>
+            <CreditCard className="w-4 h-4" />
           </div>
-          <div>
-            <div className="flex items-center space-x-2">
-              <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white whitespace-nowrap">
-                3. 💰 가계부 및 자산 분석
+          <div className="min-w-0">
+            <div className="flex items-center space-x-1.5">
+              <h2 className={`${isCompact ? 'text-sm' : 'text-base sm:text-lg'} font-bold text-slate-900 dark:text-white whitespace-nowrap`}>
+                3. 💰 가계부
               </h2>
-              <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 font-semibold border border-emerald-200/60 dark:border-emerald-800/40 whitespace-nowrap">
+              <span className="text-[11px] px-1.5 py-0.2 rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 font-semibold border border-emerald-200/60 dark:border-emerald-800/40 whitespace-nowrap">
                 {currentMonthExpenses.length}건
               </span>
             </div>
-            <p className="text-xs text-slate-500 dark:text-neutral-400 mt-0.5 whitespace-nowrap">
-              코파일럿 머니/뱅크샐러드급 월간 페이싱 & AI 누수 이상 탐지
-            </p>
+            {!isCompact && (
+              <p className="text-xs text-slate-500 dark:text-neutral-400 mt-0.5 whitespace-nowrap">
+                코파일럿 머니/뱅크샐러드급 월간 페이싱 & AI 누수 이상 탐지
+              </p>
+            )}
           </div>
         </div>
 
         {/* 연/월 선택 드롭다운 및 신규 등록 버튼 */}
-        <div className="flex items-center space-x-2 shrink-0">
+        <div className="flex items-center space-x-1.5 shrink-0">
           <div className="flex items-center bg-white dark:bg-neutral-800 border border-slate-200 dark:border-neutral-700 rounded-xl p-0.5 shadow-xs">
             <button
               onClick={handlePrevMonth}
               title="이전 달"
-              className="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 dark:text-neutral-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-neutral-700 transition cursor-pointer"
+              className="p-1 rounded-lg text-slate-500 hover:text-slate-900 dark:text-neutral-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-neutral-700 transition cursor-pointer"
             >
               <ChevronLeft className="w-3.5 h-3.5" />
             </button>
-            <div className="flex items-center space-x-1 px-2">
-              <Calendar className="w-3.5 h-3.5 text-slate-400" />
+            <div className="flex items-center space-x-1 px-1.5">
+              <Calendar className="w-3 h-3 text-slate-400" />
               <select
                 value={selectedMonth}
                 onChange={(e) => setSelectedMonth(e.target.value)}
-                className="bg-transparent text-xs font-bold text-slate-800 dark:text-neutral-200 focus:outline-none cursor-pointer py-1"
+                className="bg-transparent text-xs font-bold text-slate-800 dark:text-neutral-200 focus:outline-none cursor-pointer py-0.5"
               >
                 {MONTH_OPTIONS.map((opt) => (
                   <option key={opt.value} value={opt.value} className="dark:bg-neutral-800">
@@ -326,62 +328,68 @@ export const ExpenseAnalyticsView: React.FC<ExpenseAnalyticsViewProps> = ({
               onClick={handleNextMonth}
               disabled={selectedMonth === '2026-09'}
               title="다음 달"
-              className="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 dark:text-neutral-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-neutral-700 transition cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+              className="p-1 rounded-lg text-slate-500 hover:text-slate-900 dark:text-neutral-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-neutral-700 transition cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
             >
               <ChevronRight className="w-3.5 h-3.5" />
             </button>
           </div>
 
-          <button
-            onClick={onQuickCapture}
-            title="영수증 OCR 촬영 및 자연어 퀵 캡처"
-            className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-white dark:bg-neutral-800 hover:bg-slate-50 dark:hover:bg-neutral-700 text-slate-700 dark:text-neutral-200 border border-slate-200 dark:border-neutral-700 text-xs font-semibold shadow-xs transition cursor-pointer active:scale-95 whitespace-nowrap"
-          >
-            <Camera className="w-3.5 h-3.5 text-emerald-500" />
-            <span className="whitespace-nowrap hidden sm:inline">영수증 OCR</span>
-          </button>
+          {!isCompact && (
+            <button
+              onClick={onQuickCapture}
+              title="영수증 OCR 촬영 및 자연어 퀵 캡처"
+              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-white dark:bg-neutral-800 hover:bg-slate-50 dark:hover:bg-neutral-700 text-slate-700 dark:text-neutral-200 border border-slate-200 dark:border-neutral-700 text-xs font-semibold shadow-xs transition cursor-pointer active:scale-95 whitespace-nowrap"
+            >
+              <Camera className="w-3.5 h-3.5 text-emerald-500" />
+              <span className="whitespace-nowrap hidden sm:inline">영수증 OCR</span>
+            </button>
+          )}
 
           <button
             onClick={() => setIsAddModalOpen(true)}
-            className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-white text-white dark:text-slate-900 text-xs font-semibold shadow-xs transition cursor-pointer active:scale-95 whitespace-nowrap"
+            className={`flex items-center space-x-1 ${isCompact ? 'px-2.5 py-1' : 'px-3 py-1.5'} rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-white text-white dark:text-slate-900 text-xs font-semibold shadow-xs transition cursor-pointer active:scale-95 whitespace-nowrap`}
           >
             <Plus className="w-3.5 h-3.5" />
-            <span className="whitespace-nowrap">지출 기록</span>
+            <span className="whitespace-nowrap">{isCompact ? '기록' : '지출 기록'}</span>
           </button>
         </div>
       </div>
 
 
       {/* 2. 코파일럿 머니/뱅크샐러드급 월간 페이싱 게이지 요약 카드 */}
-      <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-b from-white to-slate-50/70 dark:from-neutral-900 dark:to-neutral-900/60 border border-slate-200/90 dark:border-neutral-800 shadow-sm space-y-4">
+      <div className={`${isCompact ? 'p-2.5 rounded-xl space-y-2.5' : 'p-4 sm:p-5 rounded-2xl space-y-4'} bg-gradient-to-b from-white to-slate-50/70 dark:from-neutral-900 dark:to-neutral-900/60 border border-slate-200/90 dark:border-neutral-800 shadow-sm`}>
         {/* 상단 4대 핵심 지표 */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <div className="p-3 rounded-xl bg-slate-50 dark:bg-neutral-800/60 border border-slate-200/60 dark:border-neutral-700/60">
+        <div className={`grid grid-cols-2 ${isCompact ? 'gap-2' : 'lg:grid-cols-4 gap-3'}`}>
+          <div className={`${isCompact ? 'p-2 rounded-lg' : 'p-3 rounded-xl'} bg-slate-50 dark:bg-neutral-800/60 border border-slate-200/60 dark:border-neutral-700/60`}>
             <span className="text-[11px] font-medium text-slate-500 dark:text-neutral-400 block whitespace-nowrap">
               월간 총수입
             </span>
-            <div className="text-base sm:text-lg font-bold text-slate-900 dark:text-white mt-0.5 whitespace-nowrap">
+            <div className={`${isCompact ? 'text-xs sm:text-sm' : 'text-base sm:text-lg'} font-bold text-slate-900 dark:text-white mt-0.5 whitespace-nowrap`}>
               {calculatedIncome.toLocaleString()}원
             </div>
-            <span className="text-[10px] text-emerald-600 dark:text-emerald-400 flex items-center space-x-0.5 mt-0.5 whitespace-nowrap">
-              <TrendingUp className="w-3 h-3" />
-              <span>정기 급여 및 부수입</span>
-            </span>
+            {!isCompact && (
+              <span className="text-[10px] text-emerald-600 dark:text-emerald-400 flex items-center space-x-0.5 mt-0.5 whitespace-nowrap">
+                <TrendingUp className="w-3 h-3" />
+                <span>정기 급여 및 부수입</span>
+              </span>
+            )}
           </div>
 
-          <div className="p-3 rounded-xl bg-slate-50 dark:bg-neutral-800/60 border border-slate-200/60 dark:border-neutral-700/60">
+          <div className={`${isCompact ? 'p-2 rounded-lg' : 'p-3 rounded-xl'} bg-slate-50 dark:bg-neutral-800/60 border border-slate-200/60 dark:border-neutral-700/60`}>
             <span className="text-[11px] font-medium text-slate-500 dark:text-neutral-400 block whitespace-nowrap">
               당월 총지출
             </span>
-            <div className="text-base sm:text-lg font-bold text-rose-600 dark:text-rose-400 mt-0.5 whitespace-nowrap">
+            <div className={`${isCompact ? 'text-xs sm:text-sm' : 'text-base sm:text-lg'} font-bold text-rose-600 dark:text-rose-400 mt-0.5 whitespace-nowrap`}>
               {totalExpense.toLocaleString()}원
             </div>
-            <span className="text-[10px] text-slate-400 dark:text-neutral-500 block mt-0.5 whitespace-nowrap">
-              총 {currentMonthExpenses.length}건 집계 완료
-            </span>
+            {!isCompact && (
+              <span className="text-[10px] text-slate-400 dark:text-neutral-500 block mt-0.5 whitespace-nowrap">
+                총 {currentMonthExpenses.length}건 집계 완료
+              </span>
+            )}
           </div>
 
-          <div className="p-3 rounded-xl bg-slate-50 dark:bg-neutral-800/60 border border-slate-200/60 dark:border-neutral-700/60">
+          <div className={`${isCompact ? 'p-2 rounded-lg' : 'p-3 rounded-xl'} bg-slate-50 dark:bg-neutral-800/60 border border-slate-200/60 dark:border-neutral-700/60`}>
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-medium text-slate-500 dark:text-neutral-400 whitespace-nowrap">
                 월 목표 예산
@@ -409,16 +417,18 @@ export const ExpenseAnalyticsView: React.FC<ExpenseAnalyticsViewProps> = ({
                 className="w-full mt-1 px-1.5 py-0.5 text-xs font-bold bg-white dark:bg-neutral-900 border border-slate-300 rounded"
               />
             ) : (
-              <div className="text-base sm:text-lg font-bold text-slate-900 dark:text-white mt-0.5 whitespace-nowrap">
+              <div className={`${isCompact ? 'text-xs sm:text-sm' : 'text-base sm:text-lg'} font-bold text-slate-900 dark:text-white mt-0.5 whitespace-nowrap`}>
                 {monthlyBudget.toLocaleString()}원
               </div>
             )}
-            <span className="text-[10px] text-slate-400 dark:text-neutral-500 block mt-0.5 whitespace-nowrap">
-              권장 일일 예산: {Math.round(monthlyBudget / pacingMetrics.daysInMonth).toLocaleString()}원
-            </span>
+            {!isCompact && (
+              <span className="text-[10px] text-slate-400 dark:text-neutral-500 block mt-0.5 whitespace-nowrap">
+                권장 일일 예산: {Math.round(monthlyBudget / pacingMetrics.daysInMonth).toLocaleString()}원
+              </span>
+            )}
           </div>
 
-          <div className={`p-3 rounded-xl border ${
+          <div className={`${isCompact ? 'p-2 rounded-lg' : 'p-3 rounded-xl'} border ${
             remainingBudget >= 0 
               ? 'bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-200/70 dark:border-emerald-900/40' 
               : 'bg-rose-50/50 dark:bg-rose-950/20 border-rose-200/70 dark:border-rose-900/40'
@@ -426,14 +436,16 @@ export const ExpenseAnalyticsView: React.FC<ExpenseAnalyticsViewProps> = ({
             <span className="text-[11px] font-medium text-slate-500 dark:text-neutral-400 block whitespace-nowrap">
               잔여 예산
             </span>
-            <div className={`text-base sm:text-lg font-bold mt-0.5 whitespace-nowrap ${
+            <div className={`${isCompact ? 'text-xs sm:text-sm' : 'text-base sm:text-lg'} font-bold mt-0.5 whitespace-nowrap ${
               remainingBudget >= 0 ? 'text-emerald-700 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
             }`}>
               {remainingBudget >= 0 ? `${remainingBudget.toLocaleString()}원` : `-${Math.abs(remainingBudget).toLocaleString()}원 초과`}
             </div>
-            <span className="text-[10px] text-slate-500 dark:text-neutral-400 block mt-0.5 whitespace-nowrap">
-              남은 {pacingMetrics.remainingDays}일간 하루 {pacingMetrics.dailySafeSpend.toLocaleString()}원 가능
-            </span>
+            {!isCompact && (
+              <span className="text-[10px] text-slate-500 dark:text-neutral-400 block mt-0.5 whitespace-nowrap">
+                남은 {pacingMetrics.remainingDays}일간 하루 {pacingMetrics.dailySafeSpend.toLocaleString()}원 가능
+              </span>
+            )}
           </div>
         </div>
 
