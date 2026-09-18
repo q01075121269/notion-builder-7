@@ -29,6 +29,10 @@ export interface LifeScheduleItem {
   attendees?: ScheduleAttendee[];
   notes?: string; // 사전 준비 메모 및 안건
   isAllDay?: boolean;
+
+  // 스마트할일 연동 타임블록 속성
+  taskId?: string;        // 연동된 할 일 ID
+  isTimeBlock?: boolean;   // 타임블록 여부 플래그
 }
 
 export type PaymentMethod = '신용카드' | '체크카드' | '현금' | '간편결제';
@@ -66,10 +70,17 @@ export interface LifeTodoItem {
   priority: string;
   dueDate?: string;
   dday?: string;
+  category?: string; // 목표/카테고리: 업무, 개인, 프로젝트, 학습, 건강
   reminder?: ReminderType;
   subtasks?: LifeSubTask[];
   eisenhower?: EisenhowerPriority;
   notionPageId?: string;
+
+  // 타임블록 On/Off 연동 속성
+  isTimeBlocked?: boolean;       // 스마트일정 캘린더에 타임블록으로 등록되었는지 여부
+  timeBlockScheduleId?: string; // 연결된 캘린더 일정 ID
+  timeBlockDate?: string;       // 타임블록 날짜 (YYYY-MM-DD)
+  timeBlockTime?: string;       // 타임블록 시작 시각 (HH:mm)
 }
 
 export function calculateDDay(dateStr?: string): string {

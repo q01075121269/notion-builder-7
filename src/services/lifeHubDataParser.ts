@@ -159,7 +159,22 @@ export function extractQuickCaptureLifeItems(): {
           memo: task.properties?.['메모'] || '',
           isLeak
         });
+      } else if (task.intent === 'todo' || task.properties?.['분류'] === '할 일') {
+        // [격리] 스마트할일 전용 아이템으로만 등록 (캘린더 일정으로 자동 복제 차단)
+        todos.push({
+          id: `qc-t-${key}`,
+          title: task.title,
+          done: task.properties?.['상태'] === '완료',
+          priority: task.properties?.['우선순위'] || '🔥 우선',
+          category: task.properties?.['카테고리'] || (task.properties?.['분류'] !== '할 일' ? task.properties?.['분류'] : '업무') || '업무',
+          dueDate: dateStr.split(' ')[0],
+          dday: calculateDDay(dateStr.split(' ')[0]),
+          reminder: 'before_30m',
+          eisenhower: (task.properties?.['우선순위'] === 'P2' ? 'P2' : task.properties?.['우선순위'] === 'P3' ? 'P3' : task.properties?.['우선순위'] === 'P4' ? 'P4' : 'P1'),
+          isTimeBlocked: false
+        });
       } else {
+        // [격리] 스마트일정(캘린더) 전용 아이템으로만 등록 (할 일 목록으로 자동 복제 차단)
         const pUrl = rec.notionPageUrls?.[tIdx] || rec.notionPageUrls?.[0];
         const pId = pUrl ? pUrl.split('/').pop()?.split('?')[0]?.replace(/-/g, '') : undefined;
         let icon = task.suggestedIcon;
@@ -167,25 +182,26 @@ export function extractQuickCaptureLifeItems(): {
           if (/연가|휴가|반차|휴무/.test(taskTitle)) icon = '🌴';
           else if (/치과|병원|진료|검진/.test(taskTitle)) icon = '🏥';
           else if (/회의|미팅|출장/.test(taskTitle)) icon = '💼';
-          else icon = task.intent === 'todo' ? '⚡' : '📅';
+          else icon = '📅';
         }
+
+        const fullTimePart = dateStr.includes(' ') ? dateStr.split(' ')[1] : '10:00';
+        const startIso = `${dateStr.split(' ')[0]}T${fullTimePart}:00`;
+        const endHour = parseInt(fullTimePart.split(':')[0], 10) + 1;
+        const endIso = `${dateStr.split(' ')[0]}T${String(endHour).padStart(2, '0')}:00:00`;
 
         schedules.push({
           id: `qc-s-${key}`,
           title: task.title,
           date: dateStr,
+          start: startIso,
+          end: endIso,
           dday: calculateDDay(dateStr),
-          category: task.properties?.['분류'] || (task.intent === 'todo' ? '할 일' : '일정'),
+          category: task.properties?.['분류'] || '일정',
           icon,
           status: task.properties?.['상태'] || '미완료',
           pageUrl: pUrl,
           notionPageId: pId
-        });
-        todos.push({
-          id: `qc-t-${key}`,
-          title: task.title,
-          done: task.properties?.['상태'] === '완료',
-          priority: task.intent === 'todo' ? '🔥 우선' : '⭐ 보통'
         });
       }
     });

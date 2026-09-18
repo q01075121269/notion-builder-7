@@ -42,6 +42,7 @@ interface TodoManagerViewProps {
   onDeleteTodo: (e: React.MouseEvent, item: LifeTodoItem) => void;
   onQuickCapture: () => void;
   onScheduleTodo?: (todo: LifeTodoItem) => void;
+  onToggleTimeBlock?: (todo: LifeTodoItem) => void;
   isCompact?: boolean;
 }
 
@@ -52,6 +53,7 @@ export const TodoManagerView: React.FC<TodoManagerViewProps> = ({
   onDeleteTodo,
   onQuickCapture,
   onScheduleTodo,
+  onToggleTimeBlock,
   isCompact = false
 }) => {
 
@@ -74,9 +76,10 @@ export const TodoManagerView: React.FC<TodoManagerViewProps> = ({
   // 펼쳐진 서브태스크 목록 ID Set
   const [expandedSubtaskIds, setExpandedSubtaskIds] = useState<Set<string>>(new Set());
 
-  // 새 할 일 인라인 폼 상태
+  // 새 할 일 인라인 폼 상태 (독립 컨테이너: 목표/카테고리 선택 지원)
   const [isAddFormOpen, setIsAddFormOpen] = useState<boolean>(false);
   const [newTitle, setNewTitle] = useState<string>('');
+  const [newCategory, setNewCategory] = useState<string>('업무');
   const [newDueDate, setNewDueDate] = useState<string>('2026-09-18');
   const [newPriority, setNewPriority] = useState<EisenhowerPriority>('P1');
   const [newReminder, setNewReminder] = useState<ReminderType>('before_30m');
@@ -252,14 +255,17 @@ export const TodoManagerView: React.FC<TodoManagerViewProps> = ({
       done: false,
       priority: newPriority === 'P1' ? '🔥 긴급/중요' : newPriority === 'P2' ? '⭐ 중요' : newPriority === 'P3' ? '⚡ 긴급' : '☕ 여유',
       eisenhower: newPriority,
+      category: newCategory,
       dueDate: newDueDate,
-      reminder: newReminder
+      dday: getDDayBadge(newDueDate)?.text || 'D-Day',
+      reminder: newReminder,
+      isTimeBlocked: false
     };
 
     setTodoItems(prev => [newTodo, ...prev]);
     setNewTitle('');
     setIsAddFormOpen(false);
-    showToast('새 스마트 할 일이 성공적으로 등록되었습니다.', 'success');
+    showToast(`새 스마트 할 일(${newCategory})이 성공적으로 등록되었습니다.`, 'success');
   };
 
   // 필터링된 할 일 목록 계산
@@ -459,9 +465,22 @@ export const TodoManagerView: React.FC<TodoManagerViewProps> = ({
               value={newTitle}
               onChange={(e) => setNewTitle(e.target.value)}
               placeholder="예: 2026 Q3 아키텍처 다이어그램 업데이트..."
-              className="sm:col-span-5 px-3 py-2 text-xs rounded-xl border border-slate-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 font-medium focus:ring-2 focus:ring-amber-500 focus:outline-none"
+              className="sm:col-span-4 px-3 py-2 text-xs rounded-xl border border-slate-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 font-medium focus:ring-2 focus:ring-amber-500 focus:outline-none"
               autoFocus
             />
+
+            {/* 목표/카테고리 선택 (독립 DB 컨테이너) */}
+            <select
+              value={newCategory}
+              onChange={(e) => setNewCategory(e.target.value)}
+              className="sm:col-span-2 px-2 py-2 text-xs rounded-xl border border-slate-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 font-medium focus:ring-2 focus:ring-amber-500"
+            >
+              <option value="업무">💼 업무</option>
+              <option value="개인">👤 개인</option>
+              <option value="프로젝트">🚀 프로젝트</option>
+              <option value="학습">📚 학습</option>
+              <option value="건강">🏋️ 건강</option>
+            </select>
 
             {/* 마감 기한 */}
             <div className="sm:col-span-3 flex items-center space-x-1.5 px-2.5 py-1.5 rounded-xl border border-slate-300 dark:border-neutral-700 bg-white dark:bg-neutral-800">
@@ -616,6 +635,13 @@ export const TodoManagerView: React.FC<TodoManagerViewProps> = ({
                           </span>
                         )}
 
+                        {/* 독립 컨테이너 목표/카테고리 뱃지 */}
+                        {todo.category && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300 border border-amber-200/60 dark:border-amber-800/40 font-medium whitespace-nowrap">
+                            {todo.category}
+                          </span>
+                        )}
+
                         {/* 알림 설정 뱃지 */}
                         {todo.reminder && todo.reminder !== 'none' && (
                           <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 dark:bg-blue-950 dark:text-blue-400 flex items-center space-x-1 whitespace-nowrap border border-blue-200/50">
@@ -637,20 +663,33 @@ export const TodoManagerView: React.FC<TodoManagerViewProps> = ({
                     </div>
                   </div>
 
-                  {/* 우측 액션: [📅 타임블록] + [🪄 AI 분해] + 우선순위 배지 + 삭제 */}
+                  {/* 우측 액션: [📅 타임블록 On/Off 토글] + [🪄 AI 분해] + 우선순위 배지 + 삭제 */}
                   <div className="flex items-center space-x-1.5 shrink-0">
-                    {/* [📅 일정으로 타임블록] 원클릭 버튼 */}
-                    {onScheduleTodo && (
+                    {/* [📅 달력에 표시] On/Off 토글 스위치 버튼 */}
+                    {(onToggleTimeBlock || onScheduleTodo) && (
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          onScheduleTodo(todo);
+                          if (onToggleTimeBlock) {
+                            onToggleTimeBlock(todo);
+                          } else if (onScheduleTodo) {
+                            onScheduleTodo(todo);
+                          }
                         }}
-                        title="스마트일정 주간 캘린더에 즉시 타임블록 배정"
-                        className="flex items-center space-x-1 px-2 py-1 rounded-xl text-xs font-semibold bg-blue-50 hover:bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 dark:hover:bg-blue-900/60 border border-blue-200/80 dark:border-blue-800/60 transition cursor-pointer active:scale-95 whitespace-nowrap shadow-xs"
+                        title={todo.isTimeBlocked ? '스마트일정 캘린더에서 타임블록 제거 (토글 Off)' : '스마트일정 주간 캘린더에 타임블록 등록 (토글 On)'}
+                        className={`flex items-center space-x-1.5 px-2.5 py-1 rounded-xl text-xs transition cursor-pointer active:scale-95 whitespace-nowrap shadow-xs ${
+                          todo.isTimeBlocked
+                            ? 'bg-blue-600 hover:bg-blue-700 text-white font-bold ring-2 ring-blue-400/40'
+                            : 'bg-slate-100 hover:bg-blue-50 text-slate-600 hover:text-blue-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-blue-950/60 dark:hover:text-blue-300 border border-slate-200 dark:border-neutral-700 font-semibold'
+                        }`}
                       >
-                        <Calendar className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-                        <span className="whitespace-nowrap hidden sm:inline">타임블록</span>
+                        <Calendar className={`w-3.5 h-3.5 ${todo.isTimeBlocked ? 'text-white' : 'text-slate-400 dark:text-neutral-400 group-hover:text-blue-600'}`} />
+                        <span className="whitespace-nowrap hidden sm:inline">
+                          {todo.isTimeBlocked ? '달력 On' : '달력에 표시'}
+                        </span>
+                        {todo.isTimeBlocked && (
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-300 animate-pulse ml-0.5" />
+                        )}
                       </button>
                     )}
 

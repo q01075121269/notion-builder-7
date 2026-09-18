@@ -142,8 +142,10 @@ const INITIAL_DEMO_TODOS: LifeTodoItem[] = [
     done: true, 
     priority: '🔥 긴급/중요', 
     eisenhower: 'P1',
+    category: '프로젝트',
     dueDate: '2026-09-18', 
     reminder: 'before_30m',
+    isTimeBlocked: false,
     subtasks: [
       { id: 'st-t1-1', title: '1단계: 변경 모듈 단위 테스트 및 번들 빌드 검증 (`npm run build`)', done: true },
       { id: 'st-t1-2', title: '2단계: Vercel 서버리스 프록시 환경변수 및 CORS 연동 확인', done: true },
@@ -156,8 +158,10 @@ const INITIAL_DEMO_TODOS: LifeTodoItem[] = [
     done: false, 
     priority: '⭐ 중요/계획', 
     eisenhower: 'P2',
+    category: '업무',
     dueDate: '2026-09-19', 
     reminder: 'day_9am',
+    isTimeBlocked: false,
     subtasks: [
       { id: 'st-t2-1', title: '1단계: 이번 주 주요 추진 성과 및 지표 데이터 취합', done: true },
       { id: 'st-t2-2', title: '2단계: 노션 주간 업무 보고 템플릿에 핵심 요약 초안 작성', done: false },
@@ -170,8 +174,10 @@ const INITIAL_DEMO_TODOS: LifeTodoItem[] = [
     done: false, 
     priority: '☕ 여유/보관', 
     eisenhower: 'P4',
+    category: '건강',
     dueDate: '2026-09-20', 
-    reminder: 'none' 
+    reminder: 'none',
+    isTimeBlocked: false
   },
   { 
     id: 't4', 
@@ -179,8 +185,10 @@ const INITIAL_DEMO_TODOS: LifeTodoItem[] = [
     done: true, 
     priority: '⚡ 긴급/위임', 
     eisenhower: 'P3',
+    category: '개인',
     dueDate: '2026-09-17', 
-    reminder: 'none' 
+    reminder: 'none',
+    isTimeBlocked: false
   }
 ];
 
@@ -440,19 +448,99 @@ export const LifePage: React.FC = () => {
     showToast(`"${mail.suggestedAction || mail.subject}" 스마트할일로 등록되었습니다.`, 'success');
   }, [showToast]);
 
-  // 스마트할일 ➔ 스마트일정 타임블로킹 크로스오버 파이프라인 (DnD 및 원클릭 지원)
+  // 스마트할일 ➔ 스마트일정 타임블록 On/Off 토글 파이프라인
+  const handleToggleTimeBlock = useCallback((todo: LifeTodoItem) => {
+    // 1. 이미 캘린더에 타임블록으로 등록되어 있는지 검사 (taskId 또는 id 기반)
+    const isCurrentlyBlocked = scheduleItems.some(
+      s => s.taskId === todo.id || s.id === `s-todo-${todo.id}` || (s.isTimeBlock && s.title === todo.title)
+    );
+
+    if (isCurrentlyBlocked || todo.isTimeBlocked) {
+      // ===== [토글 OFF] 캘린더에서 해당 타임블록 일정 깨끗하게 자동 제거 =====
+      setScheduleItems(prev => prev.filter(
+        s => s.taskId !== todo.id && s.id !== `s-todo-${todo.id}` && !(s.isTimeBlock && s.title === todo.title)
+      ));
+
+      setTodoItems(prev => prev.map(t => {
+        if (t.id === todo.id) {
+          return {
+            ...t,
+            isTimeBlocked: false,
+            timeBlockScheduleId: undefined,
+            timeBlockDate: undefined,
+            timeBlockTime: undefined
+          };
+        }
+        return t;
+      }));
+
+      showToast(`'${todo.title}' 할 일이 캘린더 타임블록에서 제거되었습니다.`, 'info');
+    } else {
+      // ===== [토글 ON] 스마트일정(캘린더)에 타임블록 블록으로 등록 (연동 taskId 부여, 중복 방지) =====
+      const targetDate = todo.dueDate || '2026-09-18';
+      const targetTime = todo.timeBlockTime || '14:00';
+      const startHour = parseInt(targetTime.split(':')[0], 10) || 14;
+      const endHourStr = String((startHour + 1) % 24).padStart(2, '0');
+      const fullStart = `${targetDate} ${targetTime}`;
+      const fullEnd = `${targetDate} ${endHourStr}:00`;
+      const scheduleId = `s-todo-${todo.id}`;
+
+      const newSchedule: LifeScheduleItem = {
+        id: scheduleId, // 고유 taskId 기반 ID 부여로 동일 일정 중복 생성 원천 차단!
+        taskId: todo.id,
+        isTimeBlock: true,
+        title: todo.title,
+        date: fullStart,
+        start: fullStart,
+        end: fullEnd,
+        dday: calculateDDay(targetDate),
+        category: '할 일',
+        icon: '🎯',
+        status: todo.done ? '완료' : '진행 중',
+        notes: `스마트할일 타임블록 연동 (카테고리: ${todo.category || '업무'}, 우선순위: ${todo.eisenhower || 'P1'})`,
+        attendees: [{ name: '나 (담당자)', status: 'accepted' }]
+      };
+
+      // 중복 방지: 동일 ID가 있으면 교체, 없으면 추가
+      setScheduleItems(prev => {
+        const filtered = prev.filter(s => s.id !== scheduleId && s.taskId !== todo.id);
+        return [newSchedule, ...filtered];
+      });
+
+      setTodoItems(prev => prev.map(t => {
+        if (t.id === todo.id) {
+          return {
+            ...t,
+            isTimeBlocked: true,
+            timeBlockScheduleId: scheduleId,
+            timeBlockDate: targetDate,
+            timeBlockTime: targetTime
+          };
+        }
+        return t;
+      }));
+
+      showToast(`'${todo.title}' 할 일이 ${targetDate} ${targetTime} 캘린더 타임블록에 등록되었습니다!`, 'success');
+    }
+  }, [scheduleItems, showToast]);
+
+  // 스마트할일 ➔ 스마트일정 타임블로킹 크로스오버 파이프라인 (주간 타임라인 DnD 드롭존)
   const handleScheduleTodoFromTask = useCallback((
     todoData: any,
     targetDate = '2026-09-18',
     targetTime = '14:00'
   ) => {
+    const todoId = todoData.id || `todo-${Date.now()}`;
     const startHour = parseInt(targetTime.split(':')[0], 10) || 14;
-    const endHourStr = String(startHour + 1).padStart(2, '0');
+    const endHourStr = String((startHour + 1) % 24).padStart(2, '0');
     const fullStart = `${targetDate} ${targetTime}`;
     const fullEnd = `${targetDate} ${endHourStr}:00`;
+    const scheduleId = `s-todo-${todoId}`;
 
     const newSchedule: LifeScheduleItem = {
-      id: `s-todo-${Date.now()}`,
+      id: scheduleId,
+      taskId: todoId,
+      isTimeBlock: true,
       title: todoData.title,
       date: fullStart,
       start: fullStart,
@@ -460,13 +548,32 @@ export const LifePage: React.FC = () => {
       dday: calculateDDay(targetDate),
       category: '할 일',
       icon: '🎯',
-      status: '진행 중',
-      notes: `스마트할일 타임블로킹으로 자동 연동된 일정 (아이젠하워 우선순위: ${todoData.eisenhower || 'P1'})`,
+      status: todoData.done ? '완료' : '진행 중',
+      notes: `스마트할일 타임블록 드롭 연동 (카테고리: ${todoData.category || '업무'}, 우선순위: ${todoData.eisenhower || 'P1'})`,
       attendees: [{ name: '나 (담당자)', status: 'accepted' }]
     };
 
-    setScheduleItems(prev => [newSchedule, ...prev]);
-    showToast(`"${todoData.title}" 일정이 ${targetDate} ${targetTime} 캘린더 타임블록에 등록되었습니다!`, 'success');
+    // 기존 타임블록이 있으면 해당 슬롯으로 이동(갱신), 없으면 신규 추가 (중복 방지)
+    setScheduleItems(prev => {
+      const filtered = prev.filter(s => s.id !== scheduleId && s.taskId !== todoId);
+      return [newSchedule, ...filtered];
+    });
+
+    // 할 일의 타임블록 상태도 On으로 동기화
+    setTodoItems(prev => prev.map(t => {
+      if (t.id === todoId || t.title === todoData.title) {
+        return {
+          ...t,
+          isTimeBlocked: true,
+          timeBlockScheduleId: scheduleId,
+          timeBlockDate: targetDate,
+          timeBlockTime: targetTime
+        };
+      }
+      return t;
+    }));
+
+    showToast(`"${todoData.title}" 일정이 ${targetDate} ${targetTime} 캘린더 타임블록으로 배치되었습니다!`, 'success');
   }, [showToast]);
 
 
@@ -634,8 +741,24 @@ export const LifePage: React.FC = () => {
     markLifeItemAsDeleted(item.id, item.title);
     removeTaskFromQuickCapture(item.id, item.title);
 
-    setScheduleItems(prev => prev.filter(s => s.id !== item.id && s.title.trim() !== item.title.trim()));
-    setTodoItems(prev => prev.filter(t => t.title.trim() !== item.title.trim()));
+    // 캘린더 일정에서 제거
+    setScheduleItems(prev => prev.filter(s => s.id !== item.id));
+
+    // 만약 타임블록 일정이었을 경우, 할 일 본체는 보존하고 타임블록 연동(isTimeBlocked)만 해제
+    if (item.taskId || item.isTimeBlock) {
+      setTodoItems(prev => prev.map(t => {
+        if (t.id === item.taskId || t.title.trim() === item.title.trim()) {
+          return {
+            ...t,
+            isTimeBlocked: false,
+            timeBlockScheduleId: undefined,
+            timeBlockDate: undefined,
+            timeBlockTime: undefined
+          };
+        }
+        return t;
+      }));
+    }
 
     try {
       if (notionApiKey && item.notionPageId) {
@@ -656,13 +779,17 @@ export const LifePage: React.FC = () => {
     setExpenseItems(prev => prev.filter(e => e.id !== item.id && e.title.trim() !== item.title.trim()));
   };
 
-  // 할 일 항목 삭제 처리
+  // 할 일 항목 삭제 처리 (독립 컨테이너 격리 및 연동 타임블록만 자동 정리)
   const handleDeleteTodo = (e: React.MouseEvent, item: LifeTodoItem) => {
     e.stopPropagation();
     markLifeItemAsDeleted(item.id, item.title);
     removeTaskFromQuickCapture(item.id, item.title);
+
+    // 1. 스마트할일 목록에서 안전하게 제거
     setTodoItems(prev => prev.filter(t => t.id !== item.id && t.title.trim() !== item.title.trim()));
-    setScheduleItems(prev => prev.filter(s => s.title.trim() !== item.title.trim()));
+
+    // 2. 이 할 일과 연동된 캘린더 타임블록이 존재한다면 캘린더에서도 함께 정리 (일반 일정은 절대 건드리지 않음)
+    setScheduleItems(prev => prev.filter(s => s.taskId !== item.id && s.id !== `s-todo-${item.id}`));
   };
 
   // 라이프 허브 데이터 동기화 (로컬 퀵 캡처 최신 항목 + 노션 클라우드 실제 DB 행 병합)
@@ -732,21 +859,29 @@ export const LifePage: React.FC = () => {
       });
       setExpenseItems(mergedExpenses);
 
-      // 할 일 병합
-      const mergedTodos = [...qcData.todos].filter(
+      // [독립 컨테이너] 스마트할일 병합 (스마트일정 복제 원천 차단)
+      // 1. 퀵 캡처에서 '할 일'로 명시 등록된 유효 데이터 필터링
+      const validQcTodos = qcData.todos.filter(
         t => !deletedIds.has(t.id) && !deletedIds.has(t.title.trim())
       );
-      mergedSchedules.forEach((ms, idx) => {
-        if (!mergedTodos.some(t => t.title === ms.title)) {
-          mergedTodos.push({
-            id: `todo-${idx}-${ms.id}`,
-            title: ms.title,
-            done: ms.status === '완료',
-            priority: ms.category === '할 일' ? '🔥 우선' : '⭐ 보통'
-          });
-        }
+
+      // 2. 사용자가 독립적으로 등록·관리한 기존 할일(todoItems) 유지 및 융합
+      setTodoItems(prev => {
+        const existingCustom = prev.filter(p => !deletedIds.has(p.id) && !deletedIds.has(p.title.trim()));
+        const combined = [...existingCustom];
+
+        validQcTodos.forEach(qt => {
+          if (!combined.some(c => c.id === qt.id || c.title.trim() === qt.title.trim())) {
+            combined.push(qt);
+          }
+        });
+
+        // 3. 타임블록 연동 상태(isTimeBlocked) 캘린더 실제 존재 여부와 실시간 동기화
+        return combined.map(t => {
+          const isBlocked = mergedSchedules.some(s => s.taskId === t.id || s.id === `s-todo-${t.id}`);
+          return { ...t, isTimeBlocked: isBlocked };
+        });
       });
-      setTodoItems(mergedTodos);
 
       setLastSyncTime(new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
     } catch (err) {
@@ -762,7 +897,20 @@ export const LifePage: React.FC = () => {
   }, [syncLifeHubData]);
 
   const toggleTodo = (id: string) => {
-    setTodoItems(prev => prev.map(t => t.id === id ? { ...t, done: !t.done } : t));
+    setTodoItems(prev => prev.map(t => {
+      if (t.id === id) {
+        const nextDone = !t.done;
+        // 연결된 캘린더 타임블록 일정이 있다면 완료 상태 동기화
+        setScheduleItems(sPrev => sPrev.map(s => {
+          if (s.taskId === id || s.id === `s-todo-${id}`) {
+            return { ...s, status: nextDone ? '완료' : '진행 중' };
+          }
+          return s;
+        }));
+        return { ...t, done: nextDone };
+      }
+      return t;
+    }));
   };
 
   const isNotionConnected = Boolean(notionApiKey && (createdNotionResource || selectedNotionDbId));
@@ -783,7 +931,7 @@ export const LifePage: React.FC = () => {
     </ErrorBoundary>
   );
 
-  // 2. 스마트 할 일 모듈 렌더러 (정밀 D-Day 엔진, 브라우저 푸시 알림, AI 서브태스크 분해기, 아이젠하워 4분면, 타임블록 전송)
+  // 2. 스마트 할 일 모듈 렌더러 (정밀 D-Day 엔진, 브라우저 푸시 알림, AI 서브태스크 분해기, 아이젠하워 4분면, 타임블록 On/Off 토글)
   const renderTodoModule = (isCompact = false) => (
     <ErrorBoundary fallbackTitle="스마트 할 일 모듈 로드 중 오류가 발생했습니다.">
       <TodoManagerView
@@ -792,7 +940,8 @@ export const LifePage: React.FC = () => {
         onToggleTodo={toggleTodo}
         onDeleteTodo={handleDeleteTodo}
         onQuickCapture={() => setCurrentView('quick_capture')}
-        onScheduleTodo={(todo) => handleScheduleTodoFromTask(todo, todo.dueDate || '2026-09-18', '14:00')}
+        onScheduleTodo={handleToggleTimeBlock}
+        onToggleTimeBlock={handleToggleTimeBlock}
         isCompact={isCompact}
       />
     </ErrorBoundary>
