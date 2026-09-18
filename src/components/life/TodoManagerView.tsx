@@ -41,6 +41,7 @@ interface TodoManagerViewProps {
   onToggleTodo: (id: string) => void;
   onDeleteTodo: (e: React.MouseEvent, item: LifeTodoItem) => void;
   onQuickCapture: () => void;
+  onScheduleTodo?: (todo: LifeTodoItem) => void;
   isCompact?: boolean;
 }
 
@@ -50,8 +51,10 @@ export const TodoManagerView: React.FC<TodoManagerViewProps> = ({
   onToggleTodo,
   onDeleteTodo,
   onQuickCapture,
+  onScheduleTodo,
   isCompact = false
 }) => {
+
   const { notionApiKey, showToast } = useApp();
 
   // 아이젠하워 4분면 필터: 'ALL' | 'P1' | 'P2' | 'P3' | 'P4'
@@ -630,8 +633,23 @@ export const TodoManagerView: React.FC<TodoManagerViewProps> = ({
                     </div>
                   </div>
 
-                  {/* 우측 액션: [🪄 AI 분해] + 우선순위 배지 + 삭제 */}
-                  <div className="flex items-center space-x-2 shrink-0">
+                  {/* 우측 액션: [📅 타임블록] + [🪄 AI 분해] + 우선순위 배지 + 삭제 */}
+                  <div className="flex items-center space-x-1.5 shrink-0">
+                    {/* [📅 일정으로 타임블록] 원클릭 버튼 */}
+                    {onScheduleTodo && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onScheduleTodo(todo);
+                        }}
+                        title="스마트일정 주간 캘린더에 즉시 타임블록 배정"
+                        className="flex items-center space-x-1 px-2 py-1 rounded-xl text-xs font-semibold bg-blue-50 hover:bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 dark:hover:bg-blue-900/60 border border-blue-200/80 dark:border-blue-800/60 transition cursor-pointer active:scale-95 whitespace-nowrap shadow-xs"
+                      >
+                        <Calendar className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                        <span className="whitespace-nowrap hidden sm:inline">타임블록</span>
+                      </button>
+                    )}
+
                     {/* [🪄 AI 서브태스크 분해] 원클릭 버튼 */}
                     <button
                       onClick={() => handleBreakdownTask(todo)}
@@ -649,6 +667,7 @@ export const TodoManagerView: React.FC<TodoManagerViewProps> = ({
                     <span className="text-[11px] px-2 py-0.5 rounded-md bg-slate-100 dark:bg-neutral-800 text-slate-700 dark:text-neutral-300 font-bold whitespace-nowrap border border-slate-200/80 dark:border-neutral-700/60">
                       {todo.priority || todo.eisenhower || 'P1'}
                     </span>
+
 
                     {/* 서브태스크 접기/펼치기 버튼 */}
                     {hasSubtasks && (

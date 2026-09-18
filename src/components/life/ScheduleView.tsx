@@ -25,6 +25,7 @@ interface ScheduleViewProps {
   onOpenEditModal: (item: LifeScheduleItem) => void;
   onDeleteItem: (item: LifeScheduleItem) => void;
   onQuickCapture: () => void;
+  onAddScheduleFromTodo?: (todoData: any, targetDate: string, targetTime: string) => void;
   isCompact?: boolean;
 }
 
@@ -33,6 +34,7 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
   onOpenEditModal,
   onDeleteItem,
   onQuickCapture,
+  onAddScheduleFromTodo,
   isCompact: _isCompact = false
 }) => {
   // 1. 뷰 모드: 월간, 주간, 일일
@@ -41,8 +43,12 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
   // 기준 날짜 (2026-09-18)
   const [currentDate, setCurrentDate] = useState<Date>(() => new Date(2026, 8, 18)); // 2026년 9월 18일
 
+  // DnD 슬롯 오버 상태 (예: "2026-09-18-14:00")
+  const [dragOverSlot, setDragOverSlot] = useState<string | null>(null);
+
   // 우측 서랍(Drawer) 상태
   const [selectedEvent, setSelectedEvent] = useState<LifeScheduleItem | null>(null);
+
   const [isDrawerOpen, setIsDrawerOpen] = useState<boolean>(false);
 
   const handleOpenDrawer = (item: LifeScheduleItem) => {
@@ -190,20 +196,53 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
             const isToday = cellYMD === todayStr;
             const daySchedules = schedules.filter(s => s.date.startsWith(cellYMD));
 
+            const isCellDragOver = dragOverSlot === cellYMD;
+
             return (
               <div 
                 key={idx}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = 'copy';
+                  if (dragOverSlot !== cellYMD) setDragOverSlot(cellYMD);
+                }}
+                onDragLeave={() => {
+                  if (dragOverSlot === cellYMD) setDragOverSlot(null);
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setDragOverSlot(null);
+                  try {
+                    const raw = e.dataTransfer.getData('application/json');
+                    if (raw) {
+                      const data = JSON.parse(raw);
+                      if (onAddScheduleFromTodo) {
+                        onAddScheduleFromTodo(data, cellYMD, '10:00');
+                      }
+                    }
+                  } catch (err) {
+                    console.error('월간 DnD 드롭 파싱 실패:', err);
+                  }
+                }}
                 onClick={() => {
                   if (daySchedules.length > 0) {
                     handleOpenDrawer(daySchedules[0]);
                   }
                 }}
-                className={`min-h-[90px] sm:min-h-[110px] p-2 flex flex-col justify-between transition group cursor-pointer ${
-                  !cell.isCurrentMonth 
-                    ? 'bg-slate-50/40 dark:bg-neutral-950/30 text-slate-300 dark:text-neutral-600' 
-                    : 'bg-white dark:bg-neutral-900/60 hover:bg-blue-50/30 dark:hover:bg-neutral-800/40 text-slate-700 dark:text-slate-200'
+                className={`min-h-[90px] sm:min-h-[110px] p-2 flex flex-col justify-between transition group cursor-pointer relative ${
+                  isCellDragOver
+                    ? 'bg-blue-50/90 dark:bg-blue-950/60 ring-2 ring-blue-500 ring-dashed z-10'
+                    : !cell.isCurrentMonth 
+                      ? 'bg-slate-50/40 dark:bg-neutral-950/30 text-slate-300 dark:text-neutral-600' 
+                      : 'bg-white dark:bg-neutral-900/60 hover:bg-blue-50/30 dark:hover:bg-neutral-800/40 text-slate-700 dark:text-slate-200'
                 }`}
               >
+                {isCellDragOver && (
+                  <div className="absolute inset-x-1 top-1 p-0.5 rounded bg-blue-500 text-white text-[9px] font-bold text-center z-20 shadow-xs animate-pulse">
+                    + 일정 드롭
+                  </div>
+                )}
+
                 {/* 상단 날짜 번호 및 밀집도 뱃지 */}
                 <div className="flex items-center justify-between">
                   <span className={`text-xs font-bold w-6 h-6 flex items-center justify-center rounded-full whitespace-nowrap ${
@@ -315,6 +354,9 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
                 {/* 7일 컬럼 슬롯 */}
                 {weekDays.map((d, dayIdx) => {
                   const ymd = formatYMD(d);
+                  const slotKey = `${ymd}-${time}`;
+                  const isDragOver = dragOverSlot === slotKey;
+
                   // 해당 날짜 및 시간대에 해당하는 일정 찾기
                   const slotEvents = schedules.filter(s => {
                     if (!s.date.startsWith(ymd)) return false;
@@ -326,9 +368,42 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
 
                   return (
                     <div 
-                      key={dayIdx} 
-                      className="p-1 relative hover:bg-slate-50/80 dark:hover:bg-neutral-800/30 transition group"
+                      key={dayIdx}
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = 'copy';
+                        if (dragOverSlot !== slotKey) setDragOverSlot(slotKey);
+                      }}
+                      onDragLeave={() => {
+                        if (dragOverSlot === slotKey) setDragOverSlot(null);
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        setDragOverSlot(null);
+                        try {
+                          const raw = e.dataTransfer.getData('application/json');
+                          if (raw) {
+                            const data = JSON.parse(raw);
+                            if (onAddScheduleFromTodo) {
+                              onAddScheduleFromTodo(data, ymd, time);
+                            }
+                          }
+                        } catch (err) {
+                          console.error('DnD 드롭 파싱 오류:', err);
+                        }
+                      }}
+                      className={`p-1 relative transition group min-h-[54px] ${
+                        isDragOver
+                          ? 'bg-blue-50/90 dark:bg-blue-950/60 ring-2 ring-blue-500 ring-dashed z-10'
+                          : 'hover:bg-slate-50/80 dark:hover:bg-neutral-800/30'
+                      }`}
                     >
+                      {isDragOver && (
+                        <div className="p-1 rounded-md bg-blue-500 text-white text-[10px] font-bold text-center animate-pulse mb-1 shadow-xs whitespace-nowrap">
+                          + 타임블록 드롭
+                        </div>
+                      )}
+
                       {slotEvents.map((item) => (
                         <div
                           key={item.id}
@@ -347,6 +422,7 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
                     </div>
                   );
                 })}
+
               </div>
             );
           })}

@@ -382,6 +382,7 @@ export const LifePage: React.FC = () => {
     setCurrentView, 
     notionApiKey, 
     apiKey,
+    showToast,
     createdNotionResource,
     selectedNotionDbId,
     selectedExpenseDbId,
@@ -427,7 +428,38 @@ export const LifePage: React.FC = () => {
       ]
     };
     setTodoItems((prev) => [newTodo, ...prev]);
-  }, []);
+    showToast(`"${mail.suggestedAction || mail.subject}" 스마트할일로 등록되었습니다.`, 'success');
+  }, [showToast]);
+
+  // 스마트할일 ➔ 스마트일정 타임블로킹 크로스오버 파이프라인 (DnD 및 원클릭 지원)
+  const handleScheduleTodoFromTask = useCallback((
+    todoData: any,
+    targetDate = '2026-09-18',
+    targetTime = '14:00'
+  ) => {
+    const startHour = parseInt(targetTime.split(':')[0], 10) || 14;
+    const endHourStr = String(startHour + 1).padStart(2, '0');
+    const fullStart = `${targetDate} ${targetTime}`;
+    const fullEnd = `${targetDate} ${endHourStr}:00`;
+
+    const newSchedule: LifeScheduleItem = {
+      id: `s-todo-${Date.now()}`,
+      title: todoData.title,
+      date: fullStart,
+      start: fullStart,
+      end: fullEnd,
+      dday: calculateDDay(targetDate),
+      category: '할 일',
+      icon: '🎯',
+      status: '진행 중',
+      notes: `스마트할일 타임블로킹으로 자동 연동된 일정 (아이젠하워 우선순위: ${todoData.eisenhower || 'P1'})`,
+      attendees: [{ name: '나 (담당자)', status: 'accepted' }]
+    };
+
+    setScheduleItems(prev => [newSchedule, ...prev]);
+    showToast(`"${todoData.title}" 일정이 ${targetDate} ${targetTime} 캘린더 타임블록에 등록되었습니다!`, 'success');
+  }, [showToast]);
+
 
 
   const [isLoadingNotion, setIsLoadingNotion] = useState<boolean>(false);
@@ -635,7 +667,7 @@ export const LifePage: React.FC = () => {
   const isNotionConnected = Boolean(notionApiKey && (createdNotionResource || selectedNotionDbId));
   const totalExpenseAmount = expenseItems.reduce((sum, item) => sum + (item.amount || 0), 0);
 
-  // 1. 스마트 일정 모듈 렌더러 (구글/노션 캘린더급 3대 뷰 스위처 & 우측 상세 서랍)
+  // 1. 스마트 일정 모듈 렌더러 (구글/노션 캘린더급 3대 뷰 스위처, 우측 상세 서랍, 크로스오버 타임블록 DnD 드롭존)
   const renderScheduleModule = (isCompact = false) => (
     <ErrorBoundary fallbackTitle="스마트 일정 모듈 로드 중 오류가 발생했습니다.">
       <ScheduleView
@@ -643,13 +675,13 @@ export const LifePage: React.FC = () => {
         onOpenEditModal={handleOpenEditModal}
         onDeleteItem={handleDeleteItem}
         onQuickCapture={() => setCurrentView('quick_capture')}
+        onAddScheduleFromTodo={handleScheduleTodoFromTask}
         isCompact={isCompact}
       />
     </ErrorBoundary>
   );
 
-  // 2. 스마트 할 일 모듈 렌더러
-  // 2. 스마트 할 일 모듈 렌더러 (정밀 D-Day 엔진, 브라우저 푸시 알림, AI 서브태스크 분해기, 아이젠하워 4분면)
+  // 2. 스마트 할 일 모듈 렌더러 (정밀 D-Day 엔진, 브라우저 푸시 알림, AI 서브태스크 분해기, 아이젠하워 4분면, 타임블록 전송)
   const renderTodoModule = (isCompact = false) => (
     <ErrorBoundary fallbackTitle="스마트 할 일 모듈 로드 중 오류가 발생했습니다.">
       <TodoManagerView
@@ -658,10 +690,12 @@ export const LifePage: React.FC = () => {
         onToggleTodo={toggleTodo}
         onDeleteTodo={handleDeleteTodo}
         onQuickCapture={() => setCurrentView('quick_capture')}
+        onScheduleTodo={(todo) => handleScheduleTodoFromTask(todo, todo.dueDate || '2026-09-18', '14:00')}
         isCompact={isCompact}
       />
     </ErrorBoundary>
   );
+
 
   // 3. 가계부 & 지출 모듈 렌더러 (월간 페이싱 게이지, 카테고리별 다차원 분석, AI 누수 진단 칩)
   const renderExpenseModule = (isCompact = false) => (
@@ -834,7 +868,7 @@ export const LifePage: React.FC = () => {
                     setActiveTab(tab.id);
                     setViewMode('tabs');
                   }}
-                  className={`flex items-center justify-center space-x-2 py-2.5 px-3 rounded-xl text-xs sm:text-sm font-bold transition cursor-pointer whitespace-nowrap shrink-0 ${
+                  className={`flex items-center justify-center space-x-2 py-2.5 px-3 min-h-[44px] rounded-xl text-xs sm:text-sm font-bold transition cursor-pointer whitespace-nowrap shrink-0 ${
                     isActive
                       ? 'bg-white dark:bg-neutral-900 text-slate-900 dark:text-white shadow-sm border border-slate-200/80 dark:border-neutral-700'
                       : 'text-slate-600 dark:text-neutral-400 hover:text-slate-900 dark:hover:text-white hover:bg-white/60 dark:hover:bg-neutral-800/60'

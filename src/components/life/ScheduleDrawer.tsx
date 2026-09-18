@@ -96,11 +96,11 @@ export const ScheduleDrawer: React.FC<ScheduleDrawerProps> = ({
         onClick={onClose}
       />
 
-      <div className="fixed inset-y-0 right-0 max-w-full flex pl-10">
-        <div className="w-screen max-w-md md:max-w-lg bg-white dark:bg-neutral-900 border-l border-slate-200 dark:border-neutral-800 shadow-2xl flex flex-col transform transition ease-in-out duration-300">
+      <div className="fixed inset-y-0 right-0 max-w-full flex pl-0 sm:pl-10">
+        <div className="w-screen max-w-full sm:max-w-md md:max-w-lg bg-white dark:bg-neutral-900 border-l border-slate-200 dark:border-neutral-800 shadow-2xl flex flex-col transform transition ease-in-out duration-300">
           
           {/* 1. 서랍 상단 헤더 */}
-          <div className="px-6 py-4 border-b border-slate-200 dark:border-neutral-800 flex items-center justify-between bg-slate-50/70 dark:bg-neutral-900/80">
+          <div className="px-5 sm:px-6 py-4 border-b border-slate-200 dark:border-neutral-800 flex items-center justify-between bg-slate-50/70 dark:bg-neutral-900/80">
             <div className="flex items-center space-x-2 min-w-0">
               <span className="text-2xl shrink-0">{event.icon || '📅'}</span>
               <div className="min-w-0">
@@ -128,7 +128,7 @@ export const ScheduleDrawer: React.FC<ScheduleDrawerProps> = ({
               <button
                 onClick={() => onOpenEdit(event)}
                 title="일정 수정"
-                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-neutral-800 transition cursor-pointer"
+                className="p-2 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-neutral-800 transition cursor-pointer min-w-[40px] min-h-[40px] flex items-center justify-center"
               >
                 <Edit2 className="w-4 h-4" />
               </button>
@@ -138,19 +138,20 @@ export const ScheduleDrawer: React.FC<ScheduleDrawerProps> = ({
                   onClose();
                 }}
                 title="일정 삭제"
-                className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-slate-100 dark:hover:bg-neutral-800 transition cursor-pointer"
+                className="p-2 rounded-xl text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-slate-100 dark:hover:bg-neutral-800 transition cursor-pointer min-w-[40px] min-h-[40px] flex items-center justify-center"
               >
                 <Trash2 className="w-4 h-4" />
               </button>
               <button
                 onClick={onClose}
                 title="서랍 닫기"
-                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-neutral-800 transition cursor-pointer"
+                className="p-2 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-neutral-800 transition cursor-pointer min-w-[40px] min-h-[40px] flex items-center justify-center"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
           </div>
+
 
           {/* 2. 서랍 본문 스크롤 영역 */}
           <div className="flex-1 overflow-y-auto p-6 space-y-6 text-slate-800 dark:text-slate-200 text-sm">
