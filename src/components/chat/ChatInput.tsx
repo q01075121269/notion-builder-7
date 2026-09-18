@@ -7,20 +7,28 @@ import {
   Paperclip, 
   UploadCloud,
   Mic,
+  MicOff,
   Camera
 } from 'lucide-react';
 import type { AttachedFile } from '../../types/fileAttachment';
 import { parseUploadedFile } from '../../services/fileParserService';
 import { FileAttachmentZone } from './FileAttachmentZone';
+import { cleanDuplicateSpeech } from '../../services/quickCaptureLocalParser';
 
 export const ChatInput: React.FC<{ inputPrompt?: string; onClearPrompt?: () => void }> = ({
   inputPrompt,
   onClearPrompt
 }) => {
-  const { sendMessage, isGenerating, setCurrentView } = useApp();
+  const { sendMessage, isGenerating } = useApp();
   const [text, setText] = useState<string>('');
   const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
   const [isDragOver, setIsDragOver] = useState(false);
+
+  // ── 인라인 STT 상태 (화면 탭 전환 없음) ──────────────────────────────
+  const [isListening, setIsListening] = useState(false);
+  const [sttSupported, setSttSupported] = useState(false);
+  const recognitionRef = useRef<any>(null);
+  const sttDispatchedRef = useRef(false);
   
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -43,6 +51,47 @@ export const ChatInput: React.FC<{ inputPrompt?: string; onClearPrompt?: () => v
       textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 140)}px`;
     }
   }, [text]);
+
+  // ── 인라인 STT 초기화 (빌더 전용, quick_capture 탭 전환 없음) ───────────
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SR) return;
+    setSttSupported(true);
+    const recog = new SR();
+    recog.lang = 'ko-KR';
+    recog.continuous = false;
+    recog.interimResults = false;
+    recog.onresult = (event: any) => {
+      if (sttDispatchedRef.current) return;
+      const result = event.results[event.results.length - 1];
+      const transcript = (result?.[0]?.transcript || '').trim();
+      if (!transcript) return;
+      sttDispatchedRef.current = true;
+      const cleaned = cleanDuplicateSpeech(transcript);
+      setText(cleaned);
+      setIsListening(false);
+      try { recog.stop(); } catch {}
+    };
+    recog.onerror = () => { setIsListening(false); sttDispatchedRef.current = false; };
+    recog.onend = () => { setIsListening(false); };
+    recognitionRef.current = recog;
+    return () => { try { recognitionRef.current?.abort(); } catch {} };
+  }, []);
+
+  const toggleBuilderListening = () => {
+    if (!sttSupported) {
+      alert('이 브라우저는 음성 인식을 지원하지 않습니다.');
+      return;
+    }
+    if (isListening) {
+      try { recognitionRef.current?.stop(); } catch {}
+      setIsListening(false);
+    } else {
+      sttDispatchedRef.current = false;
+      try { recognitionRef.current?.start(); setIsListening(true); } catch (err) { console.error(err); }
+    }
+  };
 
   // 파일 파싱 및 추가 핸들러
   const handleAddFiles = async (fileList: FileList | null) => {
@@ -203,15 +252,19 @@ export const ChatInput: React.FC<{ inputPrompt?: string; onClearPrompt?: () => v
             <Camera className="w-5 h-5" />
           </button>
 
-          {/* Voice Quick Capture Shortcut Button */}
+          {/* 인라인 STT 마이크 버튼 (화면 탭 전환 없음 — 라우팅 버그 차단) */}
           <button
             type="button"
-            onClick={() => setCurrentView('quick_capture')}
+            onClick={toggleBuilderListening}
             disabled={isGenerating}
-            className="w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl text-neutral-500 hover:text-rose-500 dark:text-neutral-400 dark:hover:text-rose-400 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition shrink-0 active:scale-95"
-            title="모바일 1초 음성 퀵 캡처 허브로 이동"
+            title={isListening ? '음성 인식 중단' : '빌더 인라인 음성 입력 (한국어)'}
+            className={`w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl transition shrink-0 active:scale-95 ${
+              isListening
+                ? 'bg-rose-500 text-white animate-pulse ring-4 ring-rose-200 dark:ring-rose-900/50'
+                : 'text-neutral-500 hover:text-rose-500 dark:text-neutral-400 dark:hover:text-rose-400 hover:bg-neutral-100 dark:hover:bg-neutral-800'
+            }`}
           >
-            <Mic className="w-5 h-5" />
+            {isListening ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
           </button>
 
           {/* Hidden File Inputs */}

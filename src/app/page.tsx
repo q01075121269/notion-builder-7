@@ -9,18 +9,15 @@ import {
   ShieldCheck, 
   Cpu, 
   Database,
-  Send,
-  Mic,
-  MicOff,
-  Volume2,
-  VolumeX,
   Bot,
   User,
   Calendar,
   Code2,
   HelpCircle,
   RotateCcw,
-  ExternalLink
+  ExternalLink,
+  Volume2,
+  VolumeX
 } from 'lucide-react';
 import { 
   sendToOrchestrator, 
@@ -63,7 +60,6 @@ export const HomePage: React.FC = () => {
   ]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [isListening, setIsListening] = useState(false);
   const [isTtsEnabled, setIsTtsEnabled] = useState(true);
   const [isSpeaking, setIsSpeaking] = useState(false);
 
@@ -100,7 +96,6 @@ export const HomePage: React.FC = () => {
 
           speechDispatchedRef.current = true;
           setInputValue(transcript);
-          setIsListening(false);
           try {
             recog.stop();
           } catch {}
@@ -113,12 +108,11 @@ export const HomePage: React.FC = () => {
 
         recog.onerror = (event: any) => {
           console.warn('음성 인식 오류:', event.error);
-          setIsListening(false);
           speechDispatchedRef.current = false;
         };
 
         recog.onend = () => {
-          setIsListening(false);
+          // STT 종료 시 별도 처리 없음
         };
 
         recognitionRef.current = recog;
@@ -134,29 +128,6 @@ export const HomePage: React.FC = () => {
       }
     };
   }, []);
-
-  // 음성 인식 토글
-  const toggleListening = () => {
-    if (!recognitionRef.current) {
-      alert('이 브라우저는 음성 인식을 지원하지 않습니다. Chrome 또는 최신 모바일 브라우저를 권장합니다.');
-      return;
-    }
-
-    if (isListening) {
-      recognitionRef.current.stop();
-      setIsListening(false);
-    } else {
-      speechDispatchedRef.current = false;
-      stopSpeech();
-      setIsSpeaking(false);
-      try {
-        recognitionRef.current.start();
-        setIsListening(true);
-      } catch (err) {
-        console.error('음성 인식 시작 실패:', err);
-      }
-    }
-  };
 
   // TTS 토글
   const toggleTts = () => {
@@ -595,7 +566,7 @@ export const HomePage: React.FC = () => {
             <div ref={chatEndRef} />
           </div>
 
-          {/* 추천 칩 목록 */}
+          {/* 추천 칩 목록 (OmniChatBar로 입력창 통합 후에도 빠른 예시로 유지) */}
           <div className="px-4 py-2 border-t border-neutral-100 dark:border-neutral-800/80 bg-white dark:bg-notion-dark-card flex items-center gap-1.5 overflow-x-auto no-scrollbar">
             <span className="text-[10px] text-neutral-400 shrink-0 font-medium mr-1">추천:</span>
             {quickChips.map((chip, idx) => (
@@ -610,58 +581,11 @@ export const HomePage: React.FC = () => {
             ))}
           </div>
 
-          {/* 하단 입력 폼 (텍스트 입력창 + 마이크 버튼) */}
-          <div className="p-3 sm:p-4 border-t border-neutral-100 dark:border-neutral-800 bg-neutral-50/50 dark:bg-neutral-900/30">
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                handleSendMessage();
-              }}
-              className="flex items-center space-x-2"
-            >
-              {/* 마이크 버튼 (음성 STT) */}
-              <button
-                type="button"
-                onClick={toggleListening}
-                title={isListening ? '음성 듣는 중... 클릭하여 중지' : '모바일/PC 마이크 음성 입력'}
-                className={`p-2.5 sm:p-3 rounded-2xl transition flex items-center justify-center shrink-0 ${
-                  isListening
-                    ? 'bg-rose-500 text-white animate-pulse ring-4 ring-rose-200 dark:ring-rose-900/50'
-                    : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-200 dark:hover:bg-neutral-700'
-                }`}
-              >
-                {isListening ? (
-                  <MicOff className="w-5 h-5 text-white" />
-                ) : (
-                  <Mic className="w-5 h-5" />
-                )}
-              </button>
-
-              {/* 텍스트 입력 인풋 */}
-              <div className="relative flex-1">
-                <input
-                  type="text"
-                  value={inputValue}
-                  onChange={(e) => setInputValue(e.target.value)}
-                  placeholder={
-                    isListening
-                      ? '🎙️ 지금 말씀하세요... 한국어로 듣고 있습니다.'
-                      : '비서에게 말하거나 타이핑하세요 (예: "내일 3시 치과 예약해줘")'
-                  }
-                  disabled={isLoading}
-                  className="w-full bg-white dark:bg-neutral-800/90 text-neutral-900 dark:text-white text-xs sm:text-sm rounded-2xl px-4 py-2.5 sm:py-3 border border-neutral-200/80 dark:border-neutral-700/80 focus:outline-none focus:ring-2 focus:ring-amber-500/50 dark:focus:ring-amber-400/40 transition placeholder:text-neutral-400"
-                />
-              </div>
-
-              {/* 전송 버튼 */}
-              <button
-                type="submit"
-                disabled={!inputValue.trim() || isLoading}
-                className="p-2.5 sm:p-3 rounded-2xl bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 disabled:opacity-40 hover:opacity-90 active:scale-95 transition shrink-0 flex items-center justify-center"
-              >
-                <Send className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
-              </button>
-            </form>
+          {/* 하단 입력 안내 (OmniChatBar로 통합됨) */}
+          <div className="px-4 py-2.5 border-t border-neutral-100 dark:border-neutral-800 bg-neutral-50/50 dark:bg-neutral-900/30">
+            <p className="text-[11px] text-neutral-400 dark:text-neutral-500 text-center">
+              💬 화면 하단 <span className="font-bold text-amber-500">옴니 챗바</span>에서 음성·텍스트로 바로 입력하세요
+            </p>
           </div>
 
         </div>
