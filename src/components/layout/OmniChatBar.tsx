@@ -14,6 +14,9 @@ import {
   Code2,
   Construction,
   ExternalLink,
+  Paperclip,
+  FileText,
+  Link as LinkIcon,
 } from 'lucide-react';
 import { sendToOrchestrator } from '../../services/orchestratorService';
 import type { ChatMessage, OrchestratorResponse } from '../../services/orchestratorService';
@@ -66,6 +69,7 @@ interface OmniMessage extends ChatMessage {
   receipts?: ActionReceipt[];
   /** DEVLAB troubleshooting 인텐트 시 SelfDiagnosticCard 데이터 */
   diagnostic?: DiagnosticResult;
+  attachments?: string[];
 }
 
 function buildReceipts(intent: string): ActionReceipt[] {
@@ -102,22 +106,27 @@ export const OmniChatBar: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
 
-  // STT 상태
+  // 첨부 파일 상태
+  const [attachedFiles, setAttachedFiles] = useState<{ name: string; size?: string; type: string }[]>([]);
+  const [showLinkModal, setShowLinkModal] = useState(false);
+  const [linkInput, setLinkInput] = useState('');
+
+  // STT 상태 (Push-to-Dictate 단방향 누적 버퍼 모드)
   const [isListening, setIsListening] = useState(false);
   const [sttSupported, setSttSupported] = useState(false);
 
   // refs
   const inputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
   const isLoadingRef = useRef(false);
+  const isListeningRef = useRef(false);
   const lastSentRef = useRef<{ text: string; time: number }>({ text: '', time: 0 });
-  const speechDispatchedRef = useRef(false);
-  const silenceTimerRef = useRef<any>(null);
   const fullTranscriptRef = useRef<string>('');
   const handleSendMessageRef = useRef<(overrideText?: string) => Promise<void>>(() => Promise.resolve());
 
-  // ── STT 초기화 ─────────────────────────────────────────────────────────────
+  // ── STT 초기화 (Push-to-Dictate 단방향 누적 버퍼) ──────────────────────────
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -150,36 +159,34 @@ export const OmniChatBar: React.FC = () => {
       if (combined) {
         setInputValue(combined);
       }
-
-      // 침묵 타이머 (1.8초 동안 말을 멈출 경우에만 완성된 문장 자동 전송)
-      if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
-      silenceTimerRef.current = setTimeout(() => {
-        const textToSend = combined || fullTranscriptRef.current;
-        if (textToSend && textToSend.trim().length >= 2 && !speechDispatchedRef.current) {
-          speechDispatchedRef.current = true;
-          try { recog.stop(); } catch {}
-          setIsListening(false);
-          handleSendMessageRef.current(textToSend.trim());
-        }
-      }, 1800);
+      // 단방향 누적 버퍼 모드: 침묵 타이머 자동 전송을 실행하지 않음!
     };
 
     recog.onerror = (e: any) => {
-      console.warn('STT 오류:', e?.error);
-      if (e?.error !== 'no-speech') {
+      console.warn('STT 상태/오류:', e?.error);
+      if (e?.error === 'not-allowed' || e?.error === 'service-not-allowed') {
+        isListeningRef.current = false;
         setIsListening(false);
-        speechDispatchedRef.current = false;
       }
     };
 
     recog.onend = () => {
-      setIsListening(false);
+      // 사용자가 수동으로 끄기 전까지는 자동으로 재시작하여 텀이 길어도 끊기지 않음
+      if (isListeningRef.current) {
+        try {
+          recog.start();
+        } catch {
+          // 이미 실행 중이거나 에러 발생 시 처리
+        }
+      } else {
+        setIsListening(false);
+      }
     };
 
     recognitionRef.current = recog;
 
     return () => {
-      if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+      isListeningRef.current = false;
       try { recognitionRef.current?.abort(); } catch {}
     };
   }, []);
@@ -195,20 +202,16 @@ export const OmniChatBar: React.FC = () => {
       alert('이 브라우저는 음성 인식을 지원하지 않습니다. Chrome 또는 최신 Edge를 사용해 주세요.');
       return;
     }
-    if (isListening) {
-      if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
-      try { recognitionRef.current?.stop(); } catch {}
-      setIsListening(false);
 
-      const textToSend = inputValue.trim() || fullTranscriptRef.current.trim();
-      if (textToSend && !speechDispatchedRef.current) {
-        speechDispatchedRef.current = true;
-        handleSendMessageRef.current(textToSend);
-      }
+    if (isListening) {
+      // 수동으로 마이크 버튼을 눌러 깔 때 -> 녹음 중단
+      isListeningRef.current = false;
+      setIsListening(false);
+      try { recognitionRef.current?.stop(); } catch {}
     } else {
-      speechDispatchedRef.current = false;
-      fullTranscriptRef.current = '';
-      setInputValue('');
+      // 수동으로 마이크 버튼을 눌러 켤 때 -> 이전 텍스트 유지한 상태에서 누적
+      isListeningRef.current = true;
+      fullTranscriptRef.current = inputValue.trim();
       try {
         recognitionRef.current?.start();
         setIsListening(true);
@@ -219,11 +222,47 @@ export const OmniChatBar: React.FC = () => {
     }
   };
 
+  // ── 파일 첨부 핸들러 ────────────────────────────────────────────────────────
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    const newAttachments = Array.from(files).map((f) => ({
+      name: f.name,
+      size: `${(f.size / 1024).toFixed(1)}KB`,
+      type: 'file',
+    }));
+
+    setAttachedFiles((prev) => [...prev, ...newAttachments]);
+    showToast(`📎 ${newAttachments.length}개 파일이 첨부되었습니다.`, 'info');
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const addLinkAttachment = () => {
+    if (!linkInput.trim()) return;
+    const url = linkInput.trim().startsWith('http') ? linkInput.trim() : `https://${linkInput.trim()}`;
+    setAttachedFiles((prev) => [...prev, { name: url, type: 'link' }]);
+    setLinkInput('');
+    setShowLinkModal(false);
+    showToast('🔗 링크가 첨부되었습니다.', 'info');
+  };
+
+  const removeAttachment = (index: number) => {
+    setAttachedFiles((prev) => prev.filter((_, i) => i !== index));
+  };
+
   // ── 메시지 전송 ─────────────────────────────────────────────────────────────
   const handleSendMessage = useCallback(async (overrideText?: string) => {
     const raw = (overrideText ?? inputValue).trim();
     const text = cleanDuplicateSpeech(raw);
-    if (!text || isLoadingRef.current) return;
+    if ((!text && attachedFiles.length === 0) || isLoadingRef.current) return;
+
+    // 만약 음성 입력 중이었다면 마이크 중단
+    if (isListeningRef.current) {
+      isListeningRef.current = false;
+      setIsListening(false);
+      try { recognitionRef.current?.stop(); } catch {}
+    }
 
     // 3초 이내 동일 텍스트 중복 방지
     const now = Date.now();
@@ -231,21 +270,31 @@ export const OmniChatBar: React.FC = () => {
 
     isLoadingRef.current = true;
     lastSentRef.current = { text, time: now };
+
+    const attachmentSummary = attachedFiles.length > 0
+      ? `\n[첨부: ${attachedFiles.map((a) => a.name).join(', ')}]`
+      : '';
+    const fullMessageText = text + attachmentSummary;
+
     setInputValue('');
+    fullTranscriptRef.current = '';
+    const currentAttachments = [...attachedFiles.map((a) => a.name)];
+    setAttachedFiles([]);
     setIsExpanded(true);
 
     const userMsg: OmniMessage = {
       id: `omni-user-${Date.now()}`,
       role: 'user',
-      content: text,
+      content: fullMessageText,
       timestamp: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }),
+      attachments: currentAttachments,
     };
     setMessages(prev => [...prev, userMsg]);
     setIsLoading(true);
 
     try {
       const response: OrchestratorResponse = await sendToOrchestrator(
-        text,
+        fullMessageText,
         [...messages, userMsg],
         apiKey,
         authUser?.email,
@@ -254,21 +303,23 @@ export const OmniChatBar: React.FC = () => {
       let finalReply = response.reply_message;
       let receipts: ActionReceipt[] = [];
 
-      // ── LIFE 인텐트: 노션 & 로컬 즉시 전송 ──────────────────────────────────
+      // ── LIFE 인텐트: 노션 & 로컬 즉시 전송 및 일정 이동(RESCHEDULE) 처리 ───────
       if (response.intent === 'LIFE') {
         const rescheduleMatch = detectReschedulePattern(text);
-        const isRescheduleCmd = Boolean(rescheduleMatch) || (/(연기|미뤄|변경|이동|옮겨)/.test(text) && /연가|휴가|일정/.test(text));
+        const isRescheduleCmd = Boolean(rescheduleMatch) ||
+          response.payload?.action === 'RESCHEDULE' ||
+          (/(연기|미뤄|변경|이동|옮겨)/.test(text) && /연가|휴가|일정/.test(text));
 
         if (isRescheduleCmd) {
-          const srcD = rescheduleMatch?.sourceDateQuery || '2026-09-21';
-          const tgtD = rescheduleMatch?.targetDateStr || '2026-09-28';
-          const kw = rescheduleMatch?.keyword || '연가';
+          const srcD = response.payload?.source_date || rescheduleMatch?.sourceDateQuery || '2026-09-21';
+          const tgtD = response.payload?.target_date || rescheduleMatch?.targetDateStr || '2026-09-28';
+          const kw = response.payload?.target_keyword || rescheduleMatch?.keyword || '연가';
 
           rescheduleTaskInQuickCapture(srcD, tgtD, kw);
           cleanupDuplicateRescheduleTasks(tgtD, kw);
 
-          finalReply = `${response.reply_message}\n\n✅ 9월 21일 연가 일정이 9월 28일로 성공적으로 이동/연기되었습니다! (20일, 21일 중복 생성 항목 자동 정제 완료)`;
-          showToast('✅ 연가 일정이 9월 28일로 이동되었습니다!', 'success');
+          finalReply = `${response.reply_message}\n\n✅ ${srcD} ${kw} 일정이 ${tgtD}로 성공적으로 이동/연기되었습니다! (기존 일정 업데이트 완료)`;
+          showToast(`✅ ${kw} 일정이 ${tgtD}로 이동되었습니다!`, 'success');
           receipts = buildReceipts('LIFE');
         } else {
           const naturalDate = extractDateFromKoreanText(text);
@@ -374,7 +425,7 @@ export const OmniChatBar: React.FC = () => {
       isLoadingRef.current = false;
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [inputValue, messages, apiKey, authUser, notionApiKey, notionParentPageId, createdNotionResource, showToast]);
+  }, [inputValue, attachedFiles, messages, apiKey, authUser, notionApiKey, notionParentPageId, createdNotionResource, showToast]);
 
   useEffect(() => {
     handleSendMessageRef.current = handleSendMessage;
@@ -421,6 +472,47 @@ export const OmniChatBar: React.FC = () => {
 
   return (
     <div className="fixed bottom-0 left-0 right-0 z-50 flex flex-col items-center pointer-events-none">
+      {/* 숨겨진 파일 선택 Input */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleFileChange}
+        multiple
+        className="hidden"
+      />
+
+      {/* ── 링크 입력 모달 ─────────────────────────────────────────────────── */}
+      {showLinkModal && (
+        <div className="pointer-events-auto fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-neutral-800 rounded-2xl p-4 max-w-sm w-full space-y-3 shadow-xl border border-slate-200 dark:border-neutral-700">
+            <h4 className="text-xs font-bold text-neutral-800 dark:text-neutral-200 flex items-center space-x-1.5">
+              <LinkIcon className="w-3.5 h-3.5 text-indigo-500" />
+              <span>웹 링크 / 참고 URL 첨부</span>
+            </h4>
+            <input
+              type="url"
+              value={linkInput}
+              onChange={(e) => setLinkInput(e.target.value)}
+              placeholder="https://example.com/notion-page"
+              className="w-full text-xs px-3 py-2 rounded-xl border border-slate-200 dark:border-neutral-700 bg-slate-50 dark:bg-neutral-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+            <div className="flex justify-end space-x-2">
+              <button
+                onClick={() => setShowLinkModal(false)}
+                className="px-3 py-1.5 rounded-lg text-xs text-neutral-500 hover:bg-slate-100 dark:hover:bg-neutral-700"
+              >
+                취소
+              </button>
+              <button
+                onClick={addLinkAttachment}
+                className="px-3 py-1.5 rounded-lg text-xs bg-indigo-600 text-white font-medium hover:bg-indigo-700"
+              >
+                첨부
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── 채팅 피드 팝업 (메시지가 있을 때 + 확장 상태) ──────────────────── */}
       {isExpanded && hasMessages && (
@@ -595,8 +687,29 @@ export const OmniChatBar: React.FC = () => {
           mb-14 md:mb-0
         "
       >
-        <div className="flex items-center gap-2">
+        {/* 첨부 파일 칩 노출 영역 */}
+        {attachedFiles.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 mb-2 px-1">
+            {attachedFiles.map((file, idx) => (
+              <div
+                key={idx}
+                className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-[11px] bg-slate-200 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 border border-slate-300 dark:border-neutral-700"
+              >
+                {file.type === 'link' ? <LinkIcon className="w-3 h-3 text-indigo-500" /> : <FileText className="w-3 h-3 text-amber-500" />}
+                <span className="max-w-[140px] truncate">{file.name}</span>
+                {file.size && <span className="text-[9px] text-neutral-400">({file.size})</span>}
+                <button
+                  onClick={() => removeAttachment(idx)}
+                  className="p-0.5 hover:text-rose-500 rounded-full"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
 
+        <div className="flex items-center gap-2">
           {/* 노션 연동 상태 점 (클릭하면 설정 열기) */}
           <button
             onClick={() => setIsNotionSettingsModalOpen(true)}
@@ -605,6 +718,29 @@ export const OmniChatBar: React.FC = () => {
           >
             <span className={`block w-2 h-2 rounded-full ${notionApiKey ? 'bg-emerald-500' : 'bg-amber-400 animate-pulse'}`} />
           </button>
+
+          {/* 클립(📎) 파일/링크 첨부 버튼 */}
+          <div className="relative group shrink-0">
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                setShowLinkModal(true);
+              }}
+              title="파일 드래그/선택 (우클릭: 웹 링크 첨부)"
+              className="
+                w-9 h-9 flex items-center justify-center
+                rounded-xl
+                bg-slate-100 dark:bg-neutral-800
+                text-neutral-500 dark:text-neutral-400
+                hover:bg-slate-200 dark:hover:bg-neutral-700
+                transition
+              "
+            >
+              <Paperclip className="w-4 h-4" />
+            </button>
+          </div>
 
           {/* 텍스트 입력창 */}
           <input
@@ -616,7 +752,7 @@ export const OmniChatBar: React.FC = () => {
             onFocus={() => hasMessages && setIsExpanded(true)}
             placeholder={
               isListening
-                ? '🎙️ 한국어로 말씀하세요...'
+                ? '🎙️ 단방향 음성 인식 중... (말을 멈춰도 유지됨, 전송 또는 마이크 재클릭)'
                 : '무엇이든 물어보세요 — 일정·지출·템플릿·개발 등 (Enter 전송)'
             }
             disabled={isLoading}
@@ -634,12 +770,12 @@ export const OmniChatBar: React.FC = () => {
             "
           />
 
-          {/* 마이크 버튼 — 인라인 STT (화면 탭 전환 없음) */}
+          {/* 마이크 버튼 — Push-to-Dictate 단방향 연속 음성 버퍼 (빨간색 animate-pulse) */}
           <button
             type="button"
             onClick={toggleListening}
             disabled={isLoading}
-            title={isListening ? '음성 인식 중단' : '음성으로 입력 (한국어 STT)'}
+            title={isListening ? '음성 인식 중단' : '음성으로 연속 입력 (Push-to-Dictate STT)'}
             className={`
               w-10 h-10 min-w-[40px] shrink-0
               flex items-center justify-center
@@ -661,7 +797,7 @@ export const OmniChatBar: React.FC = () => {
           <button
             type="button"
             onClick={() => handleSendMessage()}
-            disabled={!inputValue.trim() || isLoading}
+            disabled={(!inputValue.trim() && attachedFiles.length === 0) || isLoading}
             className="
               w-10 h-10 min-w-[40px] shrink-0
               flex items-center justify-center

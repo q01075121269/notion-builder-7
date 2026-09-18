@@ -1,4 +1,4 @@
-﻿// app/api/orchestrator/route.ts
+// app/api/orchestrator/route.ts
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 //  NOTION ARCHITECT v2.0 — Gemini Function Calling 마스터 오케스트레이터
 //  Next.js App Router Web API (Edge/Node 양용)
@@ -208,9 +208,12 @@ const FUNCTION_DECLARATIONS = [
         },
         action: {
           type: 'STRING',
-          enum: ['create', 'update', 'delete', 'list'],
-          description: '수행할 작업 유형',
+          enum: ['create', 'update', 'delete', 'list', 'RESCHEDULE', 'CREATE', 'UPDATE', 'DELETE'],
+          description: '수행할 작업 유형 (일정 연기/변경 시 RESCHEDULE 사용)',
         },
+        target_keyword: { type: 'STRING', description: '이동/변경 대상 일정명 (예: 연가, 치과, 회의)' },
+        source_date: { type: 'STRING', description: '기존 일정 일시 (예: 2026-09-21)' },
+        target_date: { type: 'STRING', description: '변경될 목표 일시 (예: 2026-09-28)' },
         title: { type: 'STRING', description: '항목의 핵심 제목' },
         date: { type: 'STRING', description: '날짜/시간 (YYYY-MM-DD 또는 YYYY-MM-DD HH:mm)' },
         amount: { type: 'NUMBER', description: '금액 (원 단위, FINANCE 전용)' },
@@ -386,6 +389,7 @@ ${knownBugSummary}
 [도구 선택 기준]
 • 노션 템플릿/대시보드/DB 설계 요청 → route_template_forge
 • 일정/할일/지출/이메일 요청 → route_life_hub
+  - 일정 연기/이동/변경("21일 연가 28일로 옮겨줘") → route_life_hub(sub_domain: "SCHEDULE", action: "RESCHEDULE", target_keyword: "연가", source_date: "2026-09-21", target_date: "2026-09-28")
 • 개발 코드/에러/아이디어/프롬프트 요청 → route_dev_lab
 • 이 시스템(Notion Architect) 자체 버그/UI 오류 언급 → diagnose_system_error
 • 그 외 인사/일상 대화/시스템 안내 → general_chat

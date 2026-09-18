@@ -6,7 +6,6 @@ import {
   Leaf,
   Terminal,
   Layers, 
-  Zap, 
   Settings, 
   Bot,
   ChevronDown
@@ -130,21 +129,8 @@ export const Navbar: React.FC = () => {
             </button>
           </div>
 
-          {/* [우측]: 퀵 캡처, 보관함, Gemini 모델 셀렉터, [⚙️ 설정] 버튼, 프로필 아바타 */}
-          <div className="flex items-center space-x-1 sm:space-x-1.5 shrink-0">
-            {/* 1초 퀵 캡처 숏컷 */}
-            <button
-              onClick={() => setCurrentView('quick_capture')}
-              className={`p-1.5 rounded-xl border transition cursor-pointer shrink-0 ${
-                currentView === 'quick_capture'
-                  ? 'bg-rose-50 dark:bg-rose-950/40 border-rose-300 text-rose-600 dark:text-rose-400 shadow-xs'
-                  : 'border-neutral-200 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-600 dark:text-neutral-300'
-              }`}
-              title="1초 퀵 캡처"
-            >
-              <Zap className="w-4 h-4 text-rose-500" />
-            </button>
-
+          {/* [우측]: 보관함, Gemini 모델 셀렉터, [⚙️ 설정] 버튼, 프로필 아바타 */}
+          <div className="flex items-center space-x-1 sm:space-x-1.5 shrink-0 whitespace-nowrap">
             {/* 보관함 숏컷 */}
             <button
               onClick={() => setCurrentView('dashboard')}
