@@ -4,6 +4,7 @@ import { getRecentMediaItems, deleteMediaItem } from '../../lib/mediaStorage';
 import type { MediaItem } from '../../lib/mediaStorage';
 import { ImageStudioView } from './ImageStudioView';
 import { VideoStudioView } from './VideoStudioView';
+import { AudioStudioView } from './AudioStudioView';
 import { useApp } from '../../context/AppContext';
 
 export type MediaSubTab = 'IMAGE' | 'VIDEO' | 'AUDIO';
@@ -148,26 +149,10 @@ export const MediaLabView: React.FC = () => {
             onTransferToAudio={handleTransferToAudio}
           />
         ) : (
-          <div className="bg-white dark:bg-neutral-800 rounded-3xl p-6 sm:p-8 border border-slate-200 dark:border-neutral-700 space-y-4 text-center">
-            <Music className="w-10 h-10 mx-auto text-pink-500 animate-pulse" />
-            <h3 className="text-base font-bold text-slate-800 dark:text-white">
-              🎵 제3단계: BGM & 사운드 입히기 모듈
-            </h3>
-            {audioTargetVideo ? (
-              <div className="p-4 rounded-2xl bg-pink-50 dark:bg-pink-950/40 border border-pink-200 dark:border-pink-900/50 max-w-md mx-auto space-y-1 text-xs">
-                <span className="font-bold text-pink-700 dark:text-pink-300">
-                  타깃 영상: {audioTargetVideo.title} ({audioTargetVideo.duration}초)
-                </span>
-                <p className="text-slate-500 dark:text-neutral-400">
-                  2단계 모션 영상이 로드되었습니다. 어울리는 분위기의 BGM과 음향 효과를 생성하세요.
-                </p>
-              </div>
-            ) : (
-              <p className="text-xs text-slate-400">
-                2단계 영상 스튜디오에서 <b>[🎵 3단계: BGM 입히기]</b> 버튼을 누르면 영상 정보가 이 탭으로 연결됩니다.
-              </p>
-            )}
-          </div>
+          <AudioStudioView
+            targetVideo={audioTargetVideo}
+            onMasteringComplete={loadMedia}
+          />
         )}
 
         {/* 1계층 IndexedDB 최근 미디어 캐시 보관함 */}
