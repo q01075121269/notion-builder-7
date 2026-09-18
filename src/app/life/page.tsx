@@ -10,16 +10,15 @@ import {
   CreditCard, 
   CheckSquare, 
   ArrowLeft, 
-  Plus, 
   Bot,
   RefreshCw, 
   Edit2, 
-  Trash2, 
   X, 
   Check,
   LayoutGrid,
   Layers
 } from 'lucide-react';
+
 import { ErrorBoundary } from '../../components/common/ErrorBoundary';
 import { 
   fetchNotionDatabaseRows, 
@@ -44,6 +43,7 @@ import {
 } from '../../services/quickCaptureStorage';
 import { ScheduleView } from '../../components/life/ScheduleView';
 import { TodoManagerView } from '../../components/life/TodoManagerView';
+import { ExpenseAnalyticsView } from '../../components/life/ExpenseAnalyticsView';
 
 // 사용자 동선 우선순위 재배치: 1. 스마트일정 -> 2. 스마트할일 -> 3. 가계부 -> 4. 이메일 요약
 type LifeHubTab = 'schedule' | 'todo' | 'expense' | 'email';
@@ -176,9 +176,52 @@ const INITIAL_DEMO_TODOS: LifeTodoItem[] = [
 ];
 
 const INITIAL_DEMO_EXPENSES: LifeExpenseItem[] = [
-  { id: 'ex1', title: '점심 식사 (구내식당)', amount: 9000, date: '2026-09-18', category: '식비', icon: '🍱' },
-  { id: 'ex2', title: '지하철 정기권 충전', amount: 55000, date: '2026-09-17', category: '교통', icon: '🚇' },
-  { id: 'ex3', title: '업무용 도서 구입 (클린 코드)', amount: 28000, date: '2026-09-16', category: '도서', icon: '📚' }
+  // 2026년 9월 데이터: 총 1,375,000원 (250만원 예산의 55.0% 소진 -> 18일 기준 권장 60.0% 대비 5% 안전)
+  // 식비: 480,000원
+  { id: 'ex1', title: '점심 식사 (구내식당 정식)', amount: 9000, date: '2026-09-18', category: '식비', icon: '🍱', paymentMethod: '체크카드', type: '지출', merchant: '사내식당' },
+  { id: 'ex2', title: '팀 프로젝트 저녁 회식 (삼겹살)', amount: 120000, date: '2026-09-15', category: '식비', icon: '🥩', paymentMethod: '신용카드', type: '지출', merchant: '맛찬들 왕소금구이' },
+  { id: 'ex3', title: '주말 가족 외식 (이탈리안)', amount: 165000, date: '2026-09-13', category: '식비', icon: '🍝', paymentMethod: '신용카드', type: '지출', merchant: '보나베띠' },
+  { id: 'ex4', title: '주간 식자재 장보기 (이마트)', amount: 142000, date: '2026-09-08', category: '식비', icon: '🛒', paymentMethod: '신용카드', type: '지출', merchant: '이마트 역삼점' },
+  { id: 'ex5', title: '점심 샐러드 & 샌드위치 배달', amount: 44000, date: '2026-09-04', category: '식비', icon: '🥗', paymentMethod: '간편결제', type: '지출', merchant: '배달의민족' },
+
+  // 주거/구독: 365,000원
+  { id: 'ex6', title: '아파트 관리비 및 공과금', amount: 285000, date: '2026-09-10', category: '주거/구독', icon: '🏠', paymentMethod: '현금', type: '지출', merchant: '관리사무소' },
+  { id: 'ex7', title: '넷플릭스 & 유튜브 프리미엄 구독', amount: 34000, date: '2026-09-05', category: '주거/구독', icon: '🎬', paymentMethod: '신용카드', type: '지출', merchant: '구글/넷플릭스' },
+  { id: 'ex8', title: '클라우드 저장소 & 노션 AI 구독', amount: 46000, date: '2026-09-02', category: '주거/구독', icon: '☁️', paymentMethod: '신용카드', type: '지출', merchant: 'Notion Labs' },
+
+  // 쇼핑: 150,000원
+  { id: 'ex9', title: '가을 출퇴근용 셔츠 및 슬랙스', amount: 115000, date: '2026-09-11', category: '쇼핑', icon: '👔', paymentMethod: '신용카드', type: '지출', merchant: '무신사 스토어' },
+  { id: 'ex10', title: '사무용 듀얼 모니터 암 거치대', amount: 35000, date: '2026-09-06', category: '쇼핑', icon: '🖥️', paymentMethod: '간편결제', type: '지출', merchant: '네이버페이' },
+
+  // 교통: 125,000원
+  { id: 'ex11', title: '지하철/버스 정기 교통카드 충전', amount: 65000, date: '2026-09-17', category: '교통', icon: '🚇', paymentMethod: '신용카드', type: '지출', merchant: '티머니' },
+  { id: 'ex12', title: '심야 야근 카카오 T 택시비', amount: 24000, date: '2026-09-12', category: '교통', icon: '🚕', paymentMethod: '간편결제', type: '지출', merchant: '카카오모빌리티' },
+  { id: 'ex13', title: '주유소 휘발유 주유', amount: 36000, date: '2026-09-07', category: '교통', icon: '⛽', paymentMethod: '신용카드', type: '지출', merchant: 'GS칼텍스' },
+
+  // 문화/여가: 110,000원
+  { id: 'ex14', title: '영화관람 및 팝콘 세트 (2인)', amount: 38000, date: '2026-09-14', category: '문화/여가', icon: '🍿', paymentMethod: '간편결제', type: '지출', merchant: 'CGV 강남' },
+  { id: 'ex15', title: '업무용 개발 전문 서적 2권 구입', amount: 52000, date: '2026-09-09', category: '문화/여가', icon: '📚', paymentMethod: '신용카드', type: '지출', merchant: '교보문고' },
+  { id: 'ex16', title: '주말 미술 전시회 입장 티켓', amount: 20000, date: '2026-09-03', category: '문화/여가', icon: '🎨', paymentMethod: '신용카드', type: '지출', merchant: '예술의전당' },
+
+  // 기타/미분류 (누수 의심 지출): 총 145,000원 (그 중 편의점/카페 소액 104,400원 = 72% 비중)
+  { id: 'ex17', title: 'GS25 편의점 야식 및 컵라면', amount: 9800, date: '2026-09-17', category: '기타', icon: '🏪', paymentMethod: '체크카드', type: '지출', merchant: 'GS25 역삼점', isLeak: true },
+  { id: 'ex18', title: '스타벅스 카페 라떼 & 마카롱', amount: 11500, date: '2026-09-16', category: '기타', icon: '☕', paymentMethod: '간편결제', type: '지출', merchant: '스타벅스 코리아', isLeak: true },
+  { id: 'ex19', title: 'CU 편의점 음료 및 초콜릿', amount: 5400, date: '2026-09-15', category: '기타', icon: '🍫', paymentMethod: '체크카드', type: '지출', merchant: 'CU 강남스퀘어점', isLeak: true },
+  { id: 'ex20', title: '메가MGC커피 아이스 아메리카노', amount: 4000, date: '2026-09-14', category: '기타', icon: '🥤', paymentMethod: '간편결제', type: '지출', merchant: '메가커피 테헤란로점', isLeak: true },
+  { id: 'ex21', title: '세븐일레븐 모바일 간식 결제', amount: 14200, date: '2026-09-11', category: '기타', icon: '🏪', paymentMethod: '간편결제', type: '지출', merchant: '세븐일레븐', isLeak: true },
+  { id: 'ex22', title: '이디야 커피 2잔 테이크아웃', amount: 6400, date: '2026-09-09', category: '기타', icon: '☕', paymentMethod: '신용카드', type: '지출', merchant: '이디야커피', isLeak: true },
+  { id: 'ex23', title: 'GS25 간식 및 샌드위치', amount: 8600, date: '2026-09-08', category: '기타', icon: '🥪', paymentMethod: '체크카드', type: '지출', merchant: 'GS25 서초점', isLeak: true },
+  { id: 'ex24', title: '컴포즈 커피 및 디저트', amount: 7500, date: '2026-09-05', category: '기타', icon: '☕', paymentMethod: '간편결제', type: '지출', merchant: '컴포즈커피', isLeak: true },
+  { id: 'ex25', title: '배달의민족 야간 배달팁', amount: 4000, date: '2026-09-04', category: '기타', icon: '🛵', paymentMethod: '간편결제', type: '지출', merchant: '배달의민족', isLeak: true },
+  { id: 'ex26', title: '스타벅스 원두 및 텀블러 쿠폰', amount: 18000, date: '2026-09-03', category: '기타', icon: '☕', paymentMethod: '신용카드', type: '지출', merchant: '스타벅스 코리아', isLeak: true },
+  { id: 'ex27', title: 'CU 편의점 생수 및 간식 묶음', amount: 15000, date: '2026-09-01', category: '기타', icon: '🏪', paymentMethod: '신용카드', type: '지출', merchant: 'CU 본점', isLeak: true },
+  { id: 'ex28', title: '모바일 앱 인앱결제 정기권', amount: 22000, date: '2026-09-10', category: '기타', icon: '📱', paymentMethod: '신용카드', type: '지출', merchant: '애플 앱스토어', isLeak: false },
+  { id: 'ex29', title: '우체국 등기 발송 및 서류 수수료', amount: 18600, date: '2026-09-02', category: '기타', icon: '✉️', paymentMethod: '체크카드', type: '지출', merchant: '서울중앙우체국', isLeak: false },
+
+  // 2026년 8월 데이터 (월 스위칭 시 지난달 결산용)
+  { id: 'ex-aug-1', title: '8월 아파트 관리비', amount: 260000, date: '2026-08-10', category: '주거/구독', icon: '🏠', paymentMethod: '현금', type: '지출' },
+  { id: 'ex-aug-2', title: '8월 식비 및 마트 장보기', amount: 620000, date: '2026-08-20', category: '식비', icon: '🍱', paymentMethod: '신용카드', type: '지출' },
+  { id: 'ex-aug-3', title: '8월 하계 휴가 숙소 예약', amount: 350000, date: '2026-08-05', category: '문화/여가', icon: '🏖️', paymentMethod: '신용카드', type: '지출' }
 ];
 
 const INITIAL_DEMO_EMAILS = [
@@ -191,6 +234,7 @@ export const LifePage: React.FC = () => {
   const { 
     setCurrentView, 
     notionApiKey, 
+    apiKey,
     createdNotionResource,
     selectedNotionDbId,
     selectedExpenseDbId,
@@ -451,93 +495,20 @@ export const LifePage: React.FC = () => {
     </ErrorBoundary>
   );
 
-  // 3. 가계부 & 지출 모듈 렌더러
+  // 3. 가계부 & 지출 모듈 렌더러 (월간 페이싱 게이지, 카테고리별 다차원 분석, AI 누수 진단 칩)
   const renderExpenseModule = (isCompact = false) => (
     <ErrorBoundary fallbackTitle="가계부 및 소비 분석 모듈 로드 중 오류가 발생했습니다.">
-      <div className={`space-y-4 ${isCompact ? 'p-1' : ''}`}>
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-2 border-b border-slate-200/80 dark:border-neutral-800">
-          <div>
-            <h2 className="text-base sm:text-lg font-bold flex items-center space-x-2 text-slate-900 dark:text-white whitespace-nowrap">
-              <CreditCard className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
-              <span className="whitespace-nowrap">3. 💰 가계부 및 지출 분석</span>
-              <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 font-semibold border border-emerald-200/60 dark:border-emerald-800/40 whitespace-nowrap">
-                {expenseItems.length}건
-              </span>
-            </h2>
-            <p className="text-xs text-slate-500 dark:text-neutral-400 mt-0.5 whitespace-nowrap">
-              영수증 카메라 OCR 및 1초 퀵 캡처로 등록된 실제 지출 내역
-            </p>
-          </div>
-          <div className="flex items-center space-x-3 shrink-0">
-            <div className="text-right whitespace-nowrap">
-              <span className="text-[10px] text-slate-400 dark:text-neutral-500 block leading-tight">총 지출 합계</span>
-              <span className="text-sm sm:text-base font-bold text-emerald-600 dark:text-emerald-400">
-                {totalExpenseAmount.toLocaleString()}원
-              </span>
-            </div>
-            <button 
-              onClick={() => setCurrentView('quick_capture')}
-              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-white text-white dark:text-slate-900 text-xs font-semibold shadow-xs transition cursor-pointer active:scale-95 whitespace-nowrap"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span className="whitespace-nowrap">지출 기록</span>
-            </button>
-          </div>
-        </div>
+      <ExpenseAnalyticsView
+        expenseItems={expenseItems}
+        setExpenseItems={setExpenseItems}
+        onDeleteExpense={handleDeleteExpense}
+        onQuickCapture={() => setCurrentView('quick_capture')}
+        isCompact={isCompact}
+        notionApiKey={notionApiKey}
+        expenseDbId={selectedExpenseDbId || undefined}
+        geminiApiKey={apiKey}
 
-        {/* Empty State vs 데이터 목록 */}
-        {expenseItems.length === 0 ? (
-          <div className="py-12 px-4 text-center border-2 border-dashed border-slate-200 dark:border-neutral-800 rounded-2xl bg-slate-50/70 dark:bg-neutral-900/30">
-            <CreditCard className="w-10 h-10 mx-auto mb-2 text-slate-400 dark:text-neutral-500 opacity-70" />
-            <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200 whitespace-nowrap">
-              지출 내역이 비어 있습니다.
-            </h4>
-            <p className="text-xs text-slate-500 dark:text-neutral-400 mt-1 max-w-sm mx-auto">
-              영수증 사진을 촬영하거나 "점심 식비 12,000원 결제"라고 퀵 캡처에 입력해 보세요.
-            </p>
-            <button
-              onClick={() => setCurrentView('quick_capture')}
-              className="mt-3.5 inline-flex items-center space-x-1.5 px-3.5 py-1.5 rounded-xl bg-white dark:bg-neutral-800 border border-slate-200 dark:border-neutral-700 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 transition shadow-xs whitespace-nowrap"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>영수증 / 식비 등록하기</span>
-            </button>
-          </div>
-        ) : (
-          <div className="space-y-2.5">
-            {expenseItems.map((ex) => (
-              <div 
-                key={ex.id} 
-                className="p-3 sm:p-3.5 rounded-xl border border-slate-200 dark:border-neutral-800 bg-white dark:bg-neutral-900/60 hover:border-emerald-300 dark:hover:border-emerald-700 flex items-center justify-between transition shadow-xs"
-              >
-                <div className="flex items-center space-x-3 min-w-0">
-                  <span className="text-2xl shrink-0">{ex.icon || '🧾'}</span>
-                  <div className="min-w-0">
-                    <div className="text-xs sm:text-sm font-semibold text-slate-800 dark:text-slate-200 truncate">
-                      {ex.title}
-                    </div>
-                    <div className="text-[11px] text-slate-400 dark:text-neutral-400 whitespace-nowrap">
-                      {ex.date} · {ex.category}
-                    </div>
-                  </div>
-                </div>
-                <div className="flex items-center space-x-2.5 shrink-0 ml-3">
-                  <div className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white whitespace-nowrap">
-                    -{ex.amount.toLocaleString()}원
-                  </div>
-                  <button
-                    onClick={() => handleDeleteExpense(ex)}
-                    title="지출 내역 삭제"
-                    className="p-1 rounded-md text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-slate-100 dark:hover:bg-neutral-800 transition cursor-pointer"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+      />
     </ErrorBoundary>
   );
 

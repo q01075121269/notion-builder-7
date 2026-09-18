@@ -43,18 +43,31 @@ export function parseNotionExpenseRows(rows: any[]): LifeExpenseItem[] {
   return rows
     .map((r, idx) => {
       const props = r.properties || {};
-      const titleObj = props['상호명'] || props['이름'] || props['항목'] || props['title'];
+      const titleObj = props['이름'] || props['상호명'] || props['항목'] || props['title'];
       const title = titleObj?.title?.[0]?.plain_text || `지출 #${idx + 1}`;
       const amount = props['금액']?.number || 0;
       const dateStr = props['결제일']?.date?.start || props['날짜']?.date?.start || new Date().toISOString().split('T')[0];
       const category = props['분류']?.select?.name || '기타';
+      const paymentMethod = (props['결제수단']?.select?.name || '신용카드') as any;
+      const type = (props['구분']?.select?.name || '지출') as any;
+      const merchant = props['상호명']?.rich_text?.[0]?.plain_text || title;
+      const memo = props['메모']?.rich_text?.[0]?.plain_text || '';
+      const pageId = r.id ? String(r.id).replace(/-/g, '') : undefined;
+      const isLeak = category === '기타' || category === '미분류' || /편의점|스타벅스|카페|배달팁|인앱/.test(title);
+
       return {
         id: r.id || `notion-ex-${idx}`,
         title,
         amount,
         date: dateStr,
         category,
-        icon: r.icon?.emoji || '🧾'
+        icon: r.icon?.emoji || (category === '식비' ? '🍱' : category === '교통' ? '🚇' : '🧾'),
+        paymentMethod,
+        type,
+        merchant,
+        memo,
+        isLeak,
+        notionPageId: pageId
       };
     })
     .filter(item => {
@@ -62,6 +75,7 @@ export function parseNotionExpenseRows(rows: any[]): LifeExpenseItem[] {
       return !deletedIds.has(item.id) && !deletedIds.has(item.title.trim()) && !deletedIds.has(cleanTitle);
     });
 }
+
 
 export function extractQuickCaptureLifeItems(): {
   schedules: LifeScheduleItem[];
@@ -103,13 +117,20 @@ export function extractQuickCaptureLifeItems(): {
       
       if (task.intent === 'expense' || task.properties?.['금액']) {
         const amt = Number(String(task.properties?.['금액'] || 0).replace(/[^0-9.-]+/g, '')) || 0;
+        const cat = task.properties?.['분류'] || (/식사|식비|점심|저녁|카페|커피|간식/.test(taskTitle) ? '식비' : /택시|지하철|버스|주유/.test(taskTitle) ? '교통' : '기타');
+        const isLeak = cat === '기타' || /편의점|스타벅스|카페|배달팁|인앱/.test(taskTitle);
         expenses.push({
           id: `qc-ex-${key}`,
           title: task.title,
           amount: amt,
           date: dateStr.split(' ')[0],
-          category: task.properties?.['분류'] || '지출',
-          icon: task.suggestedIcon || '💰'
+          category: cat,
+          icon: task.suggestedIcon || (cat === '식비' ? '🍱' : cat === '교통' ? '🚇' : '💰'),
+          paymentMethod: (task.properties?.['결제수단'] as any) || '신용카드',
+          type: '지출',
+          merchant: task.title,
+          memo: task.properties?.['메모'] || '',
+          isLeak
         });
       } else {
         const pUrl = rec.notionPageUrls?.[tIdx] || rec.notionPageUrls?.[0];

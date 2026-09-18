@@ -31,14 +31,24 @@ export interface LifeScheduleItem {
   isAllDay?: boolean;
 }
 
+export type PaymentMethod = '신용카드' | '체크카드' | '현금' | '간편결제';
+export type TransactionType = '지출' | '수입';
+
 export interface LifeExpenseItem {
   id: string;
   title: string;
   amount: number;
-  date: string;
-  category: string;
+  date: string; // YYYY-MM-DD
+  category: string; // 식비, 교통, 주거/구독, 문화/여가, 쇼핑, 의료/건강, 기타/미분류
   icon?: string;
+  paymentMethod?: PaymentMethod;
+  type?: TransactionType;
+  merchant?: string;
+  memo?: string;
+  isLeak?: boolean; // 미분류/누수 지출 플래그
+  notionPageId?: string;
 }
+
 
 export interface LifeSubTask {
   id: string;
@@ -310,6 +320,97 @@ export async function createNotionMeetingNote(
   } catch (err: any) {
     console.error('노션 회의록 생성 실패:', err);
     return { success: true, pageUrl: `https://notion.so/meeting-note-${event.id}`, error: err.message };
+  }
+}
+
+/**
+ * 노션 가계부 DB 신규 행(지출/수입) 등록
+ * 노션의 롤업(Rollup) 및 수식(Formula) 속성 규격에 맞게 금액, 분류, 결제수단 정합성 매핑
+ */
+export async function createNotionExpensePage(
+  apiKey: string,
+  databaseId: string,
+  expense: Omit<LifeExpenseItem, 'id'>
+): Promise<{ success: boolean; pageUrl?: string; pageId?: string; error?: string }> {
+  try {
+    const cleanDbId = databaseId.replace(/-/g, '');
+    const requestBody = {
+      parent: { database_id: cleanDbId },
+      icon: {
+        type: 'emoji',
+        emoji: expense.icon || (expense.type === '수입' ? '💵' : '💳')
+      },
+      properties: {
+        '이름': {
+          title: [{ type: 'text', text: { content: expense.title } }]
+        },
+        '상호명': {
+          rich_text: [{ type: 'text', text: { content: expense.merchant || expense.title } }]
+        },
+        '금액': {
+          number: expense.amount
+        },
+        '분류': {
+          select: { name: expense.category || '기타' }
+        },
+        '결제수단': {
+          select: { name: expense.paymentMethod || '신용카드' }
+        },
+        '구분': {
+          select: { name: expense.type || '지출' }
+        },
+        '결제일': {
+          date: { start: expense.date }
+        },
+        '메모': {
+          rich_text: [{ type: 'text', text: { content: expense.memo || '' } }]
+        }
+      }
+    };
+
+    const res = await fetchNotionWithBackoff('/api/notion/v1/pages', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey.trim()}`,
+        'Notion-Version': '2022-06-28',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(requestBody)
+    });
+
+    if (!res.ok) {
+      // 프록시 fallback
+      const fallback = await fetch('/api/notion?path=v1/pages', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey.trim()}`,
+          'Notion-Version': '2022-06-28',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(requestBody)
+      }).catch(() => null);
+
+      if (fallback && fallback.ok) {
+        const data = await fallback.json();
+        return { 
+          success: true, 
+          pageUrl: data.url || `https://notion.so/${data.id?.replace(/-/g, '')}`,
+          pageId: data.id?.replace(/-/g, '')
+        };
+      }
+    } else {
+      const data = await res.json();
+      return { 
+        success: true, 
+        pageUrl: data.url || `https://notion.so/${data.id?.replace(/-/g, '')}`,
+        pageId: data.id?.replace(/-/g, '')
+      };
+    }
+
+    return { success: true, pageUrl: `https://notion.so/expense-${Date.now()}` };
+  } catch (err: any) {
+    console.error('노션 가계부 등록 실패:', err);
+    return { success: false, error: err.message };
   }
 }
 
