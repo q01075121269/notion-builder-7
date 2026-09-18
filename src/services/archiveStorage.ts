@@ -25,6 +25,7 @@ const SEED_TEMPLATES: ArchivedTemplate[] = [
     cover_url: 'https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=1600&q=80',
     tags: ['#스터디', '#대학생', '#캘린더연동', '#학업'],
     templateData: PRESET_TEMPLATES.college_student,
+    source: 'curated',
     createdAt: Date.now() - 1000 * 60 * 60 * 24 * 3,
     updatedAt: Date.now() - 1000 * 60 * 60 * 24 * 3
   },
@@ -36,6 +37,7 @@ const SEED_TEMPLATES: ArchivedTemplate[] = [
     cover_url: 'https://images.unsplash.com/photo-1531403009284-440f080d1e12?auto=format&fit=crop&w=1600&q=80',
     tags: ['#업무', '#스타트업', '#프로젝트', '#스프린트'],
     templateData: PRESET_TEMPLATES.startup_sprint,
+    source: 'curated',
     createdAt: Date.now() - 1000 * 60 * 60 * 24 * 2,
     updatedAt: Date.now() - 1000 * 60 * 60 * 24 * 2
   },
@@ -47,6 +49,7 @@ const SEED_TEMPLATES: ArchivedTemplate[] = [
     cover_url: 'https://images.unsplash.com/photo-1499750310107-5fef28a66643?auto=format&fit=crop&w=1600&q=80',
     tags: ['#라이프스타일', '#루틴', '#자기계발', '#습관'],
     templateData: PRESET_TEMPLATES.habit_tracker,
+    source: 'curated',
     createdAt: Date.now() - 1000 * 60 * 60 * 24 * 1,
     updatedAt: Date.now() - 1000 * 60 * 60 * 24 * 1
   },
@@ -321,6 +324,7 @@ export const getArchivedTemplates = (): ArchivedTemplate[] => {
       },
       createdAt: typeof item?.createdAt === 'number' ? item.createdAt : Date.now(),
       updatedAt: typeof item?.updatedAt === 'number' ? item.updatedAt : Date.now(),
+      source: item?.source || (item?.id?.startsWith('arch-tpl-') ? 'curated' : 'created'),
       notionUrl: item?.notionUrl || undefined
     }));
   } catch (e) {

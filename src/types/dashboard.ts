@@ -20,6 +20,7 @@ export interface ArchivedTemplate {
   templateData: NotionTemplate;
   notionUrl?: string;
   folderId?: string | null;
+  source?: 'created' | 'curated';
   createdAt: number;
   updatedAt: number;
 }

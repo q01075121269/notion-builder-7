@@ -25,6 +25,7 @@ import { extractDateFromKoreanText, cleanDuplicateSpeech, detectReschedulePatter
 import { saveQuickCaptureRecord, rescheduleTaskInQuickCapture, cleanupDuplicateRescheduleTasks } from '../../services/quickCaptureStorage';
 import type { RoutedNotionTask, QuickCaptureRecord } from '../../types/quickCapture';
 import { PRESET_TEMPLATES } from '../../services/presetTemplates';
+import { saveArchivedTemplate } from '../../services/archiveStorage';
 import { SelfDiagnosticCard, payloadToDiagnostic } from '../common/SelfDiagnosticCard';
 import type { DiagnosticResult } from '../common/SelfDiagnosticCard';
 
@@ -388,15 +389,36 @@ export const OmniChatBar: React.FC = () => {
         }
       } else if (response.intent === 'BUILDER') {
         receipts = buildReceipts('BUILDER');
-        if (response.payload?.preset_key && PRESET_TEMPLATES[response.payload.preset_key]) {
-          setCurrentTemplate(PRESET_TEMPLATES[response.payload.preset_key]);
-        } else if (/자격증|수험생|시험|공부|오답노트/.test(text) && PRESET_TEMPLATES.certification_exam) {
-          setCurrentTemplate(PRESET_TEMPLATES.certification_exam);
+        const targetTemplate = (response.payload?.preset_key && PRESET_TEMPLATES[response.payload.preset_key])
+          ? PRESET_TEMPLATES[response.payload.preset_key]
+          : (/자격증|수험생|시험|공부|오답노트/.test(text) && PRESET_TEMPLATES.certification_exam)
+          ? PRESET_TEMPLATES.certification_exam
+          : null;
+
+        if (targetTemplate) {
+          setCurrentTemplate(targetTemplate);
+          // 내 보관함에 '내가 만든 템플릿(created)'으로 자동 보관
+          try {
+            saveArchivedTemplate({
+              id: `created-tpl-${Date.now()}`,
+              title: targetTemplate.title,
+              description: targetTemplate.description || '',
+              icon: targetTemplate.icon || '🎯',
+              cover_url: targetTemplate.cover_url || 'https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=1600&q=80',
+              tags: ['#내가만든템플릿', '#커스텀생성', '#AI합격스케줄러'],
+              templateData: targetTemplate,
+              source: 'created',
+              createdAt: Date.now(),
+              updatedAt: Date.now(),
+            });
+          } catch (e) {
+            console.warn('Failed to auto-archive created template:', e);
+          }
         }
         // 완결 시 템플릿 빌더 라이브 캔버스로 자동 전환
         setTimeout(() => {
           setCurrentView('builder');
-          showToast('🎯 [자격증/수험생 올인원 합격 스케줄러] 템플릿이 캔버스에 즉시 투영되었습니다!', 'success');
+          showToast('🎯 [자격증/수험생 올인원 합격 스케줄러] 템플릿이 캔버스에 즉시 투영되고 내 보관함에 저장되었습니다!', 'success');
         }, 300);
       } else if (response.intent === 'DEVLAB') {
         receipts = buildReceipts('DEVLAB');
