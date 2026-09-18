@@ -303,5 +303,102 @@ export const PRESET_TEMPLATES: Record<string, NotionTemplate> = {
         content: "🌿 작은 습관의 반복이 인생의 방향을 바꿉니다. 완벽함보다 꾸준함을 목표로 하세요!"
       }
     ]
+  },
+  certification_exam: {
+    title: "자격증/수험생 올인원 합격 스케줄러 & 오답노트",
+    icon: "🎯",
+    cover_query: "exam study plan notes highlighter timer desk",
+    cover_url: "https://images.unsplash.com/photo-1434030216411-0b793f4b4173?auto=format&fit=crop&w=1600&q=80",
+    description: "시험 D-Day 수식 계산, 과목별 N회독 진행률 바, 취약 유형 오답노트 DB가 결합된 자격증 수험생 전용 합격 템플릿입니다.",
+    databases: [
+      {
+        name: "시험 과목 및 회독 트래커",
+        description: "과목별 시험 목표일, 회독 진행 상태 및 D-Day 수식을 실시간 관리합니다.",
+        view_type: "table",
+        properties: [
+          { name: "시험 과목명", type: "title" },
+          { name: "시험 목표일", type: "date" },
+          { name: "목표 회독", type: "number" },
+          { name: "현재 회독", type: "number" },
+          { 
+            name: "회독 진행률(수식)", 
+            type: "formula", 
+            expression: `repeat("■", round(prop("현재 회독") / prop("목표 회독") * 5)) + repeat("□", 5 - round(prop("현재 회독") / prop("목표 회독") * 5)) + " " + round(prop("현재 회독") / prop("목표 회독") * 100) + "%"` 
+          },
+          { 
+            name: "남은 일수(D-Day)", 
+            type: "formula", 
+            expression: `ifs(empty(prop("시험 목표일")), "일정 미정", dateBetween(dateStart(prop("시험 목표일")), now(), "days") < 0, "시험 완료 🏁", dateBetween(dateStart(prop("시험 목표일")), now(), "days") == 0, "D-Day 🔥", "D-" + dateBetween(dateStart(prop("시험 목표일")), now(), "days") + "일")` 
+          },
+          { name: "합격 목표점수", type: "text" }
+        ],
+        sample_rows: [
+          {
+            "시험 과목명": "1과목. 소프트웨어 설계 / 이론",
+            "시험 목표일": "2026-10-25",
+            "목표 회독": 5,
+            "현재 회독": 3,
+            "회독 진행률(수식)": "■■■□□ 60% 🟡",
+            "남은 일수(D-Day)": "D-36일",
+            "합격 목표점수": "85점 이상"
+          },
+          {
+            "시험 과목명": "2과목. 소프트웨어 개발 / 기출풀이",
+            "시험 목표일": "2026-10-25",
+            "목표 회독": 5,
+            "현재 회독": 4,
+            "회독 진행률(수식)": "■■■■□ 80% 🟢",
+            "남은 일수(D-Day)": "D-36일",
+            "합격 목표점수": "90점 이상"
+          },
+          {
+            "시험 과목명": "3과목. 데이터베이스 구축 / 실기",
+            "시험 목표일": "2026-11-10",
+            "목표 회독": 4,
+            "현재 회독": 1,
+            "회독 진행률(수식)": "■□□□□ 25% ⚪",
+            "남은 일수(D-Day)": "D-52일",
+            "합격 목표점수": "80점 이상"
+          }
+        ]
+      },
+      {
+        name: "취약 유형 오답노트 & 주요 개념",
+        description: "자주 틀리는 핵심 개념과 기출 오답 문제, 재복습 일정을 관리합니다.",
+        view_type: "board",
+        properties: [
+          { name: "문제/개념명", type: "title" },
+          { name: "관련 과목", type: "select", options: ["1과목 소프트웨어 설계", "2과목 소프트웨어 개발", "3과목 데이터베이스", "4과목 프로그래밍 언어", "5과목 정보시스템 구축"] },
+          { name: "이해도", type: "select", options: ["🔴 다시 확인 (매우 취약)", "🟡 개념 보완 필요", "🟢 복습 완료"] },
+          { name: "핵심 요약 / 오답 원인", type: "text" },
+          { name: "재복습 예정일", type: "date" }
+        ],
+        sample_rows: [
+          {
+            "문제/개념명": "디자인 패턴 (GoF) - Singleton vs Factory Method 구별",
+            "관련 과목": "1과목 소프트웨어 설계",
+            "이해도": "🔴 다시 확인 (매우 취약)",
+            "핵심 요약 / 오답 원인": "인스턴스 단일 생성 보장 vs 서브클래스에서 생성 객체 결정 차이 재정리 필요",
+            "재복습 예정일": "2026-09-22"
+          },
+          {
+            "문제/개념명": "SQL 정규화 (1NF ~ 3NF, BCNF) 결정자 함수 종속성",
+            "관련 과목": "3과목 데이터베이스",
+            "이해도": "🟡 개념 보완 필요",
+            "핵심 요약 / 오답 원인": "BCNF는 모든 결정자가 후보키여야 함. 이행적 함수 종속 제거는 3NF.",
+            "재복습 예정일": "2026-09-24"
+          }
+        ]
+      }
+    ],
+    page_layout: [
+      {
+        type: "callout",
+        icon: "🔥",
+        color: "amber",
+        content: "📚 **합격 확언 가이드**: 꾸준한 1일 1회독과 오답노트 복습이 합격을 만듭니다! 목표 D-Day까지 화이팅!"
+      }
+    ]
   }
 };
+

@@ -18,6 +18,8 @@ import {
 import type { OrchestratorResponse } from "../../services/orchestratorService";
 import { cleanDuplicateSpeech } from "../../services/quickCaptureLocalParser";
 
+import { PRESET_TEMPLATES } from "../../services/presetTemplates";
+
 // ─────────────────────────────────────────────────────────────────────────────
 // 실행 영수증 타입 (Action Receipt)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -78,7 +80,7 @@ const INTENT_META: Record<
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const OmniChatBar: React.FC = () => {
-  const { apiKey, authUser, showToast, setCurrentView } = useApp();
+  const { apiKey, authUser, showToast, setCurrentView, setCurrentTemplate } = useApp();
 
   const [text, setText] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -201,6 +203,19 @@ export const OmniChatBar: React.FC = () => {
 
         // TTS 짧은 응답 낭독
         speakKoreanText(res.reply_message.slice(0, 120));
+
+        // BUILDER 인텐트 시 템플릿 자동 투영 및 캔버스 자동 전환
+        if (res.intent === "BUILDER") {
+          if ((res as any).payload?.preset_key && PRESET_TEMPLATES[(res as any).payload.preset_key]) {
+            setCurrentTemplate(PRESET_TEMPLATES[(res as any).payload.preset_key]);
+          } else if (/자격증|수험생|시험|공부|오답노트/.test(cleaned) && PRESET_TEMPLATES.certification_exam) {
+            setCurrentTemplate(PRESET_TEMPLATES.certification_exam);
+          }
+          setTimeout(() => {
+            setCurrentView("builder");
+            showToast("🎯 [자격증/수험생 올인원 합격 스케줄러] 템플릿이 캔버스에 즉시 투영되었습니다!", "success");
+          }, 300);
+        }
 
         // 토스트 피드백
         showToast(`${meta.icon} ${meta.label}`, "success");

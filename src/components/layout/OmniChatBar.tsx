@@ -24,6 +24,7 @@ import { dispatchRoutedTasksToNotion } from '../../services/quickCaptureService'
 import { extractDateFromKoreanText, cleanDuplicateSpeech, detectReschedulePattern } from '../../services/quickCaptureLocalParser';
 import { saveQuickCaptureRecord, rescheduleTaskInQuickCapture, cleanupDuplicateRescheduleTasks } from '../../services/quickCaptureStorage';
 import type { RoutedNotionTask, QuickCaptureRecord } from '../../types/quickCapture';
+import { PRESET_TEMPLATES } from '../../services/presetTemplates';
 import { SelfDiagnosticCard, payloadToDiagnostic } from '../common/SelfDiagnosticCard';
 import type { DiagnosticResult } from '../common/SelfDiagnosticCard';
 
@@ -98,6 +99,7 @@ export const OmniChatBar: React.FC = () => {
     setIsNotionSettingsModalOpen,
     showToast,
     setCurrentView,
+    setCurrentTemplate,
   } = useApp();
 
   // 채팅 상태
@@ -386,8 +388,24 @@ export const OmniChatBar: React.FC = () => {
         }
       } else if (response.intent === 'BUILDER') {
         receipts = buildReceipts('BUILDER');
+        if (response.payload?.preset_key && PRESET_TEMPLATES[response.payload.preset_key]) {
+          setCurrentTemplate(PRESET_TEMPLATES[response.payload.preset_key]);
+        } else if (/자격증|수험생|시험|공부|오답노트/.test(text) && PRESET_TEMPLATES.certification_exam) {
+          setCurrentTemplate(PRESET_TEMPLATES.certification_exam);
+        }
+        // 완결 시 템플릿 빌더 라이브 캔버스로 자동 전환
+        setTimeout(() => {
+          setCurrentView('builder');
+          showToast('🎯 [자격증/수험생 올인원 합격 스케줄러] 템플릿이 캔버스에 즉시 투영되었습니다!', 'success');
+        }, 300);
       } else if (response.intent === 'DEVLAB') {
         receipts = buildReceipts('DEVLAB');
+        if (response.redirect_url === '/devlab') {
+          setTimeout(() => {
+            setCurrentView('devlab');
+            showToast('📑 AI 오피스 스튜디오 라이브 캔버스로 자동 전환되었습니다.', 'info');
+          }, 300);
+        }
       }
 
       // ── 진단 카드: DEVLAB + troubleshooting 서브타입 또는 에러 키워드 ──────

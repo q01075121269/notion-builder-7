@@ -98,16 +98,23 @@ async function fallbackClientOrchestration(
     };
   }
 
-  // 기본 휴리스틱 검사
-  if (lower.includes('템플릿') || lower.includes('빌더') || lower.includes('대시보드') || lower.includes('노션 페이지')) {
+  // 2. 템플릿 빌더 & 수험생/자격증 템플릿 감지
+  if (
+    lower.includes('템플릿') || lower.includes('빌더') || lower.includes('대시보드') || lower.includes('노션 페이지') ||
+    lower.includes('자격증') || lower.includes('수험생') || lower.includes('공부') || lower.includes('시험') || lower.includes('오답노트') || lower.includes('합격')
+  ) {
+    const isCertification = lower.includes('자격증') || lower.includes('수험생') || lower.includes('시험') || lower.includes('공부') || lower.includes('오답노트');
     return {
       intent: 'BUILDER',
-      reply_message: `"${userText}" 템플릿 제작을 시작할게요! 템플릿 빌더 작업실로 안내해 드립니다.`,
+      reply_message: isCertification
+        ? `🎯 [자격증/수험생 올인원 합격 스케줄러] 템플릿 제작을 시작했습니다! 템플릿 빌더 라이브 캔버스에 결과물이 즉시 투영되었습니다.`
+        : `"${userText}" 템플릿 제작을 시작할게요! 템플릿 빌더 작업실로 안내해 드립니다.`,
       needs_clarification: false,
       redirect_url: '/builder',
       payload: {
+        preset_key: isCertification ? 'certification_exam' : 'custom',
         template_topic: userText,
-        suggested_title: `${userText} 템플릿`,
+        suggested_title: isCertification ? '자격증/수험생 올인원 합격 스케줄러 & 오답노트' : `${userText} 템플릿`,
         complexity: 'intermediate',
         initial_prompt: userText,
       },
