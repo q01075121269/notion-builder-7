@@ -10,13 +10,11 @@ import {
   CreditCard, 
   CheckSquare, 
   ArrowLeft, 
-  Clock, 
   Plus, 
   Bot,
   RefreshCw, 
   Edit2, 
   Trash2, 
-  ExternalLink, 
   X, 
   Check,
   LayoutGrid,
@@ -44,15 +42,87 @@ import {
   markLifeItemAsDeleted, 
   removeTaskFromQuickCapture 
 } from '../../services/quickCaptureStorage';
+import { ScheduleView } from '../../components/life/ScheduleView';
 
 // 사용자 동선 우선순위 재배치: 1. 스마트일정 -> 2. 스마트할일 -> 3. 가계부 -> 4. 이메일 요약
 type LifeHubTab = 'schedule' | 'todo' | 'expense' | 'email';
 type ViewMode = 'tabs' | 'grid';
 
 const INITIAL_DEMO_SCHEDULES: LifeScheduleItem[] = [
-  { id: 's1', title: '치과 정기 검진', date: '2026-09-19 15:00', dday: 'D-1', category: '건강', icon: '🦷' },
-  { id: 's2', title: 'Q3 프로젝트 최종 릴리즈 회의', date: '2026-09-22 10:30', dday: 'D-4', category: '업무', icon: '💼' },
-  { id: 's3', title: '부모님 생신 저녁 식사', date: '2026-09-26 18:30', dday: 'D-8', category: '가족', icon: '🎂' }
+  { 
+    id: 's1', 
+    title: '치과 정기 검진 및 스케일링', 
+    date: '2026-09-19 15:00', 
+    start: '2026-09-19 15:00',
+    end: '2026-09-19 16:00',
+    dday: 'D-1', 
+    category: '건강', 
+    icon: '🦷',
+    location: '강남 연세사랑치과의원 3층',
+    attendees: [
+      { name: '나 (본인)', email: 'me@notion.com', status: 'accepted' },
+      { name: '김원장 (주치의)', email: 'dentist@clinic.com', status: 'accepted' }
+    ],
+    notes: '스케일링 및 어금니 레진 치료 경과 확인. 치과 보험 청구 서류 수령 필요.',
+    status: '미완료'
+  },
+  { 
+    id: 's2', 
+    title: 'Q3 프로젝트 최종 릴리즈 회의', 
+    date: '2026-09-22 10:30', 
+    start: '2026-09-22 10:30',
+    end: '2026-09-22 12:00',
+    dday: 'D-4', 
+    category: '업무', 
+    icon: '💼',
+    location: '본사 대회의실 A (온/오프라인 병행)',
+    meetingUrl: 'https://meet.google.com/q3-release-final',
+    attendees: [
+      { name: '이팀장 (PM)', email: 'pm@company.com', status: 'accepted' },
+      { name: '박개발 (Lead)', email: 'dev@company.com', status: 'accepted' },
+      { name: '최디자인 (UI/UX)', email: 'design@company.com', status: 'accepted' },
+      { name: '나 (아키텍트)', email: 'me@company.com', status: 'accepted' }
+    ],
+    notes: '1. Vercel 서버리스 프록시 성능 모니터링 결산\n2. Gemini 3.6 Flash 모델 지연시간 벤치마크 공유\n3. 프로덕션 DNS 컷오버 체크리스트 점검',
+    status: '미완료'
+  },
+  { 
+    id: 's3', 
+    title: '부모님 생신 저녁 식사', 
+    date: '2026-09-26 18:30', 
+    start: '2026-09-26 18:30',
+    end: '2026-09-26 21:00',
+    dday: 'D-8', 
+    category: '가족', 
+    icon: '🎂',
+    location: '경복궁 한정식 서초점 룸 5호',
+    attendees: [
+      { name: '아버지', status: 'accepted' },
+      { name: '어머니', status: 'accepted' },
+      { name: '동생', status: 'accepted' },
+      { name: '나 (예약자)', status: 'accepted' }
+    ],
+    notes: '생신 케이크(수제 딸기 케이크) 픽업 17:30까지 완료할 것. 선물(스마트워치) 포장 완료.',
+    status: '미완료'
+  },
+  {
+    id: 's4',
+    title: 'Notion AI 아키텍처 주간 싱크업',
+    date: '2026-09-18 14:00',
+    start: '2026-09-18 14:00',
+    end: '2026-09-18 15:00',
+    dday: 'D-Day',
+    category: '업무',
+    icon: '⚡',
+    meetingUrl: 'https://meet.google.com/notion-arch-sync',
+    location: 'Google Meet 화상회의',
+    attendees: [
+      { name: '나', email: 'me@company.com', status: 'accepted' },
+      { name: '정엔지니어', email: 'jung@company.com', status: 'accepted' }
+    ],
+    notes: '1. 노션 캘린더 iCal 연동 규격 검토\n2. 슬라이드오버 드로어 인터페이스 테스트 및 피드백',
+    status: '진행 중'
+  }
 ];
 
 const INITIAL_DEMO_TODOS: LifeTodoItem[] = [
@@ -310,113 +380,16 @@ export const LifePage: React.FC = () => {
   const isNotionConnected = Boolean(notionApiKey && (createdNotionResource || selectedNotionDbId));
   const totalExpenseAmount = expenseItems.reduce((sum, item) => sum + (item.amount || 0), 0);
 
-  // 1. 스마트 일정 모듈 렌더러
+  // 1. 스마트 일정 모듈 렌더러 (구글/노션 캘린더급 3대 뷰 스위처 & 우측 상세 서랍)
   const renderScheduleModule = (isCompact = false) => (
     <ErrorBoundary fallbackTitle="스마트 일정 모듈 로드 중 오류가 발생했습니다.">
-      <div className={`space-y-4 ${isCompact ? 'p-1' : ''}`}>
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-2 border-b border-slate-200/80 dark:border-neutral-800">
-          <div>
-            <h2 className="text-base sm:text-lg font-bold flex items-center space-x-2 text-slate-900 dark:text-white whitespace-nowrap">
-              <Calendar className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600 dark:text-blue-400 shrink-0" />
-              <span className="whitespace-nowrap">1. 📅 스마트일정 관리</span>
-              <span className="text-xs px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 font-semibold border border-blue-200/60 dark:border-blue-800/40 whitespace-nowrap">
-                {scheduleItems.length}건
-              </span>
-            </h2>
-            <p className="text-xs text-slate-500 dark:text-neutral-400 mt-0.5 whitespace-nowrap">
-              노션 캘린더 DB 및 모바일 퀵 캡처 실시간 양방향 연동 일정
-            </p>
-          </div>
-          <div className="flex items-center space-x-2 shrink-0">
-            <button 
-              onClick={() => setCurrentView('quick_capture')}
-              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-white text-white dark:text-slate-900 text-xs font-semibold shadow-xs transition cursor-pointer active:scale-95 whitespace-nowrap"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span className="whitespace-nowrap">새 일정 등록</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Empty State vs 데이터 목록 */}
-        {scheduleItems.length === 0 ? (
-          <div className="py-12 px-4 text-center border-2 border-dashed border-slate-200 dark:border-neutral-800 rounded-2xl bg-slate-50/70 dark:bg-neutral-900/30">
-            <Calendar className="w-10 h-10 mx-auto mb-2 text-slate-400 dark:text-neutral-500 opacity-70" />
-            <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200 whitespace-nowrap">
-              등록된 스마트 일정이 없습니다.
-            </h4>
-            <p className="text-xs text-slate-500 dark:text-neutral-400 mt-1 max-w-sm mx-auto">
-              우측 상단 '새 일정 등록' 또는 음성/사진 퀵 캡처로 새 일정을 간편하게 등록해 보세요.
-            </p>
-            <button
-              onClick={() => setCurrentView('quick_capture')}
-              className="mt-3.5 inline-flex items-center space-x-1.5 px-3.5 py-1.5 rounded-xl bg-white dark:bg-neutral-800 border border-slate-200 dark:border-neutral-700 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 transition shadow-xs whitespace-nowrap"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>1초 퀵 캡처 바로가기</span>
-            </button>
-          </div>
-        ) : (
-          <div className={`grid gap-3.5 ${isCompact ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'}`}>
-            {scheduleItems.map((item) => (
-              <div 
-                key={item.id} 
-                className="p-3.5 sm:p-4 rounded-xl border border-slate-200/90 dark:border-neutral-800 bg-white dark:bg-neutral-900/60 hover:border-blue-400/80 dark:hover:border-blue-500/80 hover:shadow-xs transition flex flex-col justify-between group"
-              >
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center space-x-1.5">
-                      <span className="text-xl">{item.icon || '📅'}</span>
-                      <span className="px-2 py-0.5 rounded-md text-[11px] font-bold bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 border border-blue-200/60 dark:border-blue-800/40 whitespace-nowrap">
-                        {item.dday}
-                      </span>
-                    </div>
-                    <div className="flex items-center space-x-1 opacity-80 group-hover:opacity-100 transition">
-                      {item.pageUrl && (
-                        <a
-                          href={item.pageUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          title="노션에서 직접 열기"
-                          className="p-1 rounded-md text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-100 dark:hover:bg-neutral-800 transition"
-                        >
-                          <ExternalLink className="w-3.5 h-3.5" />
-                        </a>
-                      )}
-                      <button
-                        onClick={() => handleOpenEditModal(item)}
-                        title="일정 내용 수정"
-                        className="p-1 rounded-md text-slate-400 hover:text-amber-600 dark:hover:text-amber-400 hover:bg-slate-100 dark:hover:bg-neutral-800 transition cursor-pointer"
-                      >
-                        <Edit2 className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteItem(item)}
-                        title="일정 삭제"
-                        className="p-1 rounded-md text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-slate-100 dark:hover:bg-neutral-800 transition cursor-pointer"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </div>
-                  <h3 className="font-semibold text-xs sm:text-sm text-slate-800 dark:text-slate-200 mb-2 line-clamp-2">
-                    {item.title}
-                  </h3>
-                </div>
-                <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-neutral-400 pt-2 border-t border-slate-100 dark:border-neutral-800/80">
-                  <span className="flex items-center space-x-1 whitespace-nowrap">
-                    <Clock className="w-3 h-3 text-slate-400" />
-                    <span>{item.date}</span>
-                  </span>
-                  <span className="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-neutral-800 text-[10px] font-medium text-slate-600 dark:text-neutral-300 whitespace-nowrap">
-                    {item.category}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+      <ScheduleView
+        schedules={scheduleItems}
+        onOpenEditModal={handleOpenEditModal}
+        onDeleteItem={handleDeleteItem}
+        onQuickCapture={() => setCurrentView('quick_capture')}
+        isCompact={isCompact}
+      />
     </ErrorBoundary>
   );
 
