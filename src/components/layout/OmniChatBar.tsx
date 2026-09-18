@@ -113,6 +113,9 @@ export const OmniChatBar: React.FC = () => {
   const isLoadingRef = useRef(false);
   const lastSentRef = useRef<{ text: string; time: number }>({ text: '', time: 0 });
   const speechDispatchedRef = useRef(false);
+  const silenceTimerRef = useRef<any>(null);
+  const fullTranscriptRef = useRef<string>('');
+  const handleSendMessageRef = useRef<(overrideText?: string) => Promise<void>>(() => Promise.resolve());
 
   // ── STT 초기화 ─────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -123,26 +126,50 @@ export const OmniChatBar: React.FC = () => {
     setSttSupported(true);
     const recog = new SR();
     recog.lang = 'ko-KR';
-    recog.continuous = false;
-    recog.interimResults = false;
+    recog.continuous = true;
+    recog.interimResults = true;
 
     recog.onresult = (event: any) => {
-      if (speechDispatchedRef.current) return;
-      const result = event.results[event.results.length - 1];
-      const transcript = (result?.[0]?.transcript || '').trim();
-      if (!transcript) return;
+      let finalStr = '';
+      let interimStr = '';
 
-      speechDispatchedRef.current = true;
-      const cleaned = cleanDuplicateSpeech(transcript);
-      setInputValue(cleaned);
-      setIsListening(false);
-      try { recog.stop(); } catch {}
-      if (cleaned) handleSendMessage(cleaned);
+      for (let i = event.resultIndex; i < event.results.length; ++i) {
+        const item = event.results[i];
+        if (item.isFinal) {
+          finalStr += item[0].transcript;
+        } else {
+          interimStr += item[0].transcript;
+        }
+      }
+
+      if (finalStr) {
+        fullTranscriptRef.current = (fullTranscriptRef.current + ' ' + finalStr).trim();
+      }
+
+      const combined = cleanDuplicateSpeech((fullTranscriptRef.current + ' ' + interimStr).trim());
+      if (combined) {
+        setInputValue(combined);
+      }
+
+      // 침묵 타이머 (1.8초 동안 말을 멈출 경우에만 완성된 문장 자동 전송)
+      if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+      silenceTimerRef.current = setTimeout(() => {
+        const textToSend = combined || fullTranscriptRef.current;
+        if (textToSend && textToSend.trim().length >= 2 && !speechDispatchedRef.current) {
+          speechDispatchedRef.current = true;
+          try { recog.stop(); } catch {}
+          setIsListening(false);
+          handleSendMessageRef.current(textToSend.trim());
+        }
+      }, 1800);
     };
 
-    recog.onerror = () => {
-      setIsListening(false);
-      speechDispatchedRef.current = false;
+    recog.onerror = (e: any) => {
+      console.warn('STT 오류:', e?.error);
+      if (e?.error !== 'no-speech') {
+        setIsListening(false);
+        speechDispatchedRef.current = false;
+      }
     };
 
     recog.onend = () => {
@@ -152,9 +179,10 @@ export const OmniChatBar: React.FC = () => {
     recognitionRef.current = recog;
 
     return () => {
+      if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
       try { recognitionRef.current?.abort(); } catch {}
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   // ── 채팅 자동 스크롤 ────────────────────────────────────────────────────────
   useEffect(() => {
@@ -168,10 +196,19 @@ export const OmniChatBar: React.FC = () => {
       return;
     }
     if (isListening) {
+      if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
       try { recognitionRef.current?.stop(); } catch {}
       setIsListening(false);
+
+      const textToSend = inputValue.trim() || fullTranscriptRef.current.trim();
+      if (textToSend && !speechDispatchedRef.current) {
+        speechDispatchedRef.current = true;
+        handleSendMessageRef.current(textToSend);
+      }
     } else {
       speechDispatchedRef.current = false;
+      fullTranscriptRef.current = '';
+      setInputValue('');
       try {
         recognitionRef.current?.start();
         setIsListening(true);
@@ -322,6 +359,10 @@ export const OmniChatBar: React.FC = () => {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inputValue, messages, apiKey, authUser, notionApiKey, notionParentPageId, createdNotionResource, showToast]);
+
+  useEffect(() => {
+    handleSendMessageRef.current = handleSendMessage;
+  }, [handleSendMessage]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -664,3 +705,4 @@ export const OmniChatBar: React.FC = () => {
     </div>
   );
 };
+
