@@ -2,26 +2,38 @@ import type {
   QuickCaptureAnalysisResult, 
   RoutedNotionTask 
 } from '../types/quickCapture';
-import { parseQuickTextLocally } from './quickCaptureLocalParser';
+import { parseQuickTextLocally, extractDateFromKoreanText } from './quickCaptureLocalParser';
 import type { CreatedNotionResource } from '../types/notion';
 import { compressImageToJpeg } from './imageCompressor';
+import { fetchNotionWithBackoff } from './notionApi';
 
-const ROUTING_SYSTEM_PROMPT = `
+function getRoutingSystemPrompt(): string {
+  const now = new Date();
+  const todayStr = now.toISOString().split('T')[0];
+  const days = ['일요일', '월요일', '화요일', '수요일', '목요일', '금요일', '토요일'];
+  const dayName = days[now.getDay()];
+
+  return `
 당신은 모바일 생산성 및 노션(Notion) 데이터베이스 자동 분류 라우팅 전문가입니다.
 사용자가 음성이나 휘갈겨 쓴 메모로 전달한 자연어 텍스트를 정밀 분석하여, 맞춤법을 교정하고 맥락에 맞추어 1개 이상의 독립적인 노션 작업 항목(Multi-intent Tasks)으로 분할하세요.
 
+[현재 기준 일시]
+- 오늘 날짜: ${todayStr} (${dayName})
+
 [분류 가능한 6대 인텐트(Intent)]
-1. schedule: 약속, 미팅, 진료, 마감일 등 특정 시간/날짜가 포함된 일정
+1. schedule: 약속, 미팅, 회의, 진료, 마감일, 연가, 휴가, 반차, 월차, 출장, 외근, 휴무 등 특정 일자/시간과 관련된 모든 일정
 2. expense: 식비, 쇼핑, 결제, 지출 등 금액과 소비 내역이 포함된 가계부
 3. todo: 오늘 할 일, 체크리스트, 완료해야 할 행동
 4. contact: 사람 이름, 회사, 전화번호, 이메일 등 인맥 정보
 5. idea: 영감, 독서 인용구, 번뜩이는 생각, 기획 메모
 6. general: 위 분류에 명확히 속하지 않는 일반 메모
 
-[핵심 분할 규칙]
+[핵심 분할 및 날짜 계산 규칙]
 - 사용자가 "내일 오후 3시 치과 가고, 점심 식비 12,000원 썼어"라고 복합적으로 말하면:
   반드시 [일정] 작업 1개와 [가계부] 작업 1개로 명확히 분리하여 2개의 작업 배열로 반환하세요.
-- 오늘 날짜 기준(2026-09-18)으로 "내일", "모레", "다음 주 화요일", "오후 3시" 등을 정확한 날짜/시간(YYYY-MM-DD 또는 YYYY-MM-DD HH:mm) 문자열로 변환하세요.
+- "다음주 월요일", "이번주 금요일", "내일", "모레" 등 상대 날짜는 오늘(${todayStr}, ${dayName})을 기준으로 정확한 미래 날짜(YYYY-MM-DD 또는 YYYY-MM-DD HH:mm)를 계산하여 properties의 '일정'과 '날짜'에 입력하세요.
+  (예: 오늘이 금요일인 경우 '다음주 월요일'은 3일 뒤의 월요일 날짜 YYYY-MM-DD로 정확히 연산)
+- "연가", "휴가", "반차", "휴무", "출장" 등은 반드시 schedule 인텐트로 분류하고, 아이콘은 🌴 또는 🏖️, 분류는 '일정'으로 지정하세요.
 
 [응답 JSON 규격]
 반드시 마크다운 따옴표 없이 순수한 유효 JSON 객체만 반환하세요:
@@ -34,37 +46,22 @@ const ROUTING_SYSTEM_PROMPT = `
       "id": "task-1",
       "intent": "schedule",
       "targetDbHint": "일정/캘린더 DB",
-      "title": "치과 진료 방문",
-      "summary": "내일 오후 3시 치과 예약",
-      "suggestedIcon": "🦷",
-      "tags": ["건강", "예약"],
+      "title": "다음주 월요일 연가",
+      "summary": "다음주 월요일 연가 신청",
+      "suggestedIcon": "🌴",
+      "tags": ["휴가", "일정"],
       "properties": {
-        "이름": "치과 진료 방문",
-        "일정": "2026-09-19 15:00",
-        "상태": "시작 전",
+        "이름": "다음주 월요일 연가",
+        "일정": "${todayStr}",
+        "날짜": "${todayStr}",
+        "상태": "미완료",
         "분류": "일정"
-      }
-    },
-    {
-      "id": "task-2",
-      "intent": "expense",
-      "targetDbHint": "가계부/지출 DB",
-      "title": "점심 식사",
-      "summary": "점심 식비 12,000원 결제",
-      "suggestedIcon": "🍱",
-      "tags": ["식비", "지출"],
-      "properties": {
-        "상호명": "점심 식사",
-        "이름": "점심 식사",
-        "금액": 12000,
-        "결제일": "2026-09-18",
-        "분류": "식비",
-        "상태": "결제 완료"
       }
     }
   ]
 }
 `;
+}
 
 const VISION_SYSTEM_PROMPT = `
 당신은 이미지 분석 및 OCR 정보 추출 전문가입니다.
@@ -313,7 +310,7 @@ export async function analyzeAndRouteQuickText(
       }
     ],
     systemInstruction: {
-      parts: [{ text: ROUTING_SYSTEM_PROMPT }]
+      parts: [{ text: getRoutingSystemPrompt() }]
     },
     generationConfig: {
       temperature: 0.2,
@@ -322,7 +319,29 @@ export async function analyzeAndRouteQuickText(
   };
 
   try {
-    return await callGeminiGenerateContentWithFallback(requestBody, apiKey, preferredModel);
+    const result = await callGeminiGenerateContentWithFallback(requestBody, apiKey, preferredModel);
+
+    // AI 응답 후처리: 한국어 상대 날짜("다음주 월요일", "내일" 등) 및 연가/휴가 아이콘 정밀 보정
+    const naturalDate = extractDateFromKoreanText(text);
+    if (naturalDate.isExplicitDate && result.tasks) {
+      const todayIso = new Date().toISOString().split('T')[0];
+      result.tasks.forEach(task => {
+        if (task.intent === 'schedule' || /연가|휴가|반차|휴무|출장/.test(task.title || '')) {
+          task.intent = 'schedule';
+          if (!task.properties) task.properties = {};
+          const currentPropDate = String(task.properties['일정'] || task.properties['날짜'] || '').split(' ')[0];
+          if (!currentPropDate || currentPropDate === todayIso || naturalDate.dateStr.split(' ')[0] !== todayIso) {
+            task.properties['일정'] = naturalDate.dateStr;
+            task.properties['날짜'] = naturalDate.dateStr;
+          }
+          if (/연가|휴가|반차|휴무/.test(task.title || '')) {
+            task.suggestedIcon = '🌴';
+          }
+        }
+      });
+    }
+
+    return result;
   } catch (err: any) {
     console.warn('[QuickCapture] Gemini API 통신 불가/과부하 감지 -> 즉각 로컬 지능형 파서로 안전 전환:', err);
     return parseQuickTextLocally(text);
@@ -477,11 +496,11 @@ export async function dispatchRoutedTasksToNotion(
     }
   }
 
-  if (!notionApiKey || !resource || (!resource.pageId && (!resource.databases || resource.databases.length === 0))) {
+  if (!notionApiKey || !notionApiKey.trim()) {
     return {
       successCount: 0,
       pageUrls: [],
-      errors: ['노션 워크스페이스 연동 정보가 없습니다. 상단에서 노션을 먼저 연동해 주세요.']
+      errors: ['노션 API 연동 키가 설정되지 않았습니다. 상단 설정에서 노션 키를 등록해 주세요.']
     };
   }
 
@@ -490,6 +509,68 @@ export async function dispatchRoutedTasksToNotion(
     'Notion-Version': '2022-06-28',
     'Content-Type': 'application/json'
   };
+
+  // 워크스페이스 내 DB 목록 탐색 (resource가 없거나 비어있는 경우 동적 검색 지원)
+  let availableDatabases = resource?.databases ? [...resource.databases] : [];
+  let parentPageId = resource?.pageId || (typeof window !== 'undefined' ? localStorage.getItem('notion_parent_page_id') || '' : '');
+
+  if (availableDatabases.length === 0) {
+    try {
+      const searchRes = await fetchNotionWithBackoff('/api/notion/v1/search', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          filter: { value: 'database', property: 'object' },
+          page_size: 50
+        })
+      });
+      if (searchRes.ok) {
+        const data = await searchRes.json();
+        (data.results || []).forEach((db: any) => {
+          const title = db.title?.[0]?.plain_text || db.title?.[0]?.text?.content || '이름 없는 데이터베이스';
+          availableDatabases.push({ id: db.id, name: title, url: db.url });
+          if (title.includes('라이프') && typeof window !== 'undefined') {
+            localStorage.setItem('master_life_hub_db_id', db.id);
+          }
+          if ((title.includes('가계부') || title.includes('지출')) && typeof window !== 'undefined') {
+            localStorage.setItem('master_expense_db_id', db.id);
+          }
+        });
+      }
+    } catch (e) {
+      console.warn('[QuickCapture] DB 자동 검색 실패:', e);
+    }
+  }
+
+  // 여전히 DB도 없고 부모 페이지도 없는 경우, 워크스페이스 내 최상위 페이지 1개 자동 탐색
+  if (availableDatabases.length === 0 && !parentPageId) {
+    try {
+      const pageSearch = await fetchNotionWithBackoff('/api/notion/v1/search', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          filter: { value: 'page', property: 'object' },
+          page_size: 5
+        })
+      });
+      if (pageSearch.ok) {
+        const pData = await pageSearch.json();
+        if (pData.results && pData.results.length > 0) {
+          parentPageId = pData.results[0].id;
+        }
+      }
+    } catch (e) {
+      console.warn('[QuickCapture] 페이지 자동 탐색 실패:', e);
+    }
+  }
+
+  if (availableDatabases.length === 0 && !parentPageId) {
+    return {
+      successCount: 0,
+      pageUrls: [],
+      errors: ['노션 워크스페이스에 연결된 데이터베이스나 페이지를 찾을 수 없습니다. 노션 페이지 우측 상단 [...] 메뉴 -> [연결(Connect)]에서 해당 노션 봇을 초대해 주세요.']
+    };
+  }
 
   const pageUrls: string[] = [];
   const errors: string[] = [];
@@ -501,7 +582,7 @@ export async function dispatchRoutedTasksToNotion(
     const userSelectedExpenseDbId = typeof window !== 'undefined' ? localStorage.getItem('selected_expense_db_id') : null;
     const masterLifeDbId = typeof window !== 'undefined' ? localStorage.getItem('master_life_hub_db_id') : null;
     const masterExpenseDbId = typeof window !== 'undefined' ? localStorage.getItem('master_expense_db_id') : null;
-    const hasDatabases = Boolean(resource.databases && resource.databases.length > 0);
+    const hasDatabases = availableDatabases.length > 0;
 
     // 지출/결제/금액 포함 여부 정밀 판정
     const rawCombinedText = `${task.title} ${task.summary || ''} ${JSON.stringify(task.properties || {})}`;
@@ -524,7 +605,7 @@ export async function dispatchRoutedTasksToNotion(
         isExpenseDb = true;
       } else if (hasDatabases) {
         // 워크스페이스 내 가계부 DB 자동 탐색
-        const autoExpenseDb = resource.databases.find(d => {
+        const autoExpenseDb = availableDatabases.find(d => {
           const n = d.name.toLowerCase();
           return n.includes('가계부') || n.includes('지출') || n.includes('비용') || n.includes('소비');
         });
@@ -536,24 +617,24 @@ export async function dispatchRoutedTasksToNotion(
 
       // 가계부 DB가 없거나 미연동된 상태인 경우 -> 라이프 허브(일정표)로 안전 폴백
       if (!targetDbId) {
-        targetDbId = userSelectedDbId || masterLifeDbId || (hasDatabases ? resource.databases[0].id : null);
+        targetDbId = userSelectedDbId || masterLifeDbId || (hasDatabases ? availableDatabases[0].id : null);
         isExpenseDb = false;
       }
     } else {
       // 일반 일정/할 일/아이디어 등
       targetDbId = userSelectedDbId || masterLifeDbId || null;
       if (!targetDbId && hasDatabases) {
-        const matchedDb = resource.databases.find(d => {
+        const matchedDb = availableDatabases.find(d => {
           const name = d.name.toLowerCase();
           if (task.intent === 'schedule') return name.includes('라이프') || name.includes('일정') || name.includes('달력') || name.includes('캘린더');
           if (task.intent === 'todo') return name.includes('할 일') || name.includes('태스크');
           return name.includes('라이프') || name.includes('일정');
-        }) || resource.databases[0];
+        }) || availableDatabases[0];
         if (matchedDb) targetDbId = matchedDb.id;
       }
     }
 
-    const matchedDbInfo = resource.databases?.find(d => d.id === targetDbId);
+    const matchedDbInfo = availableDatabases.find(d => d.id === targetDbId);
     const isMasterLifeHub = targetDbId === masterLifeDbId || Boolean(matchedDbInfo?.name.includes('라이프'));
     const isDatabaseMode = Boolean(targetDbId);
     let pagePayload: Record<string, any>;
@@ -658,7 +739,7 @@ export async function dispatchRoutedTasksToNotion(
       };
     } else {
       // ▶ 모드 B: 일반 페이지(Page) 하위 생성 (properties에는 title만 전달, 정보는 children 본문에 콜아웃/To-do로 구성)
-      const parentPageId = resource.pageId || targetDbId || '';
+      const finalParentPageId = resource?.pageId || targetDbId || parentPageId || '';
       const detailLines: string[] = [];
 
       if (task.intent) {
@@ -713,7 +794,7 @@ export async function dispatchRoutedTasksToNotion(
       }
 
       pagePayload = {
-        parent: { page_id: parentPageId },
+        parent: { page_id: finalParentPageId },
         icon: { type: 'emoji', emoji: task.suggestedIcon || '⚡' },
         properties: {
           title: {

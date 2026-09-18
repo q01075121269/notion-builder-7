@@ -1,18 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Mic, MicOff, Sparkles, Send, Volume2, AlertCircle } from 'lucide-react';
-
-// 음성 인식 중복 단어 및 구문 정규화 제거 함수
-function cleanDuplicateSpeech(text: string): string {
-  if (!text) return '';
-  // 1. 연속된 동일 단어 제거 (예: "회의 회의" -> "회의", "어 어 어떤" -> "어 어떤")
-  let cleaned = text.replace(/\b(\S+)(?:\s+\1\b)+/gi, '$1');
-  
-  // 2. 연속된 동일 구문 제거 (예: "점심 먹고 점심 먹고" -> "점심 먹고")
-  cleaned = cleaned.replace(/(\b.+?\b)\s+\1/gi, '$1');
-
-  // 3. 다중 공백 정리
-  return cleaned.replace(/\s+/g, ' ').trim();
-}
+import { cleanDuplicateSpeech } from '../../services/quickCaptureLocalParser';
 
 interface VoiceCapturePanelProps {
   onSendTranscript: (text: string) => void;
@@ -32,6 +20,7 @@ export const VoiceCapturePanel: React.FC<VoiceCapturePanelProps> = ({
   });
   const [permissionDenied, setPermissionDenied] = useState(false);
   const recognitionRef = useRef<any>(null);
+  const isSendingRef = useRef<boolean>(false);
 
   useEffect(() => {
     const SpeechRecognition =
@@ -47,25 +36,31 @@ export const VoiceCapturePanel: React.FC<VoiceCapturePanelProps> = ({
     recognition.interimResults = true;
 
     recognition.onresult = (event: any) => {
-      let finalStr = '';
+      const finalParts: string[] = [];
       let interimStr = '';
 
-      // event.results 전체를 순회하여 확정된 텍스트와 임시 텍스트를 엄격히 분리
+      // event.results 전체를 순회하며 모바일 브라우저의 동일 문구 누적 방지
       for (let i = 0; i < event.results.length; ++i) {
         const result = event.results[i];
+        const part = (result[0]?.transcript || '').trim();
+        if (!part) continue;
+
         if (result.isFinal) {
-          finalStr += result[0].transcript + ' ';
+          // 중복 누적 방지: 이미 포함된 동일 확정 문구는 추가하지 않음
+          if (!finalParts.includes(part)) {
+            finalParts.push(part);
+          }
         } else {
-          interimStr += result[0].transcript;
+          interimStr = part;
         }
       }
 
-      // 최종 확정 텍스트에 중복 단어/구문 필터링 적용
-      const cleanedFinal = cleanDuplicateSpeech(finalStr);
+      // 최종 확정 텍스트에 지능형 한국어 중복 구문 필터링 적용
+      const rawFinal = finalParts.join(' ').trim();
+      const cleanedFinal = cleanDuplicateSpeech(rawFinal);
       if (cleanedFinal) {
         setTranscript(cleanedFinal);
       }
-      // 임시 텍스트는 프리뷰용으로만 실시간 표시 (누적 방지)
       setInterimTranscript(interimStr.trim());
     };
 
@@ -127,6 +122,8 @@ export const VoiceCapturePanel: React.FC<VoiceCapturePanelProps> = ({
   };
 
   const handleSend = () => {
+    if (isSendingRef.current || isProcessing) return;
+
     if (isRecording) {
       try {
         recognitionRef.current?.stop();
@@ -137,10 +134,17 @@ export const VoiceCapturePanel: React.FC<VoiceCapturePanelProps> = ({
     }
 
     const textToSend = cleanDuplicateSpeech(transcript.trim() || interimTranscript.trim());
-    if (!textToSend || isProcessing) return;
+    if (!textToSend) return;
+
+    // 중복 전송 방어 락 활성화
+    isSendingRef.current = true;
     onSendTranscript(textToSend);
     setTranscript('');
     setInterimTranscript('');
+
+    setTimeout(() => {
+      isSendingRef.current = false;
+    }, 1500);
   };
 
   return (

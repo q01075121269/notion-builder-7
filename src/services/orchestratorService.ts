@@ -18,6 +18,7 @@ export interface ChatMessage {
   redirect_url?: string | null;
   needs_clarification?: boolean;
   payload?: Record<string, any> | null;
+  notionUrl?: string | null;
 }
 
 // 1. 오케스트레이터 API 호출 함수
@@ -107,15 +108,18 @@ async function fallbackClientOrchestration(
     };
   }
 
-  if (lower.includes('일정') || lower.includes('예약') || lower.includes('치과') || lower.includes('회의') || lower.includes('원') || lower.includes('식비') || lower.includes('할 일') || lower.includes('투두')) {
+  if (lower.includes('일정') || lower.includes('예약') || lower.includes('치과') || lower.includes('회의') || lower.includes('원') || lower.includes('식비') || lower.includes('할 일') || lower.includes('투두') || lower.includes('연가') || lower.includes('휴가') || lower.includes('반차') || lower.includes('월차') || lower.includes('휴무') || lower.includes('출장') || lower.includes('외근')) {
     const isExpense = lower.includes('원') || lower.includes('식비') || lower.includes('결제');
     const isTodo = lower.includes('할 일') || lower.includes('투두');
+    const isVacation = lower.includes('연가') || lower.includes('휴가') || lower.includes('반차');
     return {
       intent: 'LIFE',
       reply_message: isExpense
         ? '가계부 지출 내역으로 라이프 허브에 깔끔하게 등록해 드릴게요!'
         : isTodo
         ? '오늘의 중요한 할 일로 라이프 허브에 저장해 드릴게요!'
+        : isVacation
+        ? `"${userText}" 신청 일정을 라이프 허브 캘린더에 안전하게 기록해 드릴게요! 🌴`
         : '일정으로 라이프 허브 캘린더에 안전하게 기록해 드릴게요!',
       needs_clarification: false,
       redirect_url: '/life',

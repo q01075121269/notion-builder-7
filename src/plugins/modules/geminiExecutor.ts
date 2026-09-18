@@ -8,7 +8,7 @@ import { generateLocalFallbackResponse } from '../../services/localTemplateFallb
 
 export async function executeGeminiCall(req: AIPluginRequest): Promise<GeminiConversationResponse> {
   const apiKey = (req.apiKey || '').trim();
-  const model = req.options?.model || 'gemini-3.6-flash';
+  const model = req.options?.model || 'gemini-2.5-flash';
   const targetModel = model.replace(/^models\//, '').trim();
 
   let promptText = `[사용자 요청]: "${req.prompt}"`;
@@ -27,37 +27,59 @@ export async function executeGeminiCall(req: AIPluginRequest): Promise<GeminiCon
     generationConfig: { temperature: 0.7, topP: 0.95 }
   };
 
-  let res = await fetch(`/api/gemini?model=${targetModel}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-gemini-api-key': apiKey },
-    body: JSON.stringify(body)
-  }).catch(() => null);
-
-  if (!res || !res.ok) {
-    const directUrl = `https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:generateContent?key=${apiKey}`;
-    res = await fetch(directUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    });
+  let userEmail = '';
+  if (typeof window !== 'undefined') {
+    try {
+      const u = JSON.parse(localStorage.getItem('auth_user') || '{}');
+      userEmail = u.email || '';
+    } catch {}
   }
 
-  if (!res.ok) {
-    const errorText = await res.text().catch(() => '');
-    if (res.status === 429 || errorText.includes('quota') || errorText.includes('exceeded') || res.status >= 500) {
-      console.warn('[GeminiExecutor] 429 Quota 초과 감지 -> 로컬 스마트 템플릿 엔진으로 안전 전환');
-      return generateLocalFallbackResponse(req.prompt, req.currentTemplate || null);
+  const reqHeaders: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'x-gemini-api-key': apiKey,
+    ...(userEmail ? { 'x-user-email': userEmail } : {})
+  };
+
+  // 실존하는 안정적인 공식 모델 우선순위 체인 (요청모델 -> 2.5-flash -> 2.0-flash -> 1.5-flash -> 1.5-pro)
+  const candidateModels = Array.from(
+    new Set([targetModel, 'gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'])
+  );
+
+  for (const m of candidateModels) {
+    try {
+      // 1. 프록시 호출 (/api/gemini)
+      let res = await fetch(`/api/gemini?model=${m}`, {
+        method: 'POST',
+        headers: reqHeaders,
+        body: JSON.stringify(body)
+      }).catch(() => null);
+
+      // 2. 직접 호출 (프록시 우회)
+      if (!res || !res.ok) {
+        const directUrl = `https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${apiKey}`;
+        res = await fetch(directUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        }).catch(() => null);
+      }
+
+      if (res && res.ok) {
+        const data = await res.json();
+        const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
+        if (rawText) {
+          const parsed = parseGeminiOutput(rawText);
+          return parsed;
+        }
+      }
+    } catch (e) {
+      console.warn(`[GeminiExecutor] 모델 '${m}' 시도 실패:`, e);
     }
-    throw new Error(`API 호출 실패 (${res.status}): ${errorText.slice(0, 100)}`);
   }
 
-  try {
-    const data = await res.json();
-    const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
-    return parseGeminiOutput(rawText);
-  } catch {
-    return generateLocalFallbackResponse(req.prompt, req.currentTemplate || null);
-  }
+  console.warn('[GeminiExecutor] 모든 Gemini 모델 통신 실패 -> 지능형 로컬 스마트 템플릿 생성기로 즉시 전환');
+  return generateLocalFallbackResponse(req.prompt, req.currentTemplate || null);
 }
 
 function parseGeminiOutput(rawText: string): GeminiConversationResponse {

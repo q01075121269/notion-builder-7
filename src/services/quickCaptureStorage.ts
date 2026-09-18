@@ -72,3 +72,101 @@ export function setDefaultQuickCaptureEnabled(enabled: boolean): void {
     console.error('Failed to set default quick capture view:', e);
   }
 }
+
+const DELETED_LIFE_ITEMS_KEY = 'notion_life_hub_deleted_ids_v1';
+
+/**
+ * 라이프 허브에서 삭제 처리된 항목 ID 및 제목 목록 조회
+ */
+export function getDeletedLifeItemIds(): Set<string> {
+  try {
+    const raw = localStorage.getItem(DELETED_LIFE_ITEMS_KEY);
+    if (!raw) return new Set();
+    const arr: string[] = JSON.parse(raw);
+    return new Set(arr);
+  } catch {
+    return new Set();
+  }
+}
+
+/**
+ * 특정 일정/지출/할일을 삭제 목록에 영구 등록 (F5 새로고침 및 동기화 시 재출현 원천 방지)
+ */
+export function markLifeItemAsDeleted(id: string, title?: string): void {
+  try {
+    const set = getDeletedLifeItemIds();
+    if (id) set.add(id);
+    if (title && title.trim()) {
+      set.add(title.trim());
+      set.add(title.replace(/^⚡\s*/, '').trim());
+    }
+    localStorage.setItem(DELETED_LIFE_ITEMS_KEY, JSON.stringify(Array.from(set)));
+  } catch (e) {
+    console.error('Failed to mark life item as deleted:', e);
+  }
+}
+
+/**
+ * 삭제 기록 초기화
+ */
+export function clearDeletedLifeItemIds(): void {
+  try {
+    localStorage.removeItem(DELETED_LIFE_ITEMS_KEY);
+  } catch {}
+}
+
+/**
+ * 퀵 캡처 저장소 내부의 특정 태스크 또는 레코드를 완전히 영구 삭제
+ */
+export function removeTaskFromQuickCapture(taskIdOrKey: string, title?: string): void {
+  try {
+    const records = getQuickCaptureRecords();
+    let isChanged = false;
+    const cleanTargetTitle = title ? title.replace(/^⚡\s*/, '').trim() : '';
+
+    const updated = records.map(rec => {
+      // 1. 레코드 ID 자체가 일치하는 경우 전체 레코드 삭제
+      if (rec.id === taskIdOrKey) {
+        isChanged = true;
+        return null;
+      }
+
+      // 2. 레코드 내부의 tasks 배열에서 대상 태스크 제거
+      const remainingTasks = rec.tasks.filter((task, idx) => {
+        const matchKey = `${rec.id}-${idx}`;
+        if (taskIdOrKey && (taskIdOrKey.includes(matchKey) || task.id === taskIdOrKey)) {
+          isChanged = true;
+          return false;
+        }
+        if (cleanTargetTitle) {
+          const taskTitle = (task.title || '').replace(/^⚡\s*/, '').trim();
+          const taskPropName = (task.properties?.['이름'] || '').replace(/^⚡\s*/, '').trim();
+          if (taskTitle === cleanTargetTitle || taskPropName === cleanTargetTitle) {
+            isChanged = true;
+            return false;
+          }
+        }
+        return true;
+      });
+
+      if (remainingTasks.length !== rec.tasks.length) {
+        isChanged = true;
+      }
+
+      if (remainingTasks.length === 0) {
+        return null;
+      }
+
+      return {
+        ...rec,
+        tasks: remainingTasks
+      };
+    }).filter((r): r is QuickCaptureRecord => r !== null);
+
+    if (isChanged) {
+      localStorage.setItem(QUICK_CAPTURE_STORAGE_KEY, JSON.stringify(updated));
+    }
+  } catch (e) {
+    console.error('Failed to remove task from quick capture storage:', e);
+  }
+}

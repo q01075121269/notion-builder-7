@@ -59,7 +59,7 @@ function geminiApiProxyPlugin(): Plugin {
 
           req.on('end', () => {
             const candidateModels = Array.from(
-              new Set(['gemini-3.6-flash', model, 'gemini-3.8-flash', 'gemini-2.5-flash', 'gemini-2.0-flash'])
+              new Set(['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash', model, 'gemini-3.6-flash'])
             );
 
             const tryModel = (idx: number) => {

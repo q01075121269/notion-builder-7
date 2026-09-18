@@ -33,12 +33,18 @@ export interface LifeTodoItem {
 
 export function calculateDDay(dateStr?: string): string {
   if (!dateStr) return 'D-Day';
-  const target = new Date(dateStr.split(' ')[0]);
-  if (isNaN(target.getTime())) return 'D-Day';
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  target.setHours(0, 0, 0, 0);
-  const diffDays = Math.ceil((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+  const rawPart = dateStr.split(' ')[0].trim();
+  const parts = rawPart.split('-').map(Number);
+  if (parts.length < 3 || parts.some(isNaN)) return 'D-Day';
+
+  const [year, month, day] = parts;
+  const target = new Date(year, month - 1, day, 0, 0, 0, 0);
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+
+  const diffMs = target.getTime() - today.getTime();
+  const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
+
   if (diffDays === 0) return 'D-Day';
   return diffDays > 0 ? `D-${diffDays}` : `D+${Math.abs(diffDays)}`;
 }

@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
-import type { CaptureMode, QuickCaptureRecord } from '../../types/quickCapture';
+import type { CaptureMode, QuickCaptureRecord, RoutedNotionTask } from '../../types/quickCapture';
 import type { CreatedNotionResource } from '../../types/notion';
+import { cleanDuplicateSpeech } from '../../services/quickCaptureLocalParser';
 import { 
   getQuickCaptureRecords, 
   saveQuickCaptureRecord, 
@@ -52,6 +53,8 @@ export const QuickCaptureView: React.FC = () => {
   const [toastMessage, setToastMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [records, setRecords] = useState<QuickCaptureRecord[]>([]);
   const [isDefaultMobile, setIsDefaultMobile] = useState<boolean>(isDefaultQuickCaptureEnabled());
+  const isProcessingRef = useRef<boolean>(false);
+  const lastProcessedTextRef = useRef<{ text: string; time: number }>({ text: '', time: 0 });
 
   useEffect(() => {
     setRecords(getQuickCaptureRecords());
@@ -71,12 +74,48 @@ export const QuickCaptureView: React.FC = () => {
     showToast('success', checked ? '모바일 접속 시 첫 화면이 퀵 캡처로 설정되었습니다.' : '모바일 기본 첫 화면 설정이 해제되었습니다.');
   };
 
-  // 1. 텍스트 / 음성 캡처 전송 처리
+  // 1. 텍스트 / 음성 캡처 전송 처리 (중복 방지 락 및 태스크 레벨 정규화 적용)
   const handleProcessText = async (rawText: string, mode: CaptureMode = 'voice') => {
+    const cleanedText = cleanDuplicateSpeech(rawText);
+    if (!cleanedText) return;
+
+    // A. 동시 요청 차단 (Mutex Lock)
+    if (isProcessingRef.current) {
+      console.warn('[QuickCapture] 이미 다른 전송 작업이 진행 중입니다.');
+      return;
+    }
+
+    // B. 3초 이내 동일 텍스트 중복 입력 방지 (모바일 멀티터치 방어)
+    const now = Date.now();
+    if (
+      lastProcessedTextRef.current.text === cleanedText &&
+      now - lastProcessedTextRef.current.time < 3000
+    ) {
+      console.warn('[QuickCapture] 3초 이내 동일 텍스트 중복 방지됨');
+      return;
+    }
+
+    isProcessingRef.current = true;
+    lastProcessedTextRef.current = { text: cleanedText, time: now };
     setIsProcessing(true);
+
     try {
       // Gemini 멀티 인텐트 라우팅
-      const analysis = await analyzeAndRouteQuickText(rawText, apiKey, selectedModel);
+      const analysis = await analyzeAndRouteQuickText(cleanedText, apiKey, selectedModel);
+
+      // 작업 레벨 중복 제거 (동일 인텐트 + 동일 제목 + 동일 날짜 중복 제거)
+      const uniqueTasks: RoutedNotionTask[] = [];
+      const seenKeys = new Set<string>();
+      for (const t of analysis.tasks) {
+        const normTitle = (t.title || '').replace(/\s+/g, '').toLowerCase();
+        const normDate = String(t.properties?.['일정'] || t.properties?.['날짜'] || '').split(' ')[0];
+        const key = `${t.intent}-${normTitle}-${normDate}`;
+        if (!seenKeys.has(key)) {
+          seenKeys.add(key);
+          uniqueTasks.push(t);
+        }
+      }
+      analysis.tasks = uniqueTasks;
       
       // 노션 연동 리소스 구성 (DB가 0개이더라도 부모 페이지가 있으면 즉시 Fallback 생성)
       const targetResource: CreatedNotionResource | null = createdNotionResource || (notionParentPageId ? {
@@ -99,7 +138,7 @@ export const QuickCaptureView: React.FC = () => {
         id: `qc-${Date.now()}`,
         timestamp: Date.now(),
         mode,
-        rawContent: rawText,
+        rawContent: cleanedText,
         correctedSummary: analysis.correctedText || analysis.rawInput,
         tasks: analysis.tasks,
         status: isNotionConnected && dispatchResult.successCount > 0 ? 'sent' : 'local_saved',
@@ -120,6 +159,7 @@ export const QuickCaptureView: React.FC = () => {
       showToast('error', err.message || '퀵 캡처 처리 중 오류가 발생했습니다.');
     } finally {
       setIsProcessing(false);
+      isProcessingRef.current = false;
     }
   };
 
