@@ -8,18 +8,8 @@ import { StructureTreeView } from './StructureTreeView';
 import { TemplateSchemaTable } from './TemplateSchemaTable';
 import { CuratedTop10Hub } from './CuratedTop10Hub';
 import { SEPTEMBER_TOP_10_TEMPLATES } from '../../services/curatedTemplates';
-import { 
-  FileText, 
-  GitBranch, 
-  Code2, 
-  Share2, 
-  Sparkles, 
-  Loader2,
-  Zap,
-  ArrowLeft,
-  MessageSquare,
-  Compass
-} from 'lucide-react';
+import { FileText, GitBranch, Code2, Share2, Sparkles, Loader2, Zap, ArrowLeft, MessageSquare, Compass } from 'lucide-react';
+import { TemplateBenchmarkCard } from './TemplateBenchmarkCard';
 
 export const NotionMockup: React.FC = () => {
   const { 
@@ -192,6 +182,12 @@ export const NotionMockup: React.FC = () => {
         <StructureTreeView template={currentTemplate} />
       ) : (
         <div className="pb-24">
+
+          {/* 💡 상용 베스트셀러 대비 고도화 분석 아코디언 (미리보기 최상단) */}
+          <div className="px-4 sm:px-12 md:px-16 pt-4">
+            <TemplateBenchmarkCard template={currentTemplate} />
+          </div>
+
           {/* 1. Cover Image */}
           <NotionCover coverUrl={currentTemplate.cover_url} />
 

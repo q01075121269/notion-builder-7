@@ -20,6 +20,8 @@ import { dispatchRoutedTasksToNotion } from '../../services/quickCaptureService'
 import { extractDateFromKoreanText, cleanDuplicateSpeech } from '../../services/quickCaptureLocalParser';
 import { saveQuickCaptureRecord } from '../../services/quickCaptureStorage';
 import type { RoutedNotionTask, QuickCaptureRecord } from '../../types/quickCapture';
+import { SelfDiagnosticCard, payloadToDiagnostic } from '../common/SelfDiagnosticCard';
+import type { DiagnosticResult } from '../common/SelfDiagnosticCard';
 
 // ─── 실행 영수증 카드 타입 ──────────────────────────────────────────────────
 type ReceiptType = 'builder' | 'life' | 'devlab';
@@ -58,9 +60,11 @@ const RECEIPT_META: Record<ReceiptType, Omit<ActionReceipt, 'id' | 'type'>> = {
   },
 };
 
-// ─── 메시지에 실행 영수증 연결 ────────────────────────────────────────────────
+// ─── 메시지에 실행 영수증 + 진단 카드 연결 ──────────────────────────────────
 interface OmniMessage extends ChatMessage {
   receipts?: ActionReceipt[];
+  /** DEVLAB troubleshooting 인텐트 시 SelfDiagnosticCard 데이터 */
+  diagnostic?: DiagnosticResult;
 }
 
 function buildReceipts(intent: string): ActionReceipt[] {
@@ -280,6 +284,16 @@ export const OmniChatBar: React.FC = () => {
         receipts = buildReceipts('DEVLAB');
       }
 
+      // ── 진단 카드: DEVLAB + troubleshooting 서브타입 또는 에러 키워드 ──────
+      let diagnostic: DiagnosticResult | undefined;
+      const isErrorIntent =
+        response.intent === 'DEVLAB' &&
+        (response.payload?.sub_type === 'troubleshooting' ||
+          /에러|오류|버그|crash|error|exception|fail/i.test(text));
+      if (isErrorIntent && response.payload) {
+        diagnostic = payloadToDiagnostic(response.payload, text.slice(0, 40));
+      }
+
       const aiMsg: OmniMessage = {
         id: `omni-ai-${Date.now()}`,
         role: 'assistant',
@@ -288,6 +302,7 @@ export const OmniChatBar: React.FC = () => {
         intent: response.intent,
         redirect_url: response.redirect_url,
         receipts,
+        diagnostic,
       };
 
       setMessages(prev => [...prev, aiMsg]);
@@ -418,6 +433,16 @@ export const OmniChatBar: React.FC = () => {
 
                     {/* 인텐트 배지 */}
                     {!isUser && intentBadge(msg.intent)}
+
+                    {/* ── 진단 카드 (DEVLAB 에러 인텐트 시 표시) ───────────── */}
+                    {!isUser && msg.diagnostic && (
+                      <div className="w-full mt-1 max-w-[340px] sm:max-w-[480px]">
+                        <SelfDiagnosticCard
+                          diagnostic={msg.diagnostic}
+                          timestamp={msg.timestamp}
+                        />
+                      </div>
+                    )}
 
                     {/* ── 실행 영수증 카드 ─────────────────────────────────── */}
                     {!isUser && msg.receipts && msg.receipts.length > 0 && (
