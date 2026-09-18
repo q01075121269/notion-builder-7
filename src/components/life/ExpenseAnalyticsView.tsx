@@ -31,6 +31,7 @@ import {
 import type { LifeExpenseItem, PaymentMethod, TransactionType } from '../../services/notionLifeHubSync';
 import { createNotionExpensePage } from '../../services/notionLifeHubSync';
 import { analyzeExpenseAnomalies, type ExpenseAnomalyInsight } from '../../services/aiExpenseAnomaly';
+import { useApp } from '../../context/AppContext';
 
 
 interface ExpenseAnalyticsViewProps {
@@ -73,6 +74,7 @@ export const ExpenseAnalyticsView: React.FC<ExpenseAnalyticsViewProps> = ({
   expenseDbId,
   geminiApiKey
 }) => {
+  const { setCurrentView, showToast } = useApp();
   // 1. 월단위 기준 선택 (기본: 2026-09)
   const [selectedMonth, setSelectedMonth] = useState<string>('2026-09');
   const [monthlyBudget, setMonthlyBudget] = useState<number>(2500000); // 월 목표 예산 250만원
@@ -340,6 +342,20 @@ export const ExpenseAnalyticsView: React.FC<ExpenseAnalyticsViewProps> = ({
               <ChevronRight className="w-3.5 h-3.5" />
             </button>
           </div>
+
+          {!isCompact && (
+            <button
+              onClick={() => {
+                setCurrentView('devlab');
+                showToast('📄 가계부 결산 데이터가 제3챕터 오피스 스튜디오 소스로 즉시 연결되었습니다!', 'success');
+              }}
+              title="가계부 결산 내역을 오피스 스튜디오 소스로 보내기"
+              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-200 dark:border-blue-800 text-xs font-bold transition cursor-pointer active:scale-95 whitespace-nowrap"
+            >
+              <Zap className="w-3.5 h-3.5 text-blue-500" />
+              <span className="whitespace-nowrap hidden sm:inline">📄 오피스 소스로 전송</span>
+            </button>
+          )}
 
           {!isCompact && (
             <button

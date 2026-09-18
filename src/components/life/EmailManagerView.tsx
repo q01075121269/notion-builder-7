@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 
 import { generateEmailReplyDraft, type ReplyScenario, type EmailReplyResult } from '../../services/aiEmailReply';
+import { useApp } from '../../context/AppContext';
 
 export interface EmailAttachment {
   id: string;
@@ -63,6 +64,7 @@ export const EmailManagerView: React.FC<EmailManagerViewProps> = ({
   isCompact = false,
   apiKey
 }) => {
+  const { setCurrentView } = useApp();
   // 선택된 메일 (우측 서랍 뷰어용)
   const [selectedMail, setSelectedMail] = useState<LifeEmailItem | null>(null);
 
@@ -599,6 +601,17 @@ export const EmailManagerView: React.FC<EmailManagerViewProps> = ({
               </button>
 
               <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => {
+                    setCurrentView('devlab');
+                    showToast(`📄 [${selectedMail.subject}] 이메일 회의록이 제3챕터 오피스 스튜디오 소스로 전송되었습니다!`);
+                  }}
+                  className="flex items-center space-x-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-blue-50 hover:bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-200 dark:border-blue-800 transition cursor-pointer whitespace-nowrap"
+                >
+                  <Bot className="w-3.5 h-3.5 text-blue-500" />
+                  <span>📄 오피스 소스로 전송</span>
+                </button>
+
                 <button
                   onClick={() => handleTransferToTodo(selectedMail)}
                   className="flex items-center space-x-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-600 text-white shadow-xs transition cursor-pointer active:scale-95 whitespace-nowrap"
