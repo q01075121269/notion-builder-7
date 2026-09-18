@@ -896,10 +896,13 @@ export const LifePage: React.FC = () => {
     syncLifeHubData();
   }, [syncLifeHubData]);
 
-  const toggleTodo = (id: string) => {
+  const toggleTodo = (id: string, forcedDone?: boolean) => {
     setTodoItems(prev => prev.map(t => {
       if (t.id === id) {
-        const nextDone = !t.done;
+        const nextDone = forcedDone !== undefined ? forcedDone : !t.done;
+        // 메인 할 일 완료 상태에 따라 서브태스크 상태도 일괄 동기화
+        const updatedSubtasks = t.subtasks ? t.subtasks.map(st => ({ ...st, done: nextDone })) : t.subtasks;
+
         // 연결된 캘린더 타임블록 일정이 있다면 완료 상태 동기화
         setScheduleItems(sPrev => sPrev.map(s => {
           if (s.taskId === id || s.id === `s-todo-${id}`) {
@@ -907,7 +910,7 @@ export const LifePage: React.FC = () => {
           }
           return s;
         }));
-        return { ...t, done: nextDone };
+        return { ...t, done: nextDone, subtasks: updatedSubtasks };
       }
       return t;
     }));

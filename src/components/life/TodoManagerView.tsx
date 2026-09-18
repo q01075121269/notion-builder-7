@@ -17,7 +17,7 @@ import {
   Calendar, 
   Filter,
   Flame,
-  Star,
+  Target,
   Zap,
   Coffee,
   ListTodo
@@ -35,10 +35,71 @@ import {
 } from '../../services/aiTaskBreakdown';
 import { useApp } from '../../context/AppContext';
 
+// P1~P4 단일 우선순위 체계 설정 (색상 및 뱃지 스타일 통일)
+export const PRIORITY_CONFIG: Record<EisenhowerPriority, {
+  label: string;
+  name: string;
+  badgeClass: string;
+  activeClass: string;
+  textColor: string;
+  iconName: string;
+  dotColor: string;
+}> = {
+  P1: {
+    label: '긴급/중요',
+    name: 'P1',
+    badgeClass: 'bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 border-rose-200 dark:border-rose-900/60 hover:bg-rose-100 dark:hover:bg-rose-900/40',
+    activeClass: 'bg-rose-500 text-white shadow-xs',
+    textColor: 'text-rose-600 dark:text-rose-400',
+    iconName: '🔥',
+    dotColor: 'bg-rose-500'
+  },
+  P2: {
+    label: '중요/계획',
+    name: 'P2',
+    badgeClass: 'bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border-blue-200 dark:border-blue-900/60 hover:bg-blue-100 dark:hover:bg-blue-900/40',
+    activeClass: 'bg-blue-600 text-white shadow-xs',
+    textColor: 'text-blue-600 dark:text-blue-400',
+    iconName: '🎯',
+    dotColor: 'bg-blue-500'
+  },
+  P3: {
+    label: '긴급/위임',
+    name: 'P3',
+    badgeClass: 'bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 border-amber-200 dark:border-amber-900/60 hover:bg-amber-100 dark:hover:bg-amber-900/40',
+    activeClass: 'bg-amber-500 text-white shadow-xs',
+    textColor: 'text-amber-600 dark:text-amber-400',
+    iconName: '⚡',
+    dotColor: 'bg-amber-500'
+  },
+  P4: {
+    label: '일반/여유',
+    name: 'P4',
+    badgeClass: 'bg-slate-100 text-slate-700 dark:bg-neutral-800 dark:text-slate-300 border-slate-200 dark:border-neutral-700 hover:bg-slate-200 dark:hover:bg-neutral-700',
+    activeClass: 'bg-slate-600 text-white shadow-xs',
+    textColor: 'text-slate-600 dark:text-neutral-400',
+    iconName: '☕',
+    dotColor: 'bg-slate-500'
+  }
+};
+
+// 레거시 정적 텍스트('별 보통' 등)를 제거하고 P1~P4로 단일 정규화
+export function normalizePriority(todo: LifeTodoItem): EisenhowerPriority {
+  if (todo.eisenhower && ['P1', 'P2', 'P3', 'P4'].includes(todo.eisenhower)) {
+    return todo.eisenhower;
+  }
+  const p = todo.priority || '';
+  if (p.includes('P1') || (p.includes('긴급') && p.includes('중요')) || p.includes('우선')) return 'P1';
+  if (p.includes('P2') || p.includes('중요') || p.includes('계획')) return 'P2';
+  if (p.includes('P3') || p.includes('위임') || p.includes('긴급')) return 'P3';
+  if (p.includes('P4') || p.includes('여유') || p.includes('보관') || p.includes('보통') || p.includes('일반')) return 'P4';
+  return 'P2';
+}
+
 interface TodoManagerViewProps {
   todoItems: LifeTodoItem[];
   setTodoItems: React.Dispatch<React.SetStateAction<LifeTodoItem[]>>;
-  onToggleTodo: (id: string) => void;
+  onToggleTodo: (id: string, forcedDone?: boolean) => void;
   onDeleteTodo: (e: React.MouseEvent, item: LifeTodoItem) => void;
   onQuickCapture: () => void;
   onScheduleTodo?: (todo: LifeTodoItem) => void;
@@ -65,6 +126,9 @@ export const TodoManagerView: React.FC<TodoManagerViewProps> = ({
   // 완료 상태 필터: 'ALL' | 'ACTIVE' | 'DONE'
   const [filterStatus, setFilterStatus] = useState<'ALL' | 'ACTIVE' | 'DONE'>('ALL');
 
+  // 우선순위 인라인 변경 팝오버 메뉴 열림 상태 (todo.id)
+  const [activePriorityMenuId, setActivePriorityMenuId] = useState<string | null>(null);
+
   // 브라우저 푸시 알림 권한 상태
   const [notificationGranted, setNotificationGranted] = useState<boolean>(() => {
     return typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted';
@@ -75,6 +139,15 @@ export const TodoManagerView: React.FC<TodoManagerViewProps> = ({
 
   // 펼쳐진 서브태스크 목록 ID Set
   const [expandedSubtaskIds, setExpandedSubtaskIds] = useState<Set<string>>(new Set());
+
+  // 외부 클릭 시 우선순위 드롭다운 닫기
+  useEffect(() => {
+    const handleOutsideClick = () => {
+      setActivePriorityMenuId(null);
+    };
+    window.addEventListener('click', handleOutsideClick);
+    return () => window.removeEventListener('click', handleOutsideClick);
+  }, []);
 
   // 새 할 일 인라인 폼 상태 (독립 컨테이너: 목표/카테고리 선택 지원)
   const [isAddFormOpen, setIsAddFormOpen] = useState<boolean>(false);
@@ -217,22 +290,57 @@ export const TodoManagerView: React.FC<TodoManagerViewProps> = ({
     }
   };
 
-  // 서브태스크 완료 토글
-  const handleToggleSubtask = (todoId: string, subtaskId: string) => {
+  // 우선순위 원클릭 인라인 변경 핸들러
+  const handleChangePriority = (e: React.MouseEvent, todoId: string, newP: EisenhowerPriority) => {
+    e.stopPropagation();
+    setTodoItems(prev => prev.map(t => {
+      if (t.id === todoId) {
+        return {
+          ...t,
+          eisenhower: newP,
+          priority: PRIORITY_CONFIG[newP].label
+        };
+      }
+      return t;
+    }));
+    setActivePriorityMenuId(null);
+    showToast(`우선순위가 [${newP}: ${PRIORITY_CONFIG[newP].label}]로 변경되었습니다.`, 'success');
+  };
+
+  // 서브태스크 개별 완료 토글 & 실시간 달성률(%) 및 100% 시 메인 할 일 자동 완료 전환
+  const handleToggleSubtask = (e: React.SyntheticEvent, todoId: string, subtaskId: string) => {
+    e.stopPropagation();
+    
     setTodoItems(prev => prev.map(todo => {
       if (todo.id !== todoId || !todo.subtasks) return todo;
+
       const updatedSubtasks = todo.subtasks.map(st => 
         st.id === subtaskId ? { ...st, done: !st.done } : st
       );
+
+      const totalCount = updatedSubtasks.length;
+      const completedCount = updatedSubtasks.filter(s => s.done).length;
+      const isAllDone = totalCount > 0 && completedCount === totalCount;
+      const nextDone = isAllDone ? true : (todo.done && completedCount < totalCount ? false : todo.done);
+
+      if (todo.done !== nextDone) {
+        onToggleTodo(todo.id, nextDone);
+        if (isAllDone) {
+          showToast(`🎉 '${todo.title}'의 모든 세부 과제가 100% 완료되어 자동 완료되었습니다!`, 'success');
+        }
+      }
+
       return {
         ...todo,
-        subtasks: updatedSubtasks
+        subtasks: updatedSubtasks,
+        done: nextDone
       };
     }));
   };
 
   // 서브태스크 펼침/접힘 토글
-  const toggleExpandSubtasks = (todoId: string) => {
+  const toggleExpandSubtasks = (e: React.MouseEvent, todoId: string) => {
+    e.stopPropagation();
     setExpandedSubtaskIds(prev => {
       const next = new Set(prev);
       if (next.has(todoId)) {
@@ -253,7 +361,7 @@ export const TodoManagerView: React.FC<TodoManagerViewProps> = ({
       id: `todo-custom-${Date.now()}`,
       title: newTitle.trim(),
       done: false,
-      priority: newPriority === 'P1' ? '🔥 긴급/중요' : newPriority === 'P2' ? '⭐ 중요' : newPriority === 'P3' ? '⚡ 긴급' : '☕ 여유',
+      priority: PRIORITY_CONFIG[newPriority].label,
       eisenhower: newPriority,
       category: newCategory,
       dueDate: newDueDate,
@@ -265,19 +373,15 @@ export const TodoManagerView: React.FC<TodoManagerViewProps> = ({
     setTodoItems(prev => [newTodo, ...prev]);
     setNewTitle('');
     setIsAddFormOpen(false);
-    showToast(`새 스마트 할 일(${newCategory})이 성공적으로 등록되었습니다.`, 'success');
+    showToast(`새 스마트 할 일(${newCategory} / ${newPriority})이 등록되었습니다.`, 'success');
   };
 
-  // 필터링된 할 일 목록 계산
+  // 필터링된 할 일 목록 계산 (P1~P4 단일 체계 기준)
   const filteredTodos = useMemo(() => {
     return todoItems.filter(todo => {
-      // 1. 우선순위 필터
+      // 1. 우선순위 단일화 필터
       if (filterPriority !== 'ALL') {
-        const itemP = todo.eisenhower || (
-          todo.priority.includes('긴급') && todo.priority.includes('중요') ? 'P1' :
-          todo.priority.includes('중요') ? 'P2' :
-          todo.priority.includes('긴급') ? 'P3' : 'P4'
-        );
+        const itemP = normalizePriority(todo);
         if (itemP !== filterPriority) return false;
       }
 
@@ -369,43 +473,43 @@ export const TodoManagerView: React.FC<TodoManagerViewProps> = ({
             }`}
           >
             <Flame className="w-3 h-3" />
-            <span>P1</span>
+            <span>P1 {isCompact ? '' : '긴급/중요'}</span>
           </button>
 
           <button
             onClick={() => setFilterPriority('P2')}
-            className={`flex items-center space-x-1 px-2.5 py-1 rounded-lg text-xs font-bold transition whitespace-nowrap cursor-pointer ${
+            className={`flex items-center space-x-1 ${isCompact ? 'px-2 py-0.5 text-[11px]' : 'px-2.5 py-1 text-xs'} rounded-lg font-bold transition whitespace-nowrap cursor-pointer ${
               filterPriority === 'P2'
                 ? 'bg-blue-600 text-white shadow-xs'
                 : 'text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-neutral-900/50'
             }`}
           >
-            <Star className="w-3 h-3" />
-            <span>P2 중요/계획</span>
+            <Target className="w-3 h-3" />
+            <span>P2 {isCompact ? '' : '중요/계획'}</span>
           </button>
 
           <button
             onClick={() => setFilterPriority('P3')}
-            className={`flex items-center space-x-1 px-2.5 py-1 rounded-lg text-xs font-bold transition whitespace-nowrap cursor-pointer ${
+            className={`flex items-center space-x-1 ${isCompact ? 'px-2 py-0.5 text-[11px]' : 'px-2.5 py-1 text-xs'} rounded-lg font-bold transition whitespace-nowrap cursor-pointer ${
               filterPriority === 'P3'
                 ? 'bg-amber-500 text-white shadow-xs'
                 : 'text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-neutral-900/50'
             }`}
           >
             <Zap className="w-3 h-3" />
-            <span>P3 긴급/위임</span>
+            <span>P3 {isCompact ? '' : '긴급/위임'}</span>
           </button>
 
           <button
             onClick={() => setFilterPriority('P4')}
-            className={`flex items-center space-x-1 px-2.5 py-1 rounded-lg text-xs font-bold transition whitespace-nowrap cursor-pointer ${
+            className={`flex items-center space-x-1 ${isCompact ? 'px-2 py-0.5 text-[11px]' : 'px-2.5 py-1 text-xs'} rounded-lg font-bold transition whitespace-nowrap cursor-pointer ${
               filterPriority === 'P4'
                 ? 'bg-slate-600 text-white shadow-xs'
-                : 'text-slate-600 dark:text-neutral-400 hover:bg-slate-200'
+                : 'text-slate-600 dark:text-neutral-400 hover:bg-slate-200 dark:hover:bg-neutral-800'
             }`}
           >
             <Coffee className="w-3 h-3" />
-            <span>P4 여유/보관</span>
+            <span>P4 {isCompact ? '' : '일반/여유'}</span>
           </button>
         </div>
 
@@ -568,9 +672,15 @@ export const TodoManagerView: React.FC<TodoManagerViewProps> = ({
         <div className="space-y-3">
           {filteredTodos.map((todo) => {
             const ddayInfo = getDDayBadge(todo.dueDate);
-            const hasSubtasks = Boolean(todo.subtasks && todo.subtasks.length > 0);
+            const subtasks = todo.subtasks || [];
+            const totalSub = subtasks.length;
+            const doneSub = subtasks.filter(s => s.done).length;
+            const progressPercent = totalSub > 0 ? Math.round((doneSub / totalSub) * 100) : 0;
+            const hasSubtasks = totalSub > 0;
             const isExpanded = expandedSubtaskIds.has(todo.id);
             const isBreakingDown = breakingDownId === todo.id;
+            const normP = normalizePriority(todo);
+            const pConfig = PRIORITY_CONFIG[normP];
 
             return (
               <div
@@ -581,21 +691,22 @@ export const TodoManagerView: React.FC<TodoManagerViewProps> = ({
                     id: todo.id,
                     title: todo.title,
                     dueDate: todo.dueDate,
-                    priority: todo.priority,
-                    eisenhower: todo.eisenhower,
+                    priority: pConfig.label,
+                    eisenhower: normP,
+                    category: todo.category || '업무',
                     type: 'todo_to_schedule'
                   }));
                   e.dataTransfer.effectAllowed = 'copyMove';
                 }}
                 className={`${
                   isCompact ? 'p-2.5 rounded-xl gap-2' : 'p-4 rounded-2xl gap-3'
-                } border transition shadow-xs group ${
+                } border transition shadow-xs group relative ${
                   todo.done
-                    ? 'bg-slate-100/60 dark:bg-neutral-900/30 border-slate-200/60 dark:border-neutral-800/50 opacity-60'
+                    ? 'bg-slate-100/60 dark:bg-neutral-900/30 border-slate-200/60 dark:border-neutral-800/50 opacity-65'
                     : 'bg-white dark:bg-neutral-900/70 border-slate-200 dark:border-neutral-800 hover:border-amber-400/80 hover:shadow-md cursor-grab active:cursor-grabbing'
                 }`}
               >
-                {/* 상단 메인 라인: 드래그 핸들 + 체크박스 + 제목 + D-Day 뱃지 + AI 버튼 */}
+                {/* 상단 메인 라인: 드래그 핸들 + 체크박스 + 제목 + D-Day 뱃지 + 진행률 뱃지 + 액션 버튼들 */}
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center space-x-2.5 min-w-0 flex-1">
                     {/* 드래그 핸들 */}
@@ -614,9 +725,9 @@ export const TodoManagerView: React.FC<TodoManagerViewProps> = ({
                       className="w-4 h-4 rounded text-amber-600 focus:ring-amber-500 cursor-pointer border-slate-300 shrink-0"
                     />
 
-                    {/* 할 일 제목 */}
+                    {/* 할 일 제목 및 메타 뱃지들 */}
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center space-x-1.5 flex-wrap gap-y-0.5">
+                      <div className="flex items-center space-x-1.5 flex-wrap gap-y-1">
                         <span 
                           onClick={() => onToggleTodo(todo.id)}
                           className={`text-xs sm:text-sm font-semibold cursor-pointer truncate ${
@@ -637,8 +748,20 @@ export const TodoManagerView: React.FC<TodoManagerViewProps> = ({
 
                         {/* 독립 컨테이너 목표/카테고리 뱃지 */}
                         {todo.category && (
-                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300 border border-amber-200/60 dark:border-amber-800/40 font-medium whitespace-nowrap">
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 dark:bg-neutral-800 text-slate-600 dark:text-neutral-300 border border-slate-200 dark:border-neutral-700 font-medium whitespace-nowrap">
                             {todo.category}
+                          </span>
+                        )}
+
+                        {/* 서브태스크 실시간 진행률 뱃지 (33%, 67%, 100% 등) */}
+                        {hasSubtasks && (
+                          <span className={`text-[10px] px-2 py-0.5 rounded-md font-bold whitespace-nowrap border flex items-center space-x-1 ${
+                            progressPercent === 100
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800'
+                              : 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/60 dark:text-purple-300 dark:border-purple-800'
+                          }`}>
+                            <Sparkles className="w-2.5 h-2.5" />
+                            <span>진행률 {progressPercent}% ({doneSub}/{totalSub})</span>
                           </span>
                         )}
 
@@ -651,7 +774,7 @@ export const TodoManagerView: React.FC<TodoManagerViewProps> = ({
                         )}
                       </div>
 
-                      {/* 기한 및 우선순위 라벨 */}
+                      {/* 기한 안내 */}
                       {todo.dueDate && (
                         <div className="text-[11px] text-slate-400 dark:text-neutral-400 mt-0.5 flex items-center space-x-2">
                           <span className="flex items-center space-x-1">
@@ -660,10 +783,26 @@ export const TodoManagerView: React.FC<TodoManagerViewProps> = ({
                           </span>
                         </div>
                       )}
+
+                      {/* 실시간 서브태스크 미니 프로그레스 바 */}
+                      {hasSubtasks && (
+                        <div className="w-full max-w-md bg-slate-100 dark:bg-neutral-800 h-1.5 rounded-full overflow-hidden mt-1.5">
+                          <div
+                            className={`h-full transition-all duration-300 ${
+                              progressPercent === 100 
+                                ? 'bg-emerald-500' 
+                                : progressPercent >= 60 
+                                  ? 'bg-purple-600' 
+                                  : 'bg-amber-500'
+                            }`}
+                            style={{ width: `${progressPercent}%` }}
+                          />
+                        </div>
+                      )}
                     </div>
                   </div>
 
-                  {/* 우측 액션: [📅 타임블록 On/Off 토글] + [🪄 AI 분해] + 우선순위 배지 + 삭제 */}
+                  {/* 우측 액션: [📅 타임블록 On/Off 토글] + [🪄 AI 분해] + [P1~P4 인라인 변경 드롭다운] + 삭제 */}
                   <div className="flex items-center space-x-1.5 shrink-0">
                     {/* [📅 달력에 표시] On/Off 토글 스위치 버튼 */}
                     {(onToggleTimeBlock || onScheduleTodo) && (
@@ -706,17 +845,62 @@ export const TodoManagerView: React.FC<TodoManagerViewProps> = ({
                       </span>
                     </button>
 
-                    {/* 우선순위 뱃지 */}
-                    <span className="text-[11px] px-2 py-0.5 rounded-md bg-slate-100 dark:bg-neutral-800 text-slate-700 dark:text-neutral-300 font-bold whitespace-nowrap border border-slate-200/80 dark:border-neutral-700/60">
-                      {todo.priority || todo.eisenhower || 'P1'}
-                    </span>
+                    {/* P1~P4 단일 우선순위 뱃지 & 원클릭 인라인 변경 드롭다운 */}
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setActivePriorityMenuId(prev => prev === todo.id ? null : todo.id);
+                        }}
+                        title="클릭하여 우선순위(P1~P4) 즉시 변경"
+                        className={`text-[11px] px-2 py-0.5 rounded-md font-bold whitespace-nowrap border flex items-center space-x-1 cursor-pointer transition active:scale-95 shadow-2xs ${pConfig.badgeClass}`}
+                      >
+                        <span>{pConfig.iconName}</span>
+                        <span>{normP}</span>
+                        <ChevronDown className="w-3 h-3 opacity-60 ml-0.5" />
+                      </button>
 
+                      {/* 우선순위 선택 드롭다운 팝오버 */}
+                      {activePriorityMenuId === todo.id && (
+                        <div 
+                          onClick={(e) => e.stopPropagation()}
+                          className="absolute right-0 top-full mt-1.5 z-40 w-36 bg-white dark:bg-neutral-900 border border-slate-200 dark:border-neutral-700 rounded-xl shadow-lg p-1 space-y-0.5"
+                        >
+                          <div className="px-2 py-1 text-[10px] font-bold text-slate-400 dark:text-neutral-500 border-b border-slate-100 dark:border-neutral-800">
+                            우선순위 변경
+                          </div>
+                          {(['P1', 'P2', 'P3', 'P4'] as EisenhowerPriority[]).map((pKey) => {
+                            const conf = PRIORITY_CONFIG[pKey];
+                            const isSelected = normP === pKey;
+                            return (
+                              <button
+                                key={pKey}
+                                type="button"
+                                onClick={(e) => handleChangePriority(e, todo.id, pKey)}
+                                className={`w-full flex items-center justify-between px-2 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer text-left ${
+                                  isSelected 
+                                    ? 'bg-slate-100 dark:bg-neutral-800 text-slate-900 dark:text-white font-bold' 
+                                    : 'hover:bg-slate-50 dark:hover:bg-neutral-800/60 text-slate-700 dark:text-neutral-300'
+                                }`}
+                              >
+                                <span className="flex items-center space-x-1.5">
+                                  <span>{conf.iconName}</span>
+                                  <span>{pKey} {conf.label}</span>
+                                </span>
+                                {isSelected && <Check className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
 
                     {/* 서브태스크 접기/펼치기 버튼 */}
                     {hasSubtasks && (
                       <button
-                        onClick={() => toggleExpandSubtasks(todo.id)}
-                        className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-neutral-800 transition"
+                        onClick={(e) => toggleExpandSubtasks(e, todo.id)}
+                        className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-neutral-800 transition cursor-pointer"
                       >
                         {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                       </button>
@@ -733,34 +917,41 @@ export const TodoManagerView: React.FC<TodoManagerViewProps> = ({
                   </div>
                 </div>
 
-                {/* 5. AI 서브태스크 3단계 체크리스트 영역 */}
+                {/* 5. AI 서브태스크 3단계 체크리스트 영역 (개별 체크박스 + 달성률 연동) */}
                 {hasSubtasks && isExpanded && (
                   <div className="mt-3.5 pt-3 border-t border-slate-100 dark:border-neutral-800/80 pl-7 space-y-2">
                     <div className="flex items-center justify-between text-[11px] font-bold text-purple-700 dark:text-purple-400">
                       <span className="flex items-center space-x-1">
                         <Sparkles className="w-3 h-3 text-purple-500" />
-                        <span>AI 자동 분해 3단계 실행 체크리스트:</span>
+                        <span>AI 자동 분해 3단계 실행 과제:</span>
                       </span>
                       <span>
-                        {todo.subtasks?.filter(s => s.done).length}/{todo.subtasks?.length} 완료
+                        {doneSub}/{totalSub} 완료 ({progressPercent}%)
                       </span>
                     </div>
 
                     <div className="space-y-1.5">
-                      {todo.subtasks?.map((st) => (
+                      {subtasks.map((st) => (
                         <div
                           key={st.id}
-                          onClick={() => handleToggleSubtask(todo.id, st.id)}
-                          className="flex items-center space-x-2.5 p-2 rounded-xl bg-slate-50/80 dark:bg-neutral-800/40 hover:bg-slate-100 dark:hover:bg-neutral-800 transition cursor-pointer"
+                          onClick={(e) => handleToggleSubtask(e, todo.id, st.id)}
+                          className={`flex items-center space-x-2.5 p-2 rounded-xl transition cursor-pointer border ${
+                            st.done
+                              ? 'bg-slate-50/60 dark:bg-neutral-800/30 border-slate-200/50 dark:border-neutral-800/40 opacity-70'
+                              : 'bg-white dark:bg-neutral-850 border-slate-200 dark:border-neutral-750 hover:bg-purple-50/30 hover:border-purple-300'
+                          }`}
                         >
                           <input
                             type="checkbox"
                             checked={st.done}
-                            onChange={() => {}}
-                            className="w-3.5 h-3.5 rounded text-purple-600 focus:ring-purple-500 cursor-pointer border-slate-300"
+                            onChange={(e) => {
+                              e.stopPropagation();
+                              handleToggleSubtask(e, todo.id, st.id);
+                            }}
+                            className="w-4 h-4 rounded text-purple-600 focus:ring-purple-500 cursor-pointer border-slate-300 shrink-0"
                           />
-                          <span className={`text-xs font-medium ${
-                            st.done ? 'line-through text-slate-400 dark:text-neutral-500' : 'text-slate-700 dark:text-slate-300'
+                          <span className={`text-xs font-medium flex-1 ${
+                            st.done ? 'line-through text-slate-400 dark:text-neutral-500' : 'text-slate-700 dark:text-slate-200'
                           }`}>
                             {st.title}
                           </span>
