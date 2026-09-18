@@ -56,6 +56,13 @@ const CATEGORY_META: Record<string, { label: string; icon: any; color: string; b
   '미분류': { label: '미분류', icon: HelpCircle, color: 'text-rose-600 dark:text-rose-400', bg: 'bg-rose-400', border: 'border-rose-200 dark:border-rose-800/40' }
 };
 
+// 큰 금액 자동 축약 (isCompact 모드용): 1,000,000 → 100만, 2,450,000 → 245만
+const formatCompactAmount = (amount: number): string => {
+  if (amount >= 100000000) return `${(amount / 100000000).toFixed(1).replace(/\.0$/, '')}억`;
+  if (amount >= 10000) return `${Math.round(amount / 10000)}만`;
+  return amount.toLocaleString();
+};
+
 export const ExpenseAnalyticsView: React.FC<ExpenseAnalyticsViewProps> = ({
   expenseItems,
   setExpenseItems,
@@ -359,14 +366,21 @@ export const ExpenseAnalyticsView: React.FC<ExpenseAnalyticsViewProps> = ({
       {/* 2. 코파일럿 머니/뱅크샐러드급 월간 페이싱 게이지 요약 카드 */}
       <div className={`${isCompact ? 'p-2.5 rounded-xl space-y-2.5' : 'p-4 sm:p-5 rounded-2xl space-y-4'} bg-gradient-to-b from-white to-slate-50/70 dark:from-neutral-900 dark:to-neutral-900/60 border border-slate-200/90 dark:border-neutral-800 shadow-sm`}>
         {/* 상단 4대 핵심 지표 */}
-        <div className={`grid grid-cols-2 ${isCompact ? 'gap-2' : 'lg:grid-cols-4 gap-3'}`}>
-          <div className={`${isCompact ? 'p-2 rounded-lg' : 'p-3 rounded-xl'} bg-slate-50 dark:bg-neutral-800/60 border border-slate-200/60 dark:border-neutral-700/60`}>
-            <span className="text-[11px] font-medium text-slate-500 dark:text-neutral-400 block whitespace-nowrap">
+        <div className={`grid grid-cols-2 ${isCompact ? 'gap-1.5' : 'lg:grid-cols-4 gap-3'}`}>
+          {/* 월간 총수입 */}
+          <div className={`${isCompact ? 'p-2 rounded-lg' : 'p-3 rounded-xl'} bg-slate-50 dark:bg-neutral-800/60 border border-slate-200/60 dark:border-neutral-700/60 min-w-0 overflow-hidden`}>
+            <span className="text-[11px] font-medium text-slate-500 dark:text-neutral-400 block truncate">
               월간 총수입
             </span>
-            <div className={`${isCompact ? 'text-xs sm:text-sm' : 'text-base sm:text-lg'} font-bold text-slate-900 dark:text-white mt-0.5 whitespace-nowrap`}>
-              {calculatedIncome.toLocaleString()}원
-            </div>
+            {isCompact ? (
+              <div className="text-sm font-bold text-slate-900 dark:text-white mt-0.5 truncate">
+                {formatCompactAmount(calculatedIncome)}원
+              </div>
+            ) : (
+              <div className="text-base sm:text-lg font-bold text-slate-900 dark:text-white mt-0.5 whitespace-nowrap">
+                {calculatedIncome.toLocaleString()}원
+              </div>
+            )}
             {!isCompact && (
               <span className="text-[10px] text-emerald-600 dark:text-emerald-400 flex items-center space-x-0.5 mt-0.5 whitespace-nowrap">
                 <TrendingUp className="w-3 h-3" />
@@ -375,13 +389,20 @@ export const ExpenseAnalyticsView: React.FC<ExpenseAnalyticsViewProps> = ({
             )}
           </div>
 
-          <div className={`${isCompact ? 'p-2 rounded-lg' : 'p-3 rounded-xl'} bg-slate-50 dark:bg-neutral-800/60 border border-slate-200/60 dark:border-neutral-700/60`}>
-            <span className="text-[11px] font-medium text-slate-500 dark:text-neutral-400 block whitespace-nowrap">
+          {/* 당월 총지출 */}
+          <div className={`${isCompact ? 'p-2 rounded-lg' : 'p-3 rounded-xl'} bg-slate-50 dark:bg-neutral-800/60 border border-slate-200/60 dark:border-neutral-700/60 min-w-0 overflow-hidden`}>
+            <span className="text-[11px] font-medium text-slate-500 dark:text-neutral-400 block truncate">
               당월 총지출
             </span>
-            <div className={`${isCompact ? 'text-xs sm:text-sm' : 'text-base sm:text-lg'} font-bold text-rose-600 dark:text-rose-400 mt-0.5 whitespace-nowrap`}>
-              {totalExpense.toLocaleString()}원
-            </div>
+            {isCompact ? (
+              <div className="text-sm font-bold text-rose-600 dark:text-rose-400 mt-0.5 truncate">
+                {formatCompactAmount(totalExpense)}원
+              </div>
+            ) : (
+              <div className="text-base sm:text-lg font-bold text-rose-600 dark:text-rose-400 mt-0.5 whitespace-nowrap">
+                {totalExpense.toLocaleString()}원
+              </div>
+            )}
             {!isCompact && (
               <span className="text-[10px] text-slate-400 dark:text-neutral-500 block mt-0.5 whitespace-nowrap">
                 총 {currentMonthExpenses.length}건 집계 완료
@@ -389,10 +410,11 @@ export const ExpenseAnalyticsView: React.FC<ExpenseAnalyticsViewProps> = ({
             )}
           </div>
 
-          <div className={`${isCompact ? 'p-2 rounded-lg' : 'p-3 rounded-xl'} bg-slate-50 dark:bg-neutral-800/60 border border-slate-200/60 dark:border-neutral-700/60`}>
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-medium text-slate-500 dark:text-neutral-400 whitespace-nowrap">
-                월 목표 예산
+          {/* 월 목표 예산 */}
+          <div className={`${isCompact ? 'p-2 rounded-lg' : 'p-3 rounded-xl'} bg-slate-50 dark:bg-neutral-800/60 border border-slate-200/60 dark:border-neutral-700/60 min-w-0 overflow-hidden`}>
+            <div className="flex items-center justify-between gap-1">
+              <span className="text-[11px] font-medium text-slate-500 dark:text-neutral-400 truncate">
+                목표 예산
               </span>
               <button
                 onClick={() => {
@@ -404,7 +426,7 @@ export const ExpenseAnalyticsView: React.FC<ExpenseAnalyticsViewProps> = ({
                     setIsEditingBudget(true);
                   }
                 }}
-                className="text-[10px] text-slate-400 hover:text-slate-700 dark:hover:text-neutral-200 underline cursor-pointer whitespace-nowrap"
+                className="text-[10px] text-slate-400 hover:text-slate-700 dark:hover:text-neutral-200 underline cursor-pointer shrink-0"
               >
                 {isEditingBudget ? '완료' : '수정'}
               </button>
@@ -416,8 +438,12 @@ export const ExpenseAnalyticsView: React.FC<ExpenseAnalyticsViewProps> = ({
                 onChange={(e) => setBudgetInput(e.target.value)}
                 className="w-full mt-1 px-1.5 py-0.5 text-xs font-bold bg-white dark:bg-neutral-900 border border-slate-300 rounded"
               />
+            ) : isCompact ? (
+              <div className="text-sm font-bold text-slate-900 dark:text-white mt-0.5 truncate">
+                {formatCompactAmount(monthlyBudget)}원
+              </div>
             ) : (
-              <div className={`${isCompact ? 'text-xs sm:text-sm' : 'text-base sm:text-lg'} font-bold text-slate-900 dark:text-white mt-0.5 whitespace-nowrap`}>
+              <div className="text-base sm:text-lg font-bold text-slate-900 dark:text-white mt-0.5 whitespace-nowrap">
                 {monthlyBudget.toLocaleString()}원
               </div>
             )}
@@ -428,19 +454,30 @@ export const ExpenseAnalyticsView: React.FC<ExpenseAnalyticsViewProps> = ({
             )}
           </div>
 
-          <div className={`${isCompact ? 'p-2 rounded-lg' : 'p-3 rounded-xl'} border ${
+          {/* 잔여 예산 */}
+          <div className={`${isCompact ? 'p-2 rounded-lg' : 'p-3 rounded-xl'} border min-w-0 overflow-hidden ${
             remainingBudget >= 0 
               ? 'bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-200/70 dark:border-emerald-900/40' 
               : 'bg-rose-50/50 dark:bg-rose-950/20 border-rose-200/70 dark:border-rose-900/40'
           }`}>
-            <span className="text-[11px] font-medium text-slate-500 dark:text-neutral-400 block whitespace-nowrap">
+            <span className="text-[11px] font-medium text-slate-500 dark:text-neutral-400 block truncate">
               잔여 예산
             </span>
-            <div className={`${isCompact ? 'text-xs sm:text-sm' : 'text-base sm:text-lg'} font-bold mt-0.5 whitespace-nowrap ${
-              remainingBudget >= 0 ? 'text-emerald-700 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
-            }`}>
-              {remainingBudget >= 0 ? `${remainingBudget.toLocaleString()}원` : `-${Math.abs(remainingBudget).toLocaleString()}원 초과`}
-            </div>
+            {isCompact ? (
+              <div className={`text-sm font-bold mt-0.5 truncate ${
+                remainingBudget >= 0 ? 'text-emerald-700 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
+              }`}>
+                {remainingBudget >= 0
+                  ? `${formatCompactAmount(remainingBudget)}원`
+                  : `-${formatCompactAmount(Math.abs(remainingBudget))}원`}
+              </div>
+            ) : (
+              <div className={`text-base sm:text-lg font-bold mt-0.5 whitespace-nowrap ${
+                remainingBudget >= 0 ? 'text-emerald-700 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
+              }`}>
+                {remainingBudget >= 0 ? `${remainingBudget.toLocaleString()}원` : `-${Math.abs(remainingBudget).toLocaleString()}원 초과`}
+              </div>
+            )}
             {!isCompact && (
               <span className="text-[10px] text-slate-500 dark:text-neutral-400 block mt-0.5 whitespace-nowrap">
                 남은 {pacingMetrics.remainingDays}일간 하루 {pacingMetrics.dailySafeSpend.toLocaleString()}원 가능
@@ -451,7 +488,8 @@ export const ExpenseAnalyticsView: React.FC<ExpenseAnalyticsViewProps> = ({
 
         {/* 예산 소진율(%) 게이지 프로그레스 바 & 페이싱 마커 */}
         <div className="space-y-2 pt-1">
-          <div className="flex items-center justify-between text-xs">
+          {/* 컴팩트: 상하 1열 스택, 풀: 좌우 배치 */}
+          <div className={`text-xs ${isCompact ? 'space-y-1' : 'flex items-center justify-between'}`}>
             <div className="flex items-center space-x-2">
               <span className="font-bold text-slate-800 dark:text-slate-200 whitespace-nowrap">
                 예산 소진율
@@ -469,7 +507,8 @@ export const ExpenseAnalyticsView: React.FC<ExpenseAnalyticsViewProps> = ({
               </span>
             </div>
             <div className="text-[11px] text-slate-500 dark:text-neutral-400 whitespace-nowrap">
-              권장 이상 소진율: <span className="font-semibold text-slate-700 dark:text-slate-300">{pacingMetrics.recommendedBurnRate}%</span> ({pacingMetrics.currentDay}일 / {pacingMetrics.daysInMonth}일 경과)
+              권장: <span className="font-semibold text-slate-700 dark:text-slate-300">{pacingMetrics.recommendedBurnRate}%</span>
+              {!isCompact && ` (${pacingMetrics.currentDay}일 / ${pacingMetrics.daysInMonth}일 경과)`}
             </div>
           </div>
 

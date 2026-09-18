@@ -223,11 +223,11 @@ export const EmailManagerView: React.FC<EmailManagerViewProps> = ({
 
       {/* 1. 상단 인박스 서브헤더 및 긴급도 필터 */}
       <div className={`flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-slate-200/80 dark:border-neutral-800`}>
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <div className="flex items-center space-x-1.5">
             <h2 className={`${isCompact ? 'text-sm' : 'text-base sm:text-lg'} font-bold flex items-center space-x-1.5 text-slate-900 dark:text-white whitespace-nowrap`}>
               <Mail className="w-4 h-4 text-purple-600 dark:text-purple-400 shrink-0" />
-              <span className="whitespace-nowrap">4. ✉️ 이메일 인박스</span>
+              <span className="whitespace-nowrap">4. ✉️ {isCompact ? '이메일' : '이메일 인박스'}</span>
               <span className="text-[11px] px-1.5 py-0.2 rounded-full bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 font-semibold border border-purple-200/60 dark:border-purple-800/40 whitespace-nowrap">
                 {emails.length}건
               </span>
@@ -235,52 +235,52 @@ export const EmailManagerView: React.FC<EmailManagerViewProps> = ({
           </div>
           {!isCompact && (
             <p className="text-xs text-slate-500 dark:text-neutral-400 mt-0.5 whitespace-nowrap">
-              수퍼휴먼급 원문 본문 서랍, 첨부파일 다운로드 & 3단 AI 회신 생성
+              수퍼휴먼급 원문 본문 서랍, 첨부파일 다운로드 &amp; 3단 AI 회신 생성
             </p>
           )}
         </div>
 
-        {/* 긴급도 필터 탭 */}
-        <div className="flex items-center p-0.5 bg-slate-100 dark:bg-neutral-800 rounded-xl border border-slate-200 dark:border-neutral-700 text-xs shadow-xs">
+        {/* 긴급도 필터 탭 - 컴팩트 모드: 이모지만 표시 */}
+        <div className="flex items-center p-0.5 bg-slate-100 dark:bg-neutral-800 rounded-xl border border-slate-200 dark:border-neutral-700 text-xs shadow-xs shrink-0">
           <button
             onClick={() => setUrgencyFilter('all')}
-            className={`${isCompact ? 'px-2 py-0.5 text-[11px]' : 'px-2.5 py-1'} rounded-lg font-semibold transition cursor-pointer whitespace-nowrap ${
+            className={`${isCompact ? 'px-1.5 py-0.5 text-[11px]' : 'px-2.5 py-1'} rounded-lg font-semibold transition cursor-pointer whitespace-nowrap ${
               urgencyFilter === 'all'
                 ? 'bg-white dark:bg-neutral-900 text-slate-900 dark:text-white shadow-xs'
                 : 'text-slate-500 dark:text-neutral-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
-            전체 ({emails.length})
+            {isCompact ? '전체' : `전체 (${emails.length})`}
           </button>
           <button
             onClick={() => setUrgencyFilter('urgent')}
-            className={`${isCompact ? 'px-2 py-0.5 text-[11px]' : 'px-2.5 py-1'} rounded-lg font-semibold transition cursor-pointer whitespace-nowrap ${
+            className={`${isCompact ? 'px-1.5 py-0.5 text-[11px]' : 'px-2.5 py-1'} rounded-lg font-semibold transition cursor-pointer whitespace-nowrap ${
               urgencyFilter === 'urgent'
                 ? 'bg-white dark:bg-neutral-900 text-rose-600 dark:text-rose-400 shadow-xs'
                 : 'text-slate-500 dark:text-neutral-400 hover:text-rose-600'
             }`}
           >
-            🚨 긴급
+            {isCompact ? '🚨' : '🚨 긴급'}
           </button>
           <button
             onClick={() => setUrgencyFilter('important')}
-            className={`${isCompact ? 'px-2 py-0.5 text-[11px]' : 'px-2.5 py-1'} rounded-lg font-semibold transition cursor-pointer whitespace-nowrap ${
+            className={`${isCompact ? 'px-1.5 py-0.5 text-[11px]' : 'px-2.5 py-1'} rounded-lg font-semibold transition cursor-pointer whitespace-nowrap ${
               urgencyFilter === 'important'
                 ? 'bg-white dark:bg-neutral-900 text-amber-600 dark:text-amber-400 shadow-xs'
                 : 'text-slate-500 dark:text-neutral-400 hover:text-amber-600'
             }`}
           >
-            ⚡ 중요
+            {isCompact ? '⚡' : '⚡ 중요'}
           </button>
           <button
             onClick={() => setUrgencyFilter('info')}
-            className={`${isCompact ? 'px-2 py-0.5 text-[11px]' : 'px-2.5 py-1'} rounded-lg font-semibold transition cursor-pointer whitespace-nowrap ${
+            className={`${isCompact ? 'px-1.5 py-0.5 text-[11px]' : 'px-2.5 py-1'} rounded-lg font-semibold transition cursor-pointer whitespace-nowrap ${
               urgencyFilter === 'info'
                 ? 'bg-white dark:bg-neutral-900 text-blue-600 dark:text-blue-400 shadow-xs'
                 : 'text-slate-500 dark:text-neutral-400 hover:text-blue-600'
             }`}
           >
-            ℹ️ 참조
+            {isCompact ? 'ℹ️' : 'ℹ️ 참조'}
           </button>
         </div>
       </div>
@@ -374,11 +374,11 @@ export const EmailManagerView: React.FC<EmailManagerViewProps> = ({
               </h4>
 
               {/* AI 1줄 요약 */}
-              <div className={`${isCompact ? 'p-1.5 rounded-lg' : 'p-2.5 rounded-xl'} bg-slate-50 dark:bg-neutral-950/60 border border-slate-200/60 dark:border-neutral-800/60 flex items-start space-x-1.5`}>
+              <div className={`${isCompact ? 'p-1.5 rounded-lg' : 'p-2.5 rounded-xl'} bg-slate-50 dark:bg-neutral-950/60 border border-slate-200/60 dark:border-neutral-800/60 flex items-start space-x-1.5 min-w-0 overflow-hidden`}>
                 <Sparkles className="w-3 h-3 text-purple-600 dark:text-purple-400 shrink-0 mt-0.5" />
-                <p className={`${isCompact ? 'text-[11px] truncate' : 'text-xs leading-relaxed'} text-slate-600 dark:text-neutral-400`}>
+                <p className={`${isCompact ? 'text-[11px]' : 'text-xs leading-relaxed'} text-slate-600 dark:text-neutral-400 min-w-0 overflow-hidden`}>
                   <span className="font-semibold text-purple-700 dark:text-purple-300 mr-1">AI 요약:</span>
-                  {mail.summary}
+                  <span className={isCompact ? 'truncate block' : ''}>{mail.summary}</span>
                 </p>
               </div>
             </div>
