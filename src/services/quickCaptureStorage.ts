@@ -25,6 +25,9 @@ export function saveQuickCaptureRecord(record: QuickCaptureRecord): void {
     const records = getQuickCaptureRecords();
     const updated = [record, ...records.filter(r => r.id !== record.id)].slice(0, 50);
     localStorage.setItem(QUICK_CAPTURE_STORAGE_KEY, JSON.stringify(updated));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('quickCaptureUpdated'));
+    }
   } catch (e) {
     console.error('Failed to save quick capture record:', e);
   }
@@ -38,6 +41,9 @@ export function deleteQuickCaptureRecord(id: string): void {
     const records = getQuickCaptureRecords();
     const updated = records.filter(r => r.id !== id);
     localStorage.setItem(QUICK_CAPTURE_STORAGE_KEY, JSON.stringify(updated));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('quickCaptureUpdated'));
+    }
   } catch (e) {
     console.error('Failed to delete quick capture record:', e);
   }
@@ -49,6 +55,9 @@ export function deleteQuickCaptureRecord(id: string): void {
 export function clearQuickCaptureRecords(): void {
   try {
     localStorage.removeItem(QUICK_CAPTURE_STORAGE_KEY);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('quickCaptureUpdated'));
+    }
   } catch (e) {
     console.error('Failed to clear quick capture records:', e);
   }

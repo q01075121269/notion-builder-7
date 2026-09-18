@@ -13,6 +13,7 @@ import {
   Calendar,
   Code2,
   Construction,
+  ExternalLink,
 } from 'lucide-react';
 import { sendToOrchestrator } from '../../services/orchestratorService';
 import type { ChatMessage, OrchestratorResponse } from '../../services/orchestratorService';
@@ -92,6 +93,7 @@ export const OmniChatBar: React.FC = () => {
     createdNotionResource,
     setIsNotionSettingsModalOpen,
     showToast,
+    setCurrentView,
   } = useApp();
 
   // 채팅 상태
@@ -463,6 +465,38 @@ export const OmniChatBar: React.FC = () => {
                           </div>
                         ))}
                       </div>
+                    )}
+
+                    {/* ── 작업실 캔버스 이동 버튼 ──────────────────────────── */}
+                    {!isUser && msg.redirect_url && (
+                      <button
+                        onClick={() => {
+                          const urlKey = msg.redirect_url;
+                          if (!urlKey) return;
+                          const viewMap: Record<string, any> = {
+                            '/builder': 'builder',
+                            '/life': 'life',
+                            '/devlab': 'devlab',
+                          };
+                          const targetView = viewMap[urlKey];
+                          if (targetView) {
+                            setCurrentView(targetView);
+                            showToast(`${targetView === 'builder' ? '✨ 템플릿 빌더' : targetView === 'life' ? '🌿 라이프 허브' : '💻 개발 랩'} 캔버스로 이동했습니다.`, 'info');
+                          }
+                        }}
+                        className="
+                          mt-1 flex items-center space-x-1.5
+                          px-2.5 py-1 rounded-lg
+                          text-[11px] font-semibold
+                          bg-indigo-50 text-indigo-700 border border-indigo-200
+                          hover:bg-indigo-100
+                          dark:bg-indigo-950/60 dark:text-indigo-300 dark:border-indigo-800
+                          transition-all cursor-pointer shadow-sm
+                        "
+                      >
+                        <ExternalLink className="w-3 h-3" />
+                        <span>작업실 캔버스로 즉시 이동</span>
+                      </button>
                     )}
 
                     <span className="text-[10px] text-neutral-400 px-1">{msg.timestamp}</span>
