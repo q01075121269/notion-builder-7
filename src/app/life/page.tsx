@@ -10,7 +10,6 @@ import {
   CreditCard, 
   CheckSquare, 
   ArrowLeft, 
-  Bot,
   RefreshCw, 
   Edit2, 
   X, 
@@ -44,6 +43,7 @@ import {
 import { ScheduleView } from '../../components/life/ScheduleView';
 import { TodoManagerView } from '../../components/life/TodoManagerView';
 import { ExpenseAnalyticsView } from '../../components/life/ExpenseAnalyticsView';
+import { EmailManagerView, type LifeEmailItem } from '../../components/life/EmailManagerView';
 
 // 사용자 동선 우선순위 재배치: 1. 스마트일정 -> 2. 스마트할일 -> 3. 가계부 -> 4. 이메일 요약
 type LifeHubTab = 'schedule' | 'todo' | 'expense' | 'email';
@@ -224,10 +224,157 @@ const INITIAL_DEMO_EXPENSES: LifeExpenseItem[] = [
   { id: 'ex-aug-3', title: '8월 하계 휴가 숙소 예약', amount: 350000, date: '2026-08-05', category: '문화/여가', icon: '🏖️', paymentMethod: '신용카드', type: '지출' }
 ];
 
-const INITIAL_DEMO_EMAILS = [
-  { id: 'e1', sender: 'GitHub', subject: '[Security] New sign-in detected', summary: '새로운 브라우저에서 로그인 감지됨. 본인 확인 권장', time: '10분 전', important: true },
-  { id: 'e2', sender: 'Google Cloud Billing', subject: '2026년 8월 결제 영수증 발행 안내', summary: '총 청구금액 12,400원 정상 결제 완료', time: '2시간 전', important: false },
-  { id: 'e3', sender: 'Notion Team', subject: 'Notion 3.0 신규 업데이트 및 AI 기능 발표', summary: '새로운 수식 라이브러리와 스마트 사서 기능 공개', time: '어제', important: true }
+const INITIAL_DEMO_EMAILS: LifeEmailItem[] = [
+  {
+    id: 'e1',
+    sender: 'GitHub Security Team',
+    senderEmail: 'security@github.com',
+    subject: '[Security Alert] GitHub Personal Access Token 의심 활동 감지',
+    summary: '새로운 IP(198.51.100.42)에서 PAT 토큰을 사용한 비인가 리포지토리 접근 시도가 차단되었습니다. 즉시 토큰을 폐기하고 재생성하십시오.',
+    time: '10분 전',
+    date: '2026-09-18',
+    urgency: 'urgent',
+    suggestedAction: 'GitHub Personal Access Token 폐기 및 보안 키 갱신',
+    bodyText: `안녕하세요, 개발자님.
+
+GitHub Security Center에서 귀하의 계정 및 연동 리포지토리에 대한 비정상적인 보안 이벤트를 감지하였습니다.
+
+• 감지 일시: 2026년 9월 18일 18:48 (KST)
+• 이벤트 유형: Suspicious Personal Access Token (classic) API Usage
+• 출발지 IP: 198.51.100.42 (US / Cloud Provider Exit Node)
+• 영향받은 리포지토리: notion-builder-7 (Private)
+
+해당 토큰을 통한 고위험 쓰기(Write) 권한 요청은 시스템에 의해 즉시 차단(Blocked) 조치되었습니다.
+추가 피해를 예방하기 위해 아래 권고 조치를 24시간 이내에 수행해 주시기 바랍니다.
+
+[권고 조치 사항]
+1. GitHub 계정 설정 > Developer Settings에서 해당 토큰 폐기(Revoke)
+2. Fine-grained Personal Access Token으로 전환 및 최소 권한 부여
+3. 2단계 인증(2FA) 재인증 및 SSH 키 목록 점검
+
+상세 보안 감사 로그를 첨부파일로 동봉하오니 확인 바랍니다.
+
+GitHub Security Operations Team`,
+    attachments: [
+      {
+        id: 'att-1',
+        name: 'github_security_audit_log.txt',
+        size: '45 KB',
+        type: 'file',
+        dataContent: `[AUDIT LOG] 2026-09-18 18:48:12 UTC\nIP: 198.51.100.42\nAction: git-receive-pack\nStatus: BLOCKED\nToken_Prefix: ghp_9921\nReason: Anomalous Geo-Location & Rate Limit Triggered`
+      }
+    ]
+  },
+  {
+    id: 'e2',
+    sender: '이팀장 (PM)',
+    senderEmail: 'pm.lee@company.com',
+    subject: 'Q3 프로젝트 v2.0 최종 릴리즈 명세서 및 일정 검토 요청',
+    summary: 'Q3 마일스톤 최종 v2.0 프로덕션 릴리즈를 위한 아키텍처 점검 및 Vercel 서버리스 배포 체크리스트 검토 요청의 건입니다.',
+    time: '1시간 전',
+    date: '2026-09-18',
+    urgency: 'important',
+    suggestedAction: 'Q3 프로젝트 v2.0 릴리즈 명세서 검토 및 피드백 회신',
+    bodyText: `안녕하세요, 개발팀 여러분. PM 이팀장입니다.
+
+어느덧 Q3 스프린트 개발 마일스톤이 마무리 단계에 접어들었습니다.
+다음 주 목요일로 예정된 메이저 v2.0 프로덕션 릴리즈를 앞두고, 최종 아키텍처 명세서 및 릴리즈 체크리스트를 공유드립니다.
+
+이번 릴리즈의 핵심 변경 사항은 다음과 같습니다:
+1. 라이프 허브 4대 모듈(일정, 할일, 가계부, 이메일) v2.0 통합
+2. Vercel 서버리스 Notion API 프록시 캐싱 적용
+3. Gemini 2.5 Flash 기반 AI 누수 진단 및 자동 답장 파이프라인
+
+동봉된 [Q3_Release_Specification.pdf] 문서를 검토하신 후,
+아키텍처 및 보안 측면에서 추가 보완이 필요한 부분이 있다면 다음 주 월요일(9/21) 오전 11시까지 피드백 또는 회신 부탁드립니다.
+
+모두 한 주간 수고 많으셨습니다.
+
+감사합니다.
+PM 이팀장 드림`,
+    attachments: [
+      {
+        id: 'att-2',
+        name: 'Q3_Release_Specification.pdf',
+        size: '2.8 MB',
+        type: 'pdf',
+        dataContent: `[PDF DUMMY] Q3 Release Architecture Specification v2.0\nPrepared by PM Team\nApproved for Production Deploy`
+      }
+    ]
+  },
+  {
+    id: 'e3',
+    sender: 'Notion Team HQ',
+    senderEmail: 'updates@m.notion.so',
+    subject: 'Notion 3.0 신규 수식 라이브러리 및 롤업 규격 안내',
+    summary: 'Notion 3.0 공식 업데이트로 강력해진 Formulas 2.0 및 가계부/프로젝트 롤업 최적화 템플릿 치트시트가 공개되었습니다.',
+    time: '어제',
+    date: '2026-09-17',
+    urgency: 'info',
+    suggestedAction: 'Notion 3.0 신규 수식 치트시트 워크스페이스 템플릿 적용',
+    bodyText: `안녕하세요, 노션 빌더 여러분!
+
+더욱 스마트하고 강력해진 Notion 3.0 기능 업데이트 소식을 전해드립니다.
+
+이제 가계부 데이터베이스와 프로젝트 보드에서 복잡한 다단계 수식(Formula)과 실시간 롤업(Rollup)을 코드 블록 수준으로 자유롭게 작성할 수 있습니다.
+
+[주요 업데이트 하이라이트]
+• Array functions: map(), filter(), find() 등의 배열 함수 전면 지원
+• Dynamic Pacing Formula: 일자별 예산 소진율 자동 연산 수식 템플릿 기본 탑재
+• Multi-database Rollup: 3개 이상의 관계형 DB 간 실시간 롤업 캐싱 가속
+
+새로운 수식 문법과 실무 활용 예제가 정리된 [Notion_Formulas_Cheatsheet.xlsx] 파일을 함께 첨부해 드립니다. 지금 바로 워크스페이스에 적용해 보세요!
+
+Happy Building!
+The Notion Team`,
+    attachments: [
+      {
+        id: 'att-3',
+        name: 'Notion_Formulas_Cheatsheet.xlsx',
+        size: '680 KB',
+        type: 'xlsx',
+        dataContent: `[EXCEL DUMMY] Formula_Name,Syntax,Description\nmap,prop("Items").map(...),Iterate array\nrollup_sum,sum(prop("Amount")),Rollup sum`
+      }
+    ]
+  },
+  {
+    id: 'e4',
+    sender: 'Google Cloud Billing',
+    senderEmail: 'google-cloud-billing@google.com',
+    subject: '2026년 8월 Google Cloud 결제 영수증 발행 안내',
+    summary: '2026년 8월 Google Cloud Platform 청구 금액 12,400원이 등록된 신용카드로 정상 결제 완료되었습니다.',
+    time: '2일 전',
+    date: '2026-09-16',
+    urgency: 'info',
+    suggestedAction: 'GCP 8월 결제 영수증 회계 처리 및 법인카드 지출 등록',
+    bodyText: `Google Cloud Platform 고객님께,
+
+2026년 8월 청구 주기(2026-08-01 ~ 2026-08-31)에 대한 정기 이용 요금이 정상적으로 결제되었음을 알려드립니다.
+
+• 결제 계정: Notion-Builder-Production-Account
+• 결제 수단: 신용카드 (끝자리: 7721)
+• 총 청구 금액: ₩12,400 (VAT 포함)
+• 결제 상태: 결제 성공 (Payment Succeeded)
+
+[서비스별 세부 청구 내역]
+- Cloud Functions & Serverless API Gateway: ₩7,200
+- Artifact Registry & Container Storage: ₩3,100
+- Cloud KMS & Secret Manager: ₩2,100
+
+세부 청구 내역서(Tax Invoice)는 첨부된 PDF 영수증 파일을 확인하시거나 Google Cloud 콘솔의 [결제] 메뉴에서 언제든지 다운로드하실 수 있습니다.
+
+감사합니다.
+Google Cloud Billing 팀`,
+    attachments: [
+      {
+        id: 'att-4',
+        name: 'GCP_Billing_Invoice_202608.pdf',
+        size: '320 KB',
+        type: 'pdf',
+        dataContent: `[TAX INVOICE] Google Cloud Platform\nBilling Period: 2026-08\nTotal: 12,400 KRW (PAID)`
+      }
+    ]
+  }
 ];
 
 export const LifePage: React.FC = () => {
@@ -260,7 +407,28 @@ export const LifePage: React.FC = () => {
     return INITIAL_DEMO_EXPENSES.filter(e => !deletedIds.has(e.id) && !deletedIds.has(e.title.trim()));
   });
 
-  const [emailSummaries] = useState(INITIAL_DEMO_EMAILS);
+  const [emailSummaries, setEmailSummaries] = useState<LifeEmailItem[]>(INITIAL_DEMO_EMAILS);
+
+  // 이메일에서 스마트할일로 전송 파이프라인
+  const handleTransferMailToTodo = useCallback((mail: LifeEmailItem) => {
+    const newTodo: LifeTodoItem = {
+      id: `t-mail-${Date.now()}`,
+      title: `[메일 액션] ${mail.suggestedAction || mail.subject}`,
+      done: false,
+      priority: mail.urgency === 'urgent' ? '🔥 긴급/중요' : mail.urgency === 'important' ? '⭐ 중요/계획' : '⚡ 긴급/위임',
+      eisenhower: mail.urgency === 'urgent' ? 'P1' : mail.urgency === 'important' ? 'P2' : 'P3',
+      dueDate: '2026-09-19',
+      dday: 'D-1',
+      reminder: 'before_30m',
+      subtasks: [
+        { id: `st-m-1-${Date.now()}`, title: `1단계: "${mail.sender}" 발신 메일 원문 및 요구사항 상세 파악`, done: true },
+        { id: `st-m-2-${Date.now()}`, title: `2단계: 첨부파일 및 필요 서류 검토 완료`, done: false },
+        { id: `st-m-3-${Date.now()}`, title: `3단계: AI 답장 생성기를 통한 회신 발송 또는 후속 처리`, done: false }
+      ]
+    };
+    setTodoItems((prev) => [newTodo, ...prev]);
+  }, []);
+
 
   const [isLoadingNotion, setIsLoadingNotion] = useState<boolean>(false);
   const [lastSyncTime, setLastSyncTime] = useState<string>('');
@@ -512,78 +680,20 @@ export const LifePage: React.FC = () => {
     </ErrorBoundary>
   );
 
-  // 4. 이메일 AI 요약 모듈 렌더러
+  // 4. 이메일 AI 요약 & 수퍼휴먼 인박스 모듈 렌더러
   const renderEmailModule = (isCompact = false) => (
     <ErrorBoundary fallbackTitle="이메일 요약 모듈 로드 중 오류가 발생했습니다.">
-      <div className={`space-y-4 ${isCompact ? 'p-1' : ''}`}>
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-2 border-b border-slate-200/80 dark:border-neutral-800">
-          <div>
-            <h2 className="text-base sm:text-lg font-bold flex items-center space-x-2 text-slate-900 dark:text-white whitespace-nowrap">
-              <Mail className="w-4 h-4 sm:w-5 sm:h-5 text-purple-600 dark:text-purple-400 shrink-0" />
-              <span className="whitespace-nowrap">4. ✉️ 이메일 AI 요약 및 브리핑</span>
-              <span className="text-xs px-2 py-0.5 rounded-full bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 font-semibold border border-purple-200/60 dark:border-purple-800/40 whitespace-nowrap">
-                {emailSummaries.length}건
-              </span>
-            </h2>
-            <p className="text-xs text-slate-500 dark:text-neutral-400 mt-0.5 whitespace-nowrap">
-              수신 메일 중 중요 요약과 즉시 처리할 핵심 액션을 Gemini가 자동 분석
-            </p>
-          </div>
-          <div className="flex items-center space-x-2 shrink-0">
-            <span className="inline-flex items-center space-x-1.5 text-xs text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/40 px-3 py-1.5 rounded-xl font-medium border border-purple-200/60 dark:border-purple-800/40 whitespace-nowrap">
-              <Bot className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
-              <span className="whitespace-nowrap">Gemini 3.6 Flash 분석 연동</span>
-            </span>
-          </div>
-        </div>
-
-        {/* Empty State vs 데이터 목록 */}
-        {emailSummaries.length === 0 ? (
-          <div className="py-12 px-4 text-center border-2 border-dashed border-slate-200 dark:border-neutral-800 rounded-2xl bg-slate-50/70 dark:bg-neutral-900/30">
-            <Mail className="w-10 h-10 mx-auto mb-2 text-slate-400 dark:text-neutral-500 opacity-70" />
-            <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200 whitespace-nowrap">
-              수신된 이메일 요약이 없습니다.
-            </h4>
-            <p className="text-xs text-slate-500 dark:text-neutral-400 mt-1 max-w-sm mx-auto">
-              연동된 메일함에서 중요한 메일이 감지되면 요약 및 할 일 액션이 표시됩니다.
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {emailSummaries.map((mail) => (
-              <div 
-                key={mail.id} 
-                className="p-4 rounded-xl border border-slate-200 dark:border-neutral-800 bg-white dark:bg-neutral-900/50 hover:bg-slate-50/80 dark:hover:bg-neutral-900/80 transition flex flex-col gap-2 shadow-xs"
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center space-x-2 min-w-0">
-                    <span className="text-xs font-bold text-slate-800 dark:text-slate-200 whitespace-nowrap">
-                      {mail.sender}
-                    </span>
-                    {mail.important && (
-                      <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-50 text-rose-600 dark:bg-rose-950 dark:text-rose-400 border border-rose-200 dark:border-rose-900/40 whitespace-nowrap">
-                        중요
-                      </span>
-                    )}
-                  </div>
-                  <span className="text-[11px] text-slate-400 dark:text-neutral-400 whitespace-nowrap shrink-0">
-                    {mail.time}
-                  </span>
-                </div>
-                <h4 className="text-xs sm:text-sm font-semibold text-slate-700 dark:text-slate-300">
-                  {mail.subject}
-                </h4>
-                <p className="text-xs text-slate-600 dark:text-neutral-400 bg-slate-50 dark:bg-neutral-950/60 p-2.5 rounded-xl border border-slate-200/60 dark:border-neutral-800/60 leading-relaxed">
-                  <span className="font-semibold text-purple-600 dark:text-purple-400 mr-1">⚡ AI 요약:</span>
-                  {mail.summary}
-                </p>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+      <EmailManagerView
+        emails={emailSummaries}
+        setEmails={setEmailSummaries}
+        onTransferToTodo={handleTransferMailToTodo}
+        onQuickCapture={() => setCurrentView('quick_capture')}
+        isCompact={isCompact}
+        apiKey={apiKey}
+      />
     </ErrorBoundary>
   );
+
 
   // 탭 목록 정의 (1. 스마트일정 -> 2. 스마트할일 -> 3. 가계부 -> 4. 이메일 요약 순서 고정)
   const TABS: { 
