@@ -4,13 +4,22 @@ import { Tag, ArrowRight, ExternalLink, Sparkles } from 'lucide-react';
 interface SmartDocsRendererProps {
   title?: string;
   formMode?: 'free' | 'template';
+  onSelectCitation?: (id: number) => void;
 }
 
 export const SmartDocsRenderer: React.FC<SmartDocsRendererProps> = ({
   title = '2026년 하반기 전략 AI 비즈니스 기획서',
-  formMode = 'free'
+  formMode = 'free',
+  onSelectCitation
 }) => {
   const [selectedCitation, setSelectedCitation] = useState<number | null>(null);
+
+  const handleCitationClick = (id: number) => {
+    setSelectedCitation(selectedCitation === id ? null : id);
+    if (onSelectCitation) {
+      onSelectCitation(id);
+    }
+  };
 
   const citations = [
     { id: 1, source: 'NotebookLM 2026_Q3_사업계획서_최종.pdf (p.14)', text: 'AI 오피스 스튜디오 도입 시 전사 업무 처리 속도 평균 320% 향상 검증 데이터' },
@@ -65,7 +74,7 @@ export const SmartDocsRenderer: React.FC<SmartDocsRendererProps> = ({
             <span>
               기존의 파편화된 문서 작성 방식을 **Docs·Sheets·Slides 3대 통합 라이브 캔버스**로 전환하여 작성 시간을 80% 이상 단축합니다.
               <button
-                onClick={() => setSelectedCitation(selectedCitation === 1 ? null : 1)}
+                onClick={() => handleCitationClick(1)}
                 className="ml-1 inline-flex items-center px-1.5 py-0.2 rounded bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 text-[10px] font-extrabold cursor-pointer hover:underline"
               >
                 [1]
@@ -78,7 +87,7 @@ export const SmartDocsRenderer: React.FC<SmartDocsRendererProps> = ({
             <span>
               NotebookLM RAG 인용 엔진과의 연동을 통해 원문 출처 데이터에 근거한 100% 팩트 기반 공문서 및 품의서를 즉시 수립합니다.
               <button
-                onClick={() => setSelectedCitation(selectedCitation === 2 ? null : 2)}
+                onClick={() => handleCitationClick(2)}
                 className="ml-1 inline-flex items-center px-1.5 py-0.2 rounded bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 text-[10px] font-extrabold cursor-pointer hover:underline"
               >
                 [2]
