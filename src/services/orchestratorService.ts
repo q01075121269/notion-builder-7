@@ -1,6 +1,8 @@
 // src/services/orchestratorService.ts
 // 2단계 & 3단계: 대화형 오케스트레이터 클라이언트 서비스 및 TTS 연동
 
+import { processOfficeOrchestration } from './aiOfficeDualEngine';
+
 export interface OrchestratorResponse {
   intent: 'CHAT' | 'LIFE' | 'DEVLAB' | 'BUILDER';
   reply_message: string;
@@ -73,6 +75,22 @@ async function fallbackClientOrchestration(
   _userEmail?: string
 ): Promise<OrchestratorResponse> {
   const lower = userText.toLowerCase();
+
+  // 1. AI 오피스 스튜디오 듀얼 엔진 키워드 감지 (기안서, 품의서, 지출결의서, 주간보고, 제안서, 문서, 슬라이드, 시트)
+  if (
+    lower.includes('기안') || lower.includes('품의') || lower.includes('지출결의') || 
+    lower.includes('주간보고') || lower.includes('제안서') || lower.includes('보고서') || 
+    lower.includes('독스') || lower.includes('시트') || lower.includes('슬라이드') || lower.includes('양식')
+  ) {
+    const officePayload = processOfficeOrchestration(userText);
+    return {
+      intent: 'DEVLAB',
+      reply_message: `📑 [AI 오피스 스튜디오] ${officePayload.mode === 'FIXED_FORM' ? '사내 표준 규격 양식(Gems)' : '자유 기획(Genspark)'} 엔진으로 "${officePayload.title}" 생성을 완결했습니다! 오피스 라이브 캔버스로 이동합니다.`,
+      needs_clarification: false,
+      redirect_url: '/devlab',
+      payload: officePayload as unknown as Record<string, any>,
+    };
+  }
 
   // 기본 휴리스틱 검사
   if (lower.includes('템플릿') || lower.includes('빌더') || lower.includes('대시보드') || lower.includes('노션 페이지')) {
