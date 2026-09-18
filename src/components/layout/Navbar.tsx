@@ -5,6 +5,7 @@ import {
   Sparkles, 
   Leaf,
   Terminal,
+  Palette,
   Layers, 
   Settings, 
   Bot,
@@ -67,12 +68,12 @@ export const Navbar: React.FC = () => {
             </div>
           </div>
 
-          {/* [중앙]: [홈 | ✨ 노션 빌더 | 🌿 라이프 허브 | 💻 개발 랩] 4대 통합 내비게이션 바 */}
+          {/* [중앙]: [1. 🏗️ 템플릿 마스터 | 2. 👔 라이프 비서 | 3. 📄 오피스 스튜디오 | 4. 🎨 AI 미디어 랩] 4대 글로벌 내비게이션 바 */}
           <div className="flex items-center bg-neutral-100/90 dark:bg-neutral-800/80 p-1 rounded-xl border border-neutral-200/70 dark:border-neutral-700/60 shrink-0">
-            {/* 1. 홈 */}
+            {/* 홈 */}
             <button
               onClick={() => setCurrentView('home')}
-              className={`flex items-center space-x-1.5 px-2 sm:px-2.5 py-1.5 text-xs font-semibold rounded-lg transition whitespace-nowrap cursor-pointer ${
+              className={`flex items-center space-x-1 px-2 py-1.5 text-xs font-semibold rounded-lg transition whitespace-nowrap cursor-pointer ${
                 currentView === 'home'
                   ? 'bg-white dark:bg-notion-dark-card text-neutral-900 dark:text-white shadow-xs'
                   : 'text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white'
@@ -80,52 +81,63 @@ export const Navbar: React.FC = () => {
               title="메인 홈 대시보드"
             >
               <Home className="w-3.5 h-3.5 text-neutral-600 dark:text-neutral-300 shrink-0" />
-              <span>홈</span>
+              <span className="whitespace-nowrap">홈</span>
             </button>
 
-            {/* 2. ✨ 노션 빌더 */}
+            {/* 1. 🏗️ 템플릿 마스터 */}
             <button
               onClick={() => setCurrentView('builder')}
-              className={`flex items-center space-x-1.5 px-2 sm:px-2.5 py-1.5 text-xs font-semibold rounded-lg transition whitespace-nowrap cursor-pointer ${
+              className={`flex items-center space-x-1 px-2 sm:px-2.5 py-1.5 text-xs font-semibold rounded-lg transition whitespace-nowrap cursor-pointer ${
                 currentView === 'builder'
                   ? 'bg-white dark:bg-notion-dark-card text-amber-600 dark:text-amber-400 font-bold shadow-xs'
                   : 'text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white'
               }`}
-              title="노션 템플릿 빌더 (v1 격리 보존)"
+              title="제1챕터: 템플릿 마스터"
             >
               <Sparkles className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-              <span className="hidden sm:inline">노션 빌더</span>
-              <span className="sm:hidden">빌더</span>
+              <span className="whitespace-nowrap">1. 🏗️ 템플릿 마스터</span>
             </button>
 
-            {/* 3. 🌿 라이프 허브 */}
+            {/* 2. 👔 라이프 비서 */}
             <button
               onClick={() => setCurrentView('life')}
-              className={`flex items-center space-x-1.5 px-2 sm:px-2.5 py-1.5 text-xs font-semibold rounded-lg transition whitespace-nowrap cursor-pointer ${
+              className={`flex items-center space-x-1 px-2 sm:px-2.5 py-1.5 text-xs font-semibold rounded-lg transition whitespace-nowrap cursor-pointer ${
                 currentView === 'life'
                   ? 'bg-white dark:bg-notion-dark-card text-emerald-600 dark:text-emerald-400 font-bold shadow-xs'
                   : 'text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white'
               }`}
-              title="라이프 허브 (일정, 메일, 가계부, 할 일)"
+              title="제2챕터: 라이프 비서"
             >
               <Leaf className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-              <span className="hidden sm:inline">라이프 허브</span>
-              <span className="sm:hidden">라이프</span>
+              <span className="whitespace-nowrap">2. 👔 라이프 비서</span>
             </button>
 
-            {/* 4. 💻 개발 랩 */}
+            {/* 3. 📄 오피스 스튜디오 */}
             <button
               onClick={() => setCurrentView('devlab')}
-              className={`flex items-center space-x-1.5 px-2 sm:px-2.5 py-1.5 text-xs font-semibold rounded-lg transition whitespace-nowrap cursor-pointer ${
+              className={`flex items-center space-x-1 px-2 sm:px-2.5 py-1.5 text-xs font-semibold rounded-lg transition whitespace-nowrap cursor-pointer ${
                 currentView === 'devlab'
                   ? 'bg-white dark:bg-notion-dark-card text-blue-600 dark:text-blue-400 font-bold shadow-xs'
                   : 'text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white'
               }`}
-              title="개발 랩 (기획, 트러블슈팅, 프롬프트)"
+              title="제3챕터: 오피스 스튜디오"
             >
               <Terminal className="w-3.5 h-3.5 text-blue-500 shrink-0" />
-              <span className="hidden sm:inline">개발 랩</span>
-              <span className="sm:hidden">개발랩</span>
+              <span className="whitespace-nowrap">3. 📄 오피스 스튜디오</span>
+            </button>
+
+            {/* 4. 🎨 AI 미디어 랩 */}
+            <button
+              onClick={() => setCurrentView('media_lab')}
+              className={`flex items-center space-x-1 px-2 sm:px-2.5 py-1.5 text-xs font-semibold rounded-lg transition whitespace-nowrap cursor-pointer ${
+                currentView === 'media_lab'
+                  ? 'bg-white dark:bg-notion-dark-card text-purple-600 dark:text-purple-400 font-bold shadow-xs'
+                  : 'text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white'
+              }`}
+              title="제4챕터: AI 미디어 랩"
+            >
+              <Palette className="w-3.5 h-3.5 text-purple-500 shrink-0" />
+              <span className="whitespace-nowrap">4. 🎨 AI 미디어 랩</span>
             </button>
           </div>
 

@@ -21,7 +21,7 @@ import { getAuthSession, saveAuthSession, clearAllAuthAndCredentials, isUserAdmi
 import { getSavedChatMessages, saveChatMessages, clearSavedChatMessages, INITIAL_CHAT_MESSAGES } from '../services/chatStorage';
 import confetti from 'canvas-confetti';
 
-export type ViewType = 'home' | 'builder' | 'life' | 'devlab' | 'dashboard' | 'quick_capture';
+export type ViewType = 'home' | 'builder' | 'life' | 'devlab' | 'media_lab' | 'dashboard' | 'quick_capture';
 
 interface AppContextType {
   // 6단계 보안 및 인증 (Google OAuth & RBAC)

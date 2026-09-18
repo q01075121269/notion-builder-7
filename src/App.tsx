@@ -23,6 +23,7 @@ import HomePage from './app/page';
 import BuilderPage from './app/builder/page';
 import LifePage from './app/life/page';
 import DevLabPage from './app/devlab/page';
+import MediaLabPage from './app/medialab/page';
 
 export const MainApp: React.FC = () => {
   const { 
@@ -58,7 +59,7 @@ export const MainApp: React.FC = () => {
       <div className="flex flex-col h-screen w-screen overflow-hidden bg-white dark:bg-notion-dark-bg text-notion-light-text dark:text-notion-dark-text font-sans">
         <Navbar />
         
-        {/* 뷰 모드 분기: 홈 대시보드 vs 템플릿 빌더(격리 보존) vs 라이프 허브 vs 개발 랩 vs 내 보관함 vs 1초 퀵 캡처 */}
+        {/* 뷰 모드 분기: 홈 대시보드 vs 템플릿 빌더 vs 라이프 허브 vs 개발 랩 vs AI 미디어 랩 vs 내 보관함 vs 1초 퀵 캡처 */}
         <main className="flex-1 flex flex-col overflow-hidden pb-28 md:pb-16">
           {currentView === 'home' ? (
             <HomePage />
@@ -68,6 +69,8 @@ export const MainApp: React.FC = () => {
             <LifePage />
           ) : currentView === 'devlab' ? (
             <DevLabPage />
+          ) : currentView === 'media_lab' ? (
+            <MediaLabPage />
           ) : currentView === 'dashboard' ? (
             <DashboardView />
           ) : currentView === 'quick_capture' ? (

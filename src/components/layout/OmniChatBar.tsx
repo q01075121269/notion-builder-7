@@ -626,11 +626,13 @@ export const OmniChatBar: React.FC = () => {
                             '/builder': 'builder',
                             '/life': 'life',
                             '/devlab': 'devlab',
+                            '/medialab': 'media_lab',
+                            '/media_lab': 'media_lab',
                           };
                           const targetView = viewMap[urlKey];
                           if (targetView) {
                             setCurrentView(targetView);
-                            showToast(`${targetView === 'builder' ? '✨ 템플릿 빌더' : targetView === 'life' ? '🌿 라이프 허브' : '💻 개발 랩'} 캔버스로 이동했습니다.`, 'info');
+                            showToast(`${targetView === 'builder' ? '✨ 템플릿 빌더' : targetView === 'life' ? '🌿 라이프 허브' : targetView === 'devlab' ? '💻 개발 랩' : '🎨 AI 미디어 랩'} 캔버스로 이동했습니다.`, 'info');
                           }
                         }}
                         className="
