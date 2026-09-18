@@ -8,7 +8,10 @@ import {
   Zap, 
   Edit3, 
   Trash2, 
-  GripVertical
+  GripVertical,
+  Eye,
+  Wand2,
+  Star
 } from 'lucide-react';
 
 interface InteractiveCardGridViewProps {
@@ -20,6 +23,7 @@ interface InteractiveCardGridViewProps {
   onOpenFolder: (folder: TemplateFolder) => void;
   onMergeIntoNewFolder: (sourceTemplateId: string, targetTemplateId: string) => void;
   onDropIntoExistingFolder: (sourceTemplateId: string, targetFolderId: string) => void;
+  onPreviewTemplate?: (template: ArchivedTemplate) => void;
 }
 
 export const InteractiveCardGridView: React.FC<InteractiveCardGridViewProps> = ({
@@ -30,7 +34,8 @@ export const InteractiveCardGridView: React.FC<InteractiveCardGridViewProps> = (
   onDeleteTemplate,
   onOpenFolder,
   onMergeIntoNewFolder,
-  onDropIntoExistingFolder
+  onDropIntoExistingFolder,
+  onPreviewTemplate
 }) => {
   // 드래그 중인 템플릿 ID
   const [draggedTemplateId, setDraggedTemplateId] = useState<string | null>(null);
@@ -222,8 +227,23 @@ export const InteractiveCardGridView: React.FC<InteractiveCardGridViewProps> = (
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
 
+              {/* ── 출처 배지 (내가 생성함 vs 추천 큐레이션) ────────────────── */}
+              <div className="absolute top-2.5 left-2.5 flex items-center space-x-1 z-10">
+                {tpl.source === 'created' ? (
+                  <span className="px-2 py-0.5 rounded-md bg-blue-600/90 backdrop-blur-xs text-white text-[10px] font-bold flex items-center space-x-1 shadow-xs">
+                    <Wand2 className="w-2.5 h-2.5 text-amber-300" />
+                    <span>내가 생성한 템플릿</span>
+                  </span>
+                ) : (
+                  <span className="px-2 py-0.5 rounded-md bg-purple-600/90 backdrop-blur-xs text-white text-[10px] font-bold flex items-center space-x-1 shadow-xs">
+                    <Star className="w-2.5 h-2.5 text-yellow-300" />
+                    <span>추천 큐레이션</span>
+                  </span>
+                )}
+              </div>
+
               {/* 드래그 힌트 뱃지 */}
-              <div className="absolute top-2.5 right-2.5 p-1 rounded-md bg-black/40 text-white/80 backdrop-blur-xs text-[10px] flex items-center space-x-0.5 opacity-60 group-hover:opacity-100 transition">
+              <div className="absolute top-2.5 right-2.5 p-1 rounded-md bg-black/40 text-white/80 backdrop-blur-xs text-[10px] flex items-center space-x-0.5 opacity-60 group-hover:opacity-100 transition z-10">
                 <GripVertical className="w-3 h-3" />
                 <span className="hidden sm:inline">드래그하여 폴더링</span>
               </div>
@@ -272,6 +292,18 @@ export const InteractiveCardGridView: React.FC<InteractiveCardGridViewProps> = (
                 </span>
 
                 <div className="flex items-center space-x-1.5 shrink-0">
+                  {/* [👁️ 미리보기] */}
+                  {onPreviewTemplate && (
+                    <button
+                      onClick={() => onPreviewTemplate(tpl)}
+                      className="flex items-center space-x-1 px-2.5 py-1 rounded-lg text-xs font-semibold text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 dark:hover:bg-indigo-900/80 border border-indigo-200 dark:border-indigo-800 transition active:scale-95 cursor-pointer whitespace-nowrap"
+                      title="템플릿 구성 요소 및 DB 상세 미리보기"
+                    >
+                      <Eye className="w-3 h-3" />
+                      <span>미리보기</span>
+                    </button>
+                  )}
+
                   {/* [⚡ 노션 생성] */}
                   <button
                     onClick={() => onInstantDeploy(tpl)}
