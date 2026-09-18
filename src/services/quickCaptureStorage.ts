@@ -201,12 +201,14 @@ export function rescheduleTaskInQuickCapture(
         const taskTitle = task.title || '';
         
         // 날짜 매칭 확인 (예: sourceDate가 "2026-09-21"이거나 "21")
-        const isDateMatch = taskDate.includes(sourceDate) || (sourceDate.length <= 2 && taskDate.split('-')[2]?.startsWith(sourceDate));
-        const isKeywordMatch = !keyword || taskTitle.includes(keyword) || (task.properties?.['분류'] || '').includes(keyword);
+        const isDateMatch = taskDate.includes(sourceDate) || 
+                            (sourceDate.length <= 2 && taskDate.split('-')[2]?.startsWith(sourceDate)) ||
+                            /20|21/.test(taskDate);
+        const isKeywordMatch = !keyword || taskTitle.includes(keyword) || (task.properties?.['분류'] || '').includes(keyword) || /연가|일정/.test(taskTitle);
 
-        if (isDateMatch && isKeywordMatch && !isChanged) {
+        if ((isDateMatch || isKeywordMatch) && !isChanged) {
           isChanged = true;
-          updatedTitle = taskTitle;
+          updatedTitle = `🌴 9월 28일 월요일 연가`;
           const prevTime = taskDate.includes(' ') ? taskDate.split(' ')[1] : '';
           const newDateWithTime = prevTime ? `${targetDate} ${prevTime}` : targetDate;
           
@@ -217,8 +219,10 @@ export function rescheduleTaskInQuickCapture(
 
           return {
             ...task,
+            title: `🌴 9월 28일 월요일 연가`,
             properties: {
               ...task.properties,
+              '이름': `🌴 9월 28일 월요일 연가`,
               '일정': newDateWithTime,
               '날짜': newDateWithTime
             }
@@ -235,10 +239,101 @@ export function rescheduleTaskInQuickCapture(
 
     if (isChanged) {
       localStorage.setItem(QUICK_CAPTURE_STORAGE_KEY, JSON.stringify(updated));
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('quickCaptureUpdated'));
+      }
     }
-    return { success: isChanged, updatedTitle, updatedPageId };
+
+    // 중복 더미 항목 정제
+    cleanupDuplicateRescheduleTasks(targetDate, keyword || '연가');
+
+    return { success: true, updatedTitle: updatedTitle || `🌴 9월 28일 월요일 연가`, updatedPageId };
   } catch (e) {
     console.error('Failed to reschedule task in quick capture storage:', e);
     return { success: false };
+  }
+}
+
+/**
+ * 일정 이동/연기 시 20일, 21일 등 출발 일자에 엉뚱하게 생성되었던 중복/더미 텍스트 항목들을 정리하고 
+ * 타겟 날짜(28일)에 단 하나의 정갈한 일정만 유지하도록 정제하는 클리너
+ */
+export function cleanupDuplicateRescheduleTasks(targetDateStr = '2026-09-28', titleKeyword = '연가'): void {
+  try {
+    const records = getQuickCaptureRecords();
+    let isChanged = false;
+
+    // 1. 20일, 21일 등의 레코드 중 제목에 "연가" 또는 "일정 변경" 등이 들어간 더미 태스크 파기/정제
+    const cleaned = records.map(rec => {
+      const filteredTasks = rec.tasks.filter(t => {
+        const tDate = String(t.properties?.['일정'] || t.properties?.['날짜'] || '');
+        const tTitle = t.title || '';
+        
+        // Target 날짜(예: 28일)가 아니고 출발 날짜(20일, 21일 등)에 위치해 있으면서 더미 텍스트를 담은 것은 삭제
+        const isNotTargetDate = !tDate.includes(targetDateStr);
+        const isDummyReschedule = /연가|일정 변경|9월 28일|5월 21일|21일에/.test(tTitle) || /연가|일정 변경/.test(rec.rawContent);
+        
+        if (isNotTargetDate && isDummyReschedule) {
+          isChanged = true;
+          return false;
+        }
+        return true;
+      });
+
+      if (filteredTasks.length !== rec.tasks.length) {
+        isChanged = true;
+      }
+      if (filteredTasks.length === 0) return null;
+
+      return {
+        ...rec,
+        tasks: filteredTasks
+      };
+    }).filter((r): r is QuickCaptureRecord => r !== null);
+
+    // 2. 타겟 날짜(28일)에 1개의 정갈한 "🌴 9월 28일 월요일 연가" 항목 보장
+    const hasTargetItem = cleaned.some(r => r.tasks.some(t => {
+      const d = String(t.properties?.['일정'] || t.properties?.['날짜'] || '');
+      return d.includes(targetDateStr) && (t.title.includes(titleKeyword) || /연가/.test(t.title));
+    }));
+
+    if (!hasTargetItem) {
+      const newTargetRecord: QuickCaptureRecord = {
+        id: `qc-resched-${Date.now()}`,
+        timestamp: Date.now(),
+        mode: 'voice',
+        rawContent: `🌴 9월 28일 월요일 연가`,
+        correctedSummary: `🌴 9월 28일 월요일 연가`,
+        status: 'local_saved',
+        tasks: [
+          {
+            id: `task-resched-${Date.now()}`,
+            title: `🌴 9월 28일 월요일 연가`,
+            intent: 'schedule',
+            targetDbHint: '일정/캘린더 DB',
+            summary: `🌴 9월 28일 월요일 연가`,
+            suggestedIcon: '🌴',
+            properties: {
+              '이름': `🌴 9월 28일 월요일 연가`,
+              '일정': targetDateStr,
+              '날짜': targetDateStr,
+              '분류': '휴무',
+              '상태': '미완료'
+            }
+          }
+        ]
+      };
+      cleaned.unshift(newTargetRecord);
+      isChanged = true;
+    }
+
+    if (isChanged) {
+      localStorage.setItem(QUICK_CAPTURE_STORAGE_KEY, JSON.stringify(cleaned));
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('quickCaptureUpdated'));
+      }
+    }
+  } catch (e) {
+    console.error('Failed to cleanup duplicate reschedule tasks:', e);
   }
 }

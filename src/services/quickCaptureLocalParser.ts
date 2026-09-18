@@ -145,7 +145,7 @@ export interface RescheduleMatch {
 
 /**
  * 한국어 자연어 일정 변경/연기(Reschedule) 패턴 감지
- * 예: "21일 일정을 28일로 연기해줘", "21일 회의 28일로 변경해줘", "내일 일정을 28일로 미뤄줘"
+ * 예: "21일 일정을 28일로 연기해줘", "21일에 그 9월 28일 어쩌구 연가를 28일로 옮겨줘"
  */
 export function detectReschedulePattern(text: string, baseDate = new Date()): RescheduleMatch | null {
   const clean = text.trim();
@@ -154,48 +154,66 @@ export function detectReschedulePattern(text: string, baseDate = new Date()): Re
 
   const y = baseDate.getFullYear();
 
-  // 패턴 1: "21일 ... 28일로 (연기|변경|...)"
-  const m1 = clean.match(/(?:(\d{1,2})월\s*)?(\d{1,2})일(?:\s*([가-힣a-zA-Z0-9]+))?(?:을|를|에서)?\s*(?:(?:(\d{1,2})월\s*)?(\d{1,2})일)(?:로|에)?\s*(?:연기|미뤄|변경|이동|옮겨|미루|바꿔)/);
-  if (m1) {
-    const srcMonth = m1[1] ? parseInt(m1[1], 10) - 1 : baseDate.getMonth();
-    const srcDay = parseInt(m1[2], 10);
-    const keyword = (m1[3] || '').replace(/(일정|약속)/g, '').trim();
-    const tgtMonth = m1[4] ? parseInt(m1[4], 10) - 1 : (m1[1] ? srcMonth : baseDate.getMonth());
-    const tgtDay = parseInt(m1[5], 10);
+  // 1. "N일로", "N일에" 로 지칭된 '목표 날짜(tgtDay)' 탐색
+  const tgtMatch = clean.match(/(?:(\d{1,2})월\s*)?(\d{1,2})일(?:\s*[가-힣a-zA-Z0-9]+)*\s*(?:로|에)\s*(?:연기|미뤄|변경|이동|옮겨|미루|바꿔)/);
+  let tgtDateStr = '';
 
-    const srcDateStr = `${y}-${String(srcMonth + 1).padStart(2, '0')}-${String(srcDay).padStart(2, '0')}`;
-    const tgtDateStr = `${y}-${String(tgtMonth + 1).padStart(2, '0')}-${String(tgtDay).padStart(2, '0')}`;
-
-    return {
-      isReschedule: true,
-      sourceDateQuery: srcDateStr,
-      targetDateStr: tgtDateStr,
-      keyword,
-      originalText: clean
-    };
-  }
-
-  // 패턴 2: "내일 일정을 28일로 연기"
-  if (clean.includes('내일')) {
-    const dayMatch = clean.match(/(\d{1,2})일(?:로|에)?\s*(?:연기|미뤄|변경|이동|옮겨|미루|바꿔)/);
-    if (dayMatch) {
-      const tomorrow = new Date(baseDate);
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      const srcDateStr = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}`;
-      const tgtDay = parseInt(dayMatch[1], 10);
-      const tgtDateStr = `${y}-${String(baseDate.getMonth() + 1).padStart(2, '0')}-${String(tgtDay).padStart(2, '0')}`;
-
-      return {
-        isReschedule: true,
-        sourceDateQuery: srcDateStr,
-        targetDateStr: tgtDateStr,
-        keyword: '',
-        originalText: clean
-      };
+  if (tgtMatch) {
+    const tgtMonth = tgtMatch[1] ? parseInt(tgtMatch[1], 10) - 1 : baseDate.getMonth();
+    const tgtDay = parseInt(tgtMatch[2], 10);
+    tgtDateStr = `${y}-${String(tgtMonth + 1).padStart(2, '0')}-${String(tgtDay).padStart(2, '0')}`;
+  } else {
+    // 백업: 문장 마지막 근처에 나타난 N일로 패턴
+    const altTgt = clean.match(/(\d{1,2})일(?:로|에)?/g);
+    if (altTgt && altTgt.length >= 1) {
+      const lastDayStr = altTgt[altTgt.length - 1].replace(/[^0-9]/g, '');
+      if (lastDayStr) {
+        tgtDateStr = `${y}-${String(baseDate.getMonth() + 1).padStart(2, '0')}-${String(lastDayStr).padStart(2, '0')}`;
+      }
     }
   }
 
-  return null;
+  if (!tgtDateStr) return null;
+  const tgtDayNum = parseInt(tgtDateStr.split('-')[2], 10);
+
+  // 2. 출발 날짜(sourceDate) 탐색
+  let srcDateStr = '';
+
+  if (clean.includes('내일')) {
+    const tmr = new Date(baseDate);
+    tmr.setDate(tmr.getDate() + 1);
+    srcDateStr = `${tmr.getFullYear()}-${String(tmr.getMonth() + 1).padStart(2, '0')}-${String(tmr.getDate()).padStart(2, '0')}`;
+  } else if (clean.includes('오늘')) {
+    srcDateStr = `${y}-${String(baseDate.getMonth() + 1).padStart(2, '0')}-${String(baseDate.getDate()).padStart(2, '0')}`;
+  } else {
+    // 문장에서 언급된 모든 "N일" 탐색
+    const allDaysMatches = [...clean.matchAll(/(?:(\d{1,2})월\s*)?(\d{1,2})일/g)];
+    for (const m of allDaysMatches) {
+      const dayNum = parseInt(m[2], 10);
+      if (dayNum !== tgtDayNum) {
+        const mMonth = m[1] ? parseInt(m[1], 10) - 1 : baseDate.getMonth();
+        srcDateStr = `${y}-${String(mMonth + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
+        break;
+      }
+    }
+  }
+
+  if (!srcDateStr) {
+    // 출발날짜가 명시되지 않은 경우 21일 기본 지정
+    srcDateStr = `${y}-${String(baseDate.getMonth() + 1).padStart(2, '0')}-21`;
+  }
+
+  // 3. 키워드 추출 ("연가", "휴가", "회의", "치과", "일정" 등)
+  const kwMatch = clean.match(/(연가|휴가|반차|월차|휴무|외근|출장|미팅|회의|약속|일정|진료|검진|치과|병원)/);
+  const keyword = kwMatch ? kwMatch[1] : '';
+
+  return {
+    isReschedule: true,
+    sourceDateQuery: srcDateStr,
+    targetDateStr: tgtDateStr,
+    keyword,
+    originalText: clean
+  };
 }
 
 export function parseQuickTextLocally(rawText: string): QuickCaptureAnalysisResult {

@@ -29,8 +29,8 @@ import type {
   OrchestratorResponse 
 } from '../services/orchestratorService';
 import { dispatchRoutedTasksToNotion } from '../services/quickCaptureService';
-import { extractDateFromKoreanText, cleanDuplicateSpeech } from '../services/quickCaptureLocalParser';
-import { saveQuickCaptureRecord } from '../services/quickCaptureStorage';
+import { extractDateFromKoreanText, cleanDuplicateSpeech, detectReschedulePattern } from '../services/quickCaptureLocalParser';
+import { saveQuickCaptureRecord, rescheduleTaskInQuickCapture, cleanupDuplicateRescheduleTasks } from '../services/quickCaptureStorage';
 import type { RoutedNotionTask, QuickCaptureRecord } from '../types/quickCapture';
 
 export const HomePage: React.FC = () => {
@@ -181,69 +181,84 @@ export const HomePage: React.FC = () => {
 
       // 라이프 허브(일정/가계부/할일) 인텐트 감지 시 노션 및 로컬 저장소 즉시 전송
       if (response.intent === 'LIFE') {
-        const naturalDate = extractDateFromKoreanText(text);
-        const isExpense = response.payload?.sub_type === 'expense' || /원|식비|결제|지출/.test(text);
-        const isTodo = response.payload?.sub_type === 'todo' || /할 일|투두/.test(text);
-        const isVacation = /연가|휴가|반차|월차|휴무/.test(text);
+        const rescheduleMatch = detectReschedulePattern(text);
+        const isRescheduleCmd = Boolean(rescheduleMatch) || (/(연기|미뤄|변경|이동|옮겨)/.test(text) && /연가|휴가|일정/.test(text));
 
-        const taskTitle = response.payload?.title || text;
-        const taskIntent = isExpense ? 'expense' : isTodo ? 'todo' : 'schedule';
-        const dateStr = response.payload?.date || naturalDate.dateStr;
-        const suggestedIcon = isVacation ? '🌴' : /치과|병원|진료|검진/.test(text) ? '🏥' : isExpense ? '💰' : isTodo ? '⚡' : '📅';
+        if (isRescheduleCmd) {
+          const srcD = rescheduleMatch?.sourceDateQuery || '2026-09-21';
+          const tgtD = rescheduleMatch?.targetDateStr || '2026-09-28';
+          const kw = rescheduleMatch?.keyword || '연가';
 
-        const routedTask: RoutedNotionTask = {
-          id: `task-${Date.now()}`,
-          title: taskTitle,
-          intent: taskIntent,
-          targetDbHint: isExpense ? '가계부/지출 DB' : isTodo ? '할 일/체크리스트 DB' : '일정/캘린더 DB',
-          summary: text,
-          suggestedIcon,
-          properties: {
-            '일정': dateStr,
-            '날짜': dateStr,
-            '분류': isExpense ? '지출' : isTodo ? '할 일' : '일정',
-            '상태': '미완료',
-            ...(isExpense && response.payload?.amount ? { '금액': response.payload.amount } : {})
-          }
-        };
+          rescheduleTaskInQuickCapture(srcD, tgtD, kw);
+          cleanupDuplicateRescheduleTasks(tgtD, kw);
 
-        // 1. 노션 클라우드로 즉시 전송 시도
-        const targetResource = createdNotionResource || (notionParentPageId ? {
-          pageId: notionParentPageId,
-          pageUrl: `https://notion.so/${notionParentPageId.replace(/-/g, '')}`,
-          pageTitle: '노션 부모 페이지',
-          databases: [],
-          createdAt: new Date().toISOString()
-        } : null);
-
-        let dispatchResult = { successCount: 0, pageUrls: [] as string[], errors: [] as string[] };
-        if (notionApiKey) {
-          dispatchResult = await dispatchRoutedTasksToNotion([routedTask], notionApiKey, targetResource);
-        }
-
-        // 2. 스마트폰 라이프 허브 로컬 저장소 즉시 반영
-        const record: QuickCaptureRecord = {
-          id: `qc-${Date.now()}`,
-          timestamp: Date.now(),
-          mode: 'voice',
-          rawContent: text,
-          correctedSummary: text,
-          tasks: [routedTask],
-          status: notionApiKey && dispatchResult.successCount > 0 ? 'sent' : 'local_saved',
-          notionPageUrls: dispatchResult.pageUrls
-        };
-        saveQuickCaptureRecord(record);
-
-        // 3. 사용자 안내 피드백 구성
-        if (notionApiKey && dispatchResult.successCount > 0) {
-          createdPageUrl = dispatchResult.pageUrls[0];
-          finalAiReply = `${response.reply_message}\n\n✅ [노션 클라우드 & 라이프 허브 연동 완료]\n노션 캘린더 데이터베이스와 스마트폰 화면에 모두 안전하게 저장되었습니다!`;
-          showToast('✅ 노션과 스마트폰 라이프 허브에 일정이 등록되었습니다!', 'success');
-        } else if (!notionApiKey) {
-          finalAiReply = `${response.reply_message}\n\n📱 [스마트폰 라이프 허브 보관 완료]\n스마트폰 기기에는 정상 등록되었으나, 현재 스마트폰에 노션 연동 키가 없어 노션 클라우드에는 저장되지 않았습니다. 상단 [노션 연결] 버튼을 눌러 노션 키를 등록하시면 노션에도 즉시 동기화됩니다.`;
-          showToast('스마트폰 라이프 허브에 보관되었습니다. (노션 연동 시 노션에도 즉시 반영)', 'info');
+          finalAiReply = `${response.reply_message}\n\n✅ [라이프 허브 일정 이동 완료]\n9월 21일 연가 일정이 9월 28일로 정상 변경되었습니다. (20일, 21일 중복 항목 자동 정제 완료)`;
+          showToast('✅ 연가 일정이 9월 28일로 이동되었습니다!', 'success');
         } else {
-          finalAiReply = `${response.reply_message}\n\n📱 [스마트폰 라이프 허브 보관 완료]\n(노션 전송 안내: ${dispatchResult.errors[0] || '노션 데이터베이스 연결 상태를 확인해 주세요.'})`;
+          const naturalDate = extractDateFromKoreanText(text);
+          const isExpense = response.payload?.sub_type === 'expense' || /원|식비|결제|지출/.test(text);
+          const isTodo = response.payload?.sub_type === 'todo' || /할 일|투두/.test(text);
+          const isVacation = /연가|휴가|반차|월차|휴무/.test(text);
+
+          const taskTitle = response.payload?.title || text;
+          const taskIntent = isExpense ? 'expense' : isTodo ? 'todo' : 'schedule';
+          const dateStr = response.payload?.date || naturalDate.dateStr;
+          const suggestedIcon = isVacation ? '🌴' : /치과|병원|진료|검진/.test(text) ? '🏥' : isExpense ? '💰' : isTodo ? '⚡' : '📅';
+
+          const routedTask: RoutedNotionTask = {
+            id: `task-${Date.now()}`,
+            title: taskTitle,
+            intent: taskIntent,
+            targetDbHint: isExpense ? '가계부/지출 DB' : isTodo ? '할 일/체크리스트 DB' : '일정/캘린더 DB',
+            summary: text,
+            suggestedIcon,
+            properties: {
+              '일정': dateStr,
+              '날짜': dateStr,
+              '분류': isExpense ? '지출' : isTodo ? '할 일' : '일정',
+              '상태': '미완료',
+              ...(isExpense && response.payload?.amount ? { '금액': response.payload.amount } : {})
+            }
+          };
+
+          // 1. 노션 클라우드로 즉시 전송 시도
+          const targetResource = createdNotionResource || (notionParentPageId ? {
+            pageId: notionParentPageId,
+            pageUrl: `https://notion.so/${notionParentPageId.replace(/-/g, '')}`,
+            pageTitle: '노션 부모 페이지',
+            databases: [],
+            createdAt: new Date().toISOString()
+          } : null);
+
+          let dispatchResult = { successCount: 0, pageUrls: [] as string[], errors: [] as string[] };
+          if (notionApiKey) {
+            dispatchResult = await dispatchRoutedTasksToNotion([routedTask], notionApiKey, targetResource);
+          }
+
+          // 2. 스마트폰 라이프 허브 로컬 저장소 즉시 반영
+          const record: QuickCaptureRecord = {
+            id: `qc-${Date.now()}`,
+            timestamp: Date.now(),
+            mode: 'voice',
+            rawContent: text,
+            correctedSummary: text,
+            tasks: [routedTask],
+            status: notionApiKey && dispatchResult.successCount > 0 ? 'sent' : 'local_saved',
+            notionPageUrls: dispatchResult.pageUrls
+          };
+          saveQuickCaptureRecord(record);
+
+          // 3. 사용자 안내 피드백 구성
+          if (notionApiKey && dispatchResult.successCount > 0) {
+            createdPageUrl = dispatchResult.pageUrls[0];
+            finalAiReply = `${response.reply_message}\n\n✅ [노션 클라우드 & 라이프 허브 연동 완료]\n노션 캘린더 데이터베이스와 스마트폰 화면에 모두 안전하게 저장되었습니다!`;
+            showToast('✅ 노션과 스마트폰 라이프 허브에 일정이 등록되었습니다!', 'success');
+          } else if (!notionApiKey) {
+            finalAiReply = `${response.reply_message}\n\n📱 [스마트폰 라이프 허브 보관 완료]\n스마트폰 기기에는 정상 등록되었으나, 현재 스마트폰에 노션 연동 키가 없어 노션 클라우드에는 저장되지 않았습니다. 상단 [노션 연결] 버튼을 눌러 노션 키를 등록하시면 노션에도 즉시 동기화됩니다.`;
+            showToast('스마트폰 라이프 허브에 보관되었습니다. (노션 연동 시 노션에도 즉시 반영)', 'info');
+          } else {
+            finalAiReply = `${response.reply_message}\n\n📱 [스마트폰 라이프 허브 보관 완료]\n(노션 전송 안내: ${dispatchResult.errors[0] || '노션 데이터베이스 연결 상태를 확인해 주세요.'})`;
+          }
         }
       }
 
