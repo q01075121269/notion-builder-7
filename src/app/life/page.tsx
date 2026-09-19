@@ -891,9 +891,25 @@ export const LifePage: React.FC = () => {
     }
   }, [notionApiKey, selectedNotionDbId, selectedExpenseDbId, createdNotionResource]);
 
-  // 페이지 진입 시 실시간 동기화 실행
+  // 페이지 진입 시 실시간 동기화 및 옴니 챗 전송 후 라이브 커스텀 이벤트 수신
   useEffect(() => {
     syncLifeHubData();
+
+    const handleHubUpdate = () => {
+      syncLifeHubData();
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('life_hub_update', handleHubUpdate);
+      window.addEventListener('storage', handleHubUpdate);
+    }
+
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('life_hub_update', handleHubUpdate);
+        window.removeEventListener('storage', handleHubUpdate);
+      }
+    };
   }, [syncLifeHubData]);
 
   const toggleTodo = (id: string, forcedDone?: boolean) => {
@@ -919,6 +935,17 @@ export const LifePage: React.FC = () => {
   const isNotionConnected = Boolean(notionApiKey && (createdNotionResource || selectedNotionDbId));
   const totalExpenseAmount = expenseItems.reduce((sum, item) => sum + (item.amount || 0), 0);
 
+  // 하단 옴니 챗 포커스 핸들러 (구형 퀵 캡처 모달 팝업 방어)
+  const handleFocusOmniChat = (samplePrompt?: string) => {
+    const omniInput = document.querySelector('textarea') as HTMLTextAreaElement | null;
+    if (omniInput) {
+      if (samplePrompt) omniInput.value = samplePrompt;
+      omniInput.focus();
+      omniInput.dispatchEvent(new Event('input', { bubbles: true }));
+      omniInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  };
+
   // 1. 스마트 일정 모듈 렌더러 (구글/노션 캘린더급 3대 뷰 스위처, 우측 상세 서랍, 크로스오버 타임블록 DnD 드롭존)
   const renderScheduleModule = (isCompact = false) => (
     <ErrorBoundary fallbackTitle="스마트 일정 모듈 로드 중 오류가 발생했습니다.">
@@ -926,7 +953,7 @@ export const LifePage: React.FC = () => {
         schedules={scheduleItems}
         onOpenEditModal={handleOpenEditModal}
         onDeleteItem={handleDeleteItem}
-        onQuickCapture={() => setCurrentView('quick_capture')}
+        onQuickCapture={() => handleFocusOmniChat('9월 25일 15:00 팀 회의 일정 등록해 줘')}
         onAddScheduleFromTodo={handleScheduleTodoFromTask}
         onRescheduleNaturalLanguage={handleRescheduleNaturalLanguage}
         isCompact={isCompact}
@@ -942,7 +969,7 @@ export const LifePage: React.FC = () => {
         setTodoItems={setTodoItems}
         onToggleTodo={toggleTodo}
         onDeleteTodo={handleDeleteTodo}
-        onQuickCapture={() => setCurrentView('quick_capture')}
+        onQuickCapture={() => handleFocusOmniChat('내일까지 주간 보고서 작성 할 일 추가해 줘')}
         onScheduleTodo={handleToggleTimeBlock}
         onToggleTimeBlock={handleToggleTimeBlock}
         isCompact={isCompact}
@@ -958,7 +985,7 @@ export const LifePage: React.FC = () => {
         expenseItems={expenseItems}
         setExpenseItems={setExpenseItems}
         onDeleteExpense={handleDeleteExpense}
-        onQuickCapture={() => setCurrentView('quick_capture')}
+        onQuickCapture={() => handleFocusOmniChat('오늘 점심 식사 12000원 지출 등록해 줘')}
         isCompact={isCompact}
         notionApiKey={notionApiKey}
         expenseDbId={selectedExpenseDbId || undefined}
@@ -975,7 +1002,7 @@ export const LifePage: React.FC = () => {
         emails={emailSummaries}
         setEmails={setEmailSummaries}
         onTransferToTodo={handleTransferMailToTodo}
-        onQuickCapture={() => setCurrentView('quick_capture')}
+        onQuickCapture={() => handleFocusOmniChat()}
         isCompact={isCompact}
         apiKey={apiKey}
       />

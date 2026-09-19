@@ -39,6 +39,41 @@ export function cleanDuplicateSpeech(text: string): string {
 }
 
 /**
+ * 한국어 자연어 문장에서 날짜, 시간, 명령어 접미사, 조사를 모두 제거하고 핵심 일정 제목만 지능적 정제 추출
+ */
+export function cleanTaskTitle(rawText: string): string {
+  if (!rawText) return '일정';
+
+  let title = rawText.trim();
+
+  // 1. 날짜 및 상대 날짜 표현 제거 (예: "9월 28일 날", "2026년 9월 28일", "오늘", "내일", "15시")
+  title = title
+    .replace(/(?:(\d{4})[-./년\s]+)?(\d{1,2})[-./월\s]+(\d{1,2})(?:\s*일|\s*날|\s*일자|\s*일에|\s*일날|\s*날에|\s*일자로|\s*일로|\s*일)?/g, ' ')
+    .replace(/(\d+)\s*일\s*(?:뒤|후)/g, ' ')
+    .replace(/(오늘|내일|모레|글피)(?:\s*(?:에|날|자|로))?/g, ' ')
+    .replace(/(다다음\s*주|다음\s*주|이번\s*주)?\s*([월화수목금토일])(?:요일)(?:\s*(?:에|날|자|로))?/g, ' ')
+    .replace(/(오전|오후)?\s*(\d{1,2})시(?:\s*(\d{1,2})분)?/g, ' ');
+
+  // 2. 명령어, 동작 동사, 불필요한 서술어 및 '일정', '넣어줘', '등록' 등 접미사 제거
+  title = title
+    .replace(/(?:일정|할일|투두|내역)\s*(?:넣어\s*줘|등록해\s*줘|추가해\s*줘|기록해\s*줘|저장해\s*줘|생성해\s*줘|올려\s*줘|작성해\s*줘|넣어주|등록해주|추가해주|기록해주|저장해주|생성해주|올려주|작성해주|넣어|등록|추가|기록|저장|생성|올려|작성)?/g, ' ')
+    .replace(/(?:넣어\s*줘|등록해\s*줘|추가해\s*줘|기록해\s*줘|저장해\s*줘|생성해\s*줘|올려\s*줘|작성해\s*줘|넣어주|등록해주|추가해주|기록해주|저장해주|생성해주|올려주|작성해주|넣어|등록|추가|기록|저장|생성|올려|작성)/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  // 3. 앞뒤에 남은 조사(에, 날, 자, 로, 을, 를, 이, 가, 의) 단독 토큰 제거
+  title = title.replace(/^(?:에|날|자|로|을|를|이|가|의)\s+/, '').trim();
+  title = title.replace(/\s+(?:에|날|자|로|을|를|이|가|의)$/, '').trim();
+
+  // 4. '휴가 일정' 처럼 뒤에 '일정'이 붙어있는 경우 핵심 단어 보존 정제
+  if (title.endsWith(' 일정') && title.length > 3) {
+    title = title.replace(/\s*일정$/, '').trim();
+  }
+
+  return title.length > 0 ? title : '일정';
+}
+
+/**
  * 한국어 자연어에서 정확한 날짜(상대 날짜/요일/시간)를 계산 추출
  */
 export function extractDateFromKoreanText(text: string, baseDate = new Date()): { dateStr: string; timeStr?: string; isExplicitDate: boolean } {
@@ -47,71 +82,61 @@ export function extractDateFromKoreanText(text: string, baseDate = new Date()): 
   let targetDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
   let isExplicitDate = false;
 
-  // 1. "N일 뒤", "N일 후"
-  const dayOffsetMatch = clean.match(/(\d+)\s*일\s*(?:뒤|후)/);
-  if (dayOffsetMatch) {
+  // 1. "M월 D일" / "M월 D일 날" / "YYYY년 M월 D일" 매칭 (최우선 순위 평가)
+  const monthDayMatch = clean.match(/(?:(\d{4})[-./년\s]+)?(\d{1,2})[-./월\s]+(\d{1,2})(?:일|\s*일|\s*날)?/);
+  if (monthDayMatch) {
+    const year = monthDayMatch[1] ? parseInt(monthDayMatch[1], 10) : now.getFullYear();
+    const month = parseInt(monthDayMatch[2], 10) - 1;
+    const day = parseInt(monthDayMatch[3], 10);
+    targetDate = new Date(year, month, day, 0, 0, 0, 0);
+    isExplicitDate = true;
+  }
+  // 2. "N일 뒤", "N일 후"
+  else if (clean.match(/(\d+)\s*일\s*(?:뒤|후)/)) {
+    const dayOffsetMatch = clean.match(/(\d+)\s*일\s*(?:뒤|후)/)!;
     const days = parseInt(dayOffsetMatch[1], 10);
     targetDate.setDate(targetDate.getDate() + days);
     isExplicitDate = true;
   }
-  // 2. "오늘"
+  // 3. 상대 날짜: 오늘, 내일, 모레, 글피
   else if (clean.includes('오늘')) {
     isExplicitDate = true;
-  }
-  // 3. "내일"
-  else if (clean.includes('내일')) {
+  } else if (clean.includes('내일')) {
     targetDate.setDate(targetDate.getDate() + 1);
     isExplicitDate = true;
-  }
-  // 4. "모레"
-  else if (clean.includes('모레')) {
+  } else if (clean.includes('모레')) {
     targetDate.setDate(targetDate.getDate() + 2);
     isExplicitDate = true;
-  }
-  // 5. "글피"
-  else if (clean.includes('글피')) {
+  } else if (clean.includes('글피')) {
     targetDate.setDate(targetDate.getDate() + 3);
     isExplicitDate = true;
   }
-  // 6. 요일 매칭 (월, 화, 수, 목, 금, 토, 일) - "다음주 월요일", "이번주 금요일" 등
+  // 4. 독립 요일 매칭 (숫자가 앞에 안 붙은 "월요일", "화요일", "다음주 금요일" 등)
   else {
-    const dayMap: Record<string, number> = {
-      '월': 1, '화': 2, '수': 3, '목': 4, '금': 5, '토': 6, '일': 7
-    };
-    
-    const weekMatch = clean.match(/(다다음\s*주|다음\s*주|이번\s*주)?\s*([월화수목금토일])(?:요일)?/);
+    const weekMatch = clean.match(/(다다음\s*주|다음\s*주|이번\s*주)?\s*(?:(?<!\d))([월화수목금토일])(?:요일)/);
     if (weekMatch) {
+      const dayMap: Record<string, number> = {
+        '월': 1, '화': 2, '수': 3, '목': 4, '금': 5, '토': 6, '일': 7
+      };
       const weekPrefix = weekMatch[1]?.replace(/\s+/g, '') || '';
       const dayChar = weekMatch[2];
-      const targetIsoDay = dayMap[dayChar]; // 1 ~ 7
-      const currentIsoDay = now.getDay() === 0 ? 7 : now.getDay(); // 1 ~ 7 (월:1, 일:7)
+      const targetIsoDay = dayMap[dayChar];
+      const currentIsoDay = now.getDay() === 0 ? 7 : now.getDay();
 
       let diffDays = 0;
       if (weekPrefix === '다음주') {
-        // 다음주 해당 요일: 이번주 일요일까지 남은 일수 + 다음주 요일
         diffDays = (7 - currentIsoDay) + targetIsoDay;
       } else if (weekPrefix === '다다음주') {
         diffDays = (7 - currentIsoDay) + 7 + targetIsoDay;
       } else if (weekPrefix === '이번주') {
         diffDays = targetIsoDay - currentIsoDay;
       } else {
-        // 접두사 없이 "월요일"만 있는 경우
         const diff = targetIsoDay - currentIsoDay;
         diffDays = diff > 0 ? diff : diff + 7;
       }
 
       targetDate.setDate(targetDate.getDate() + diffDays);
       isExplicitDate = true;
-    } else {
-      // 7. "M월 D일" 매칭
-      const monthDayMatch = clean.match(/(?:(\d{4})[-./년\s]+)?(\d{1,2})[-./월\s]+(\d{1,2})일?/);
-      if (monthDayMatch) {
-        const year = monthDayMatch[1] ? parseInt(monthDayMatch[1], 10) : now.getFullYear();
-        const month = parseInt(monthDayMatch[2], 10) - 1;
-        const day = parseInt(monthDayMatch[3], 10);
-        targetDate = new Date(year, month, day, 0, 0, 0, 0);
-        isExplicitDate = true;
-      }
     }
   }
 
@@ -133,6 +158,100 @@ export function extractDateFromKoreanText(text: string, baseDate = new Date()): 
   const dateStr = timeStr ? `${y}-${m}-${d} ${timeStr}` : `${y}-${m}-${d}`;
 
   return { dateStr, timeStr, isExplicitDate };
+}
+
+export interface DateRangeResult {
+  isRange: boolean;
+  startDateStr: string;
+  endDateStr: string;
+  dateList: string[]; // 포함되는 날짜 목록 YYYY-MM-DD
+  cleanTitle: string;
+}
+
+/**
+ * 한국어 자연어 문장에서 기간 일정 ("M월 D일부터 M월 D일까지", "N일간")을 정밀 탐색 추출
+ */
+export function extractDateRangeFromKoreanText(text: string, baseDate = new Date()): DateRangeResult {
+  const clean = text.trim();
+  const y = baseDate.getFullYear();
+
+  // 1. "M월 D일부터 M월 D일까지" / "M/D ~ M/D" / "M월 D일 ~ D일"
+  const rangeMatch = clean.match(/(?:(\d{4})[-./년\s]+)?(\d{1,2})[-./월\s]+(\d{1,2})일?\s*(?:부터|~|-)\s*(?:(\d{1,2})[-./월\s]+)?(\d{1,2})일?\s*(?:까지)?/);
+  
+  if (rangeMatch) {
+    const startYear = rangeMatch[1] ? parseInt(rangeMatch[1], 10) : y;
+    const startMonth = parseInt(rangeMatch[2], 10) - 1;
+    const startDay = parseInt(rangeMatch[3], 10);
+
+    const endMonth = rangeMatch[4] ? parseInt(rangeMatch[4], 10) - 1 : startMonth;
+    const endDay = parseInt(rangeMatch[5], 10);
+
+    const startDate = new Date(startYear, startMonth, startDay);
+    const endDate = new Date(startYear, endMonth, endDay);
+
+    if (endDate >= startDate) {
+      const dateList: string[] = [];
+      const cur = new Date(startDate);
+      while (cur <= endDate && dateList.length < 31) {
+        const cy = cur.getFullYear();
+        const cm = String(cur.getMonth() + 1).padStart(2, '0');
+        const cd = String(cur.getDate()).padStart(2, '0');
+        dateList.push(`${cy}-${cm}-${cd}`);
+        cur.setDate(cur.getDate() + 1);
+      }
+
+      const titleWithoutRange = clean.replace(rangeMatch[0], ' ');
+      const cleanTitle = cleanTaskTitle(titleWithoutRange);
+
+      return {
+        isRange: true,
+        startDateStr: dateList[0],
+        endDateStr: dateList[dateList.length - 1],
+        dateList,
+        cleanTitle
+      };
+    }
+  }
+
+  // 2. "오늘부터 3일간", "내일부터 N일간"
+  const durationMatch = clean.match(/(오늘|내일|모레)?\s*(?:부터)?\s*(\d+)\s*일\s*(?:간|동안)/);
+  if (durationMatch) {
+    const prefix = durationMatch[1] || '오늘';
+    const numDays = parseInt(durationMatch[2], 10);
+
+    const startDate = new Date(baseDate);
+    if (prefix === '내일') startDate.setDate(startDate.getDate() + 1);
+    else if (prefix === '모레') startDate.setDate(startDate.getDate() + 2);
+
+    const dateList: string[] = [];
+    const cur = new Date(startDate);
+    for (let i = 0; i < Math.min(numDays, 31); i++) {
+      const cy = cur.getFullYear();
+      const cm = String(cur.getMonth() + 1).padStart(2, '0');
+      const cd = String(cur.getDate()).padStart(2, '0');
+      dateList.push(`${cy}-${cm}-${cd}`);
+      cur.setDate(cur.getDate() + 1);
+    }
+
+    const titleWithoutDuration = clean.replace(durationMatch[0], ' ');
+    const cleanTitle = cleanTaskTitle(titleWithoutDuration);
+
+    return {
+      isRange: true,
+      startDateStr: dateList[0],
+      endDateStr: dateList[dateList.length - 1],
+      dateList,
+      cleanTitle
+    };
+  }
+
+  return {
+    isRange: false,
+    startDateStr: '',
+    endDateStr: '',
+    dateList: [],
+    cleanTitle: cleanTaskTitle(clean)
+  };
 }
 
 export interface RescheduleMatch {

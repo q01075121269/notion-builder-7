@@ -21,7 +21,7 @@ import {
 import { sendToOrchestrator } from '../../services/orchestratorService';
 import type { ChatMessage, OrchestratorResponse } from '../../services/orchestratorService';
 import { dispatchRoutedTasksToNotion } from '../../services/quickCaptureService';
-import { extractDateFromKoreanText, cleanDuplicateSpeech, detectReschedulePattern } from '../../services/quickCaptureLocalParser';
+import { extractDateFromKoreanText, extractDateRangeFromKoreanText, cleanTaskTitle, cleanDuplicateSpeech, detectReschedulePattern } from '../../services/quickCaptureLocalParser';
 import { saveQuickCaptureRecord, rescheduleTaskInQuickCapture, cleanupDuplicateRescheduleTasks } from '../../services/quickCaptureStorage';
 import type { RoutedNotionTask, QuickCaptureRecord } from '../../types/quickCapture';
 import { PRESET_TEMPLATES } from '../../services/presetTemplates';
@@ -320,40 +320,51 @@ export const OmniChatBar: React.FC = () => {
 
           rescheduleTaskInQuickCapture(srcD, tgtD, kw);
           cleanupDuplicateRescheduleTasks(tgtD, kw);
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('life_hub_update'));
+          }
 
           finalReply = `${response.reply_message}\n\n✅ ${srcD} ${kw} 일정이 ${tgtD}로 성공적으로 이동/연기되었습니다! (기존 일정 업데이트 완료)`;
           showToast(`✅ ${kw} 일정이 ${tgtD}로 이동되었습니다!`, 'success');
           receipts = buildReceipts('LIFE');
         } else {
+          const dateRangeInfo = extractDateRangeFromKoreanText(text);
           const naturalDate = extractDateFromKoreanText(text);
           const isExpense = response.payload?.sub_type === 'expense' || /원|식비|결제|지출/.test(text);
           const isTodo = response.payload?.sub_type === 'todo' || /할 일|투두/.test(text);
           const isVacation = /연가|휴가|반차|월차|휴무/.test(text);
 
-          const taskTitle = response.payload?.title || text;
+          const cleanedTitle = dateRangeInfo.isRange ? dateRangeInfo.cleanTitle : cleanTaskTitle(text);
+          const taskTitle = (response.payload?.title && response.payload.title !== text)
+            ? response.payload.title
+            : cleanedTitle;
           const taskIntent = isExpense ? 'expense' : isTodo ? 'todo' : 'schedule';
-          const dateStr = response.payload?.date || naturalDate.dateStr;
           const suggestedIcon = isVacation ? '🌴'
             : /치과|병원|진료|검진/.test(text) ? '🏥'
             : isExpense ? '💰'
             : isTodo ? '⚡'
             : '📅';
 
-          const routedTask: RoutedNotionTask = {
-            id: `task-${Date.now()}`,
+          // 기간 일정이면 포함된 모든 날짜 리스트, 단일 일정이면 추출된 날짜 사용
+          const targetDates = dateRangeInfo.isRange && dateRangeInfo.dateList.length > 0
+            ? dateRangeInfo.dateList
+            : [naturalDate.isExplicitDate ? naturalDate.dateStr : (response.payload?.date || naturalDate.dateStr)];
+
+          const routedTasks: RoutedNotionTask[] = targetDates.map((dStr, idx) => ({
+            id: `task-${Date.now()}-${idx}`,
             title: taskTitle,
             intent: taskIntent,
             targetDbHint: isExpense ? '가계부/지출 DB' : isTodo ? '할 일/체크리스트 DB' : '일정/캘린더 DB',
             summary: text,
             suggestedIcon,
             properties: {
-              '일정': dateStr,
-              '날짜': dateStr,
+              '일정': dStr,
+              '날짜': dStr,
               '분류': isExpense ? '지출' : isTodo ? '할 일' : '일정',
               '상태': '미완료',
               ...(isExpense && response.payload?.amount ? { '금액': response.payload.amount } : {}),
             },
-          };
+          }));
 
           const targetResource = createdNotionResource || (notionParentPageId ? {
             pageId: notionParentPageId,
@@ -365,7 +376,7 @@ export const OmniChatBar: React.FC = () => {
 
           let dispatchResult = { successCount: 0, pageUrls: [] as string[], errors: [] as string[] };
           if (notionApiKey) {
-            dispatchResult = await dispatchRoutedTasksToNotion([routedTask], notionApiKey, targetResource);
+            dispatchResult = await dispatchRoutedTasksToNotion(routedTasks, notionApiKey, targetResource);
           }
 
           const record: QuickCaptureRecord = {
@@ -374,11 +385,14 @@ export const OmniChatBar: React.FC = () => {
             mode: 'voice',
             rawContent: text,
             correctedSummary: text,
-            tasks: [routedTask],
+            tasks: routedTasks,
             status: notionApiKey && dispatchResult.successCount > 0 ? 'sent' : 'local_saved',
             notionPageUrls: dispatchResult.pageUrls,
           };
           saveQuickCaptureRecord(record);
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('life_hub_update'));
+          }
 
           if (notionApiKey && dispatchResult.successCount > 0) {
             finalReply = `${response.reply_message}\n\n✅ 노션 클라우드 & 라이프 허브 연동 완료`;

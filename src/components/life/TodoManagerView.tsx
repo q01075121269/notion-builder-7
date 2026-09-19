@@ -112,13 +112,24 @@ export const TodoManagerView: React.FC<TodoManagerViewProps> = ({
   setTodoItems,
   onToggleTodo,
   onDeleteTodo,
-  onQuickCapture,
+  onQuickCapture: _onQuickCapture,
   onScheduleTodo,
   onToggleTimeBlock,
   isCompact = false
 }) => {
 
   const { notionApiKey, showToast } = useApp();
+
+  // 하단 옴니 챗 포커스 및 할 일 생성 가이드 인풋 자동 주입
+  const handleGuideOmniChat = () => {
+    const omniInput = document.querySelector('textarea') as HTMLTextAreaElement | null;
+    if (omniInput) {
+      omniInput.value = '내일까지 주간 보고서 작성 할 일 추가해 줘';
+      omniInput.focus();
+      omniInput.dispatchEvent(new Event('input', { bubbles: true }));
+      omniInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  };
 
   // 아이젠하워 4분면 필터: 'ALL' | 'P1' | 'P2' | 'P3' | 'P4'
   const [filterPriority, setFilterPriority] = useState<'ALL' | EisenhowerPriority>('ALL');
@@ -660,11 +671,12 @@ export const TodoManagerView: React.FC<TodoManagerViewProps> = ({
               <span>새 태스크 추가하기</span>
             </button>
             <button
-              onClick={onQuickCapture}
+              onClick={handleGuideOmniChat}
+              title="하단 옴니 챗에 말 한마디로 할 일 등록"
               className="inline-flex items-center space-x-1.5 px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold transition shadow-xs whitespace-nowrap cursor-pointer"
             >
               <Plus className="w-3.5 h-3.5" />
-              <span>1초 퀵 캡처로 등록</span>
+              <span>옴니 챗으로 등록</span>
             </button>
           </div>
         </div>

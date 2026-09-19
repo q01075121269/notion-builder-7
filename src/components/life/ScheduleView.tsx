@@ -7,7 +7,6 @@ import {
   ChevronLeft, 
   ChevronRight, 
   Clock, 
-  Plus, 
   Video, 
   Edit2, 
   Trash2, 
@@ -34,7 +33,7 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
   schedules,
   onOpenEditModal,
   onDeleteItem,
-  onQuickCapture,
+  onQuickCapture: _onQuickCapture,
   onAddScheduleFromTodo,
   onRescheduleNaturalLanguage: _onRescheduleNaturalLanguage,
   isCompact = false
@@ -60,6 +59,21 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
 
   const handleCloseDrawer = () => {
     setIsDrawerOpen(false);
+  };
+
+  // 하단 옴니 챗 포커스 및 일정 생성 텍스트 자동 주입 (커서를 날짜 뒤에 세팅)
+  const handleGuideOmniChat = (targetDateStr?: string) => {
+    const omniInput = document.querySelector('textarea') as HTMLTextAreaElement | null;
+    const defaultDate = targetDateStr || formatYMD(currentDate);
+    const sampleText = `${defaultDate} 15:00 `;
+    if (omniInput) {
+      omniInput.value = sampleText;
+      omniInput.focus();
+      // 커서를 날짜 텍스트 맨 뒤로 자동 이동하여 사용자가 즉시 일정 제목을 타이핑할 수 있도록 유도
+      omniInput.setSelectionRange(sampleText.length, sampleText.length);
+      omniInput.dispatchEvent(new Event('input', { bubbles: true }));
+      omniInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
   };
 
   // 날짜 이동 핸들러
@@ -482,11 +496,12 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
           </div>
 
           <button
-            onClick={onQuickCapture}
-            className={`flex items-center space-x-1 ${isCompact ? 'px-2 py-1 text-[11px]' : 'px-3 py-1.5 text-xs'} rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 font-bold transition shadow-xs whitespace-nowrap`}
+            onClick={() => handleGuideOmniChat(selectedYMD)}
+            title="하단 옴니 챗에 날짜 템플릿과 함께 즉시 타이핑하여 일정 등록"
+            className={`flex items-center space-x-1.5 ${isCompact ? 'px-2 py-1 text-[11px]' : 'px-3 py-1.5 text-xs'} rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold transition shadow-xs whitespace-nowrap cursor-pointer`}
           >
-            <Plus className="w-3.5 h-3.5" />
-            <span>{isCompact ? '등록' : '이 날짜에 등록'}</span>
+            <span className="text-xs">💬</span>
+            <span>{isCompact ? '챗 등록' : '챗으로 이 날짜에 등록'}</span>
           </button>
         </div>
 
@@ -498,7 +513,7 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
               이 날짜에 예정된 일정이 없습니다.
             </h4>
             <p className="text-xs text-slate-500 dark:text-neutral-400 mt-1">
-              상단 '+ 이 날짜에 등록' 버튼을 눌러 여유 시간을 알차게 계획해 보세요.
+              하단 옴니 챗에 "9월 20일 15시 팀 회의 일정 등록해 줘"라고 편하게 말해보세요!
             </p>
           </div>
         ) : (
@@ -664,13 +679,14 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
           </button>
         </div>
 
-        {/* 우측 액션: 1초 퀵 캡처로 등록 */}
+        {/* 우측 액션: 하단 옴니 챗으로 자연어 일정 등록 */}
         <button
-          onClick={onQuickCapture}
-          className={`flex items-center space-x-1 ${isCompact ? 'px-2.5 py-1' : 'px-3.5 py-1.5'} rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-white text-white dark:text-slate-900 text-xs font-bold shadow-xs transition cursor-pointer whitespace-nowrap`}
+          onClick={() => handleGuideOmniChat()}
+          title="하단 옴니 챗에 텍스트를 바로 입력하여 일정 등록"
+          className={`flex items-center space-x-1.5 ${isCompact ? 'px-2.5 py-1' : 'px-3.5 py-1.5'} rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs transition cursor-pointer whitespace-nowrap`}
         >
-          <Plus className="w-3.5 h-3.5" />
-          <span className="whitespace-nowrap">{isCompact ? '등록' : '새 일정 등록'}</span>
+          <span className="text-xs">💬</span>
+          <span className="whitespace-nowrap">{isCompact ? '챗 등록' : '챗으로 새 일정 등록'}</span>
         </button>
       </div>
       {/* 2. 뷰 본문 렌더링 */}

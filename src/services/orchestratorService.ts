@@ -139,7 +139,14 @@ async function fallbackClientOrchestration(
     };
   }
 
-  if (lower.includes('일정') || lower.includes('예약') || lower.includes('치과') || lower.includes('회의') || lower.includes('원') || lower.includes('식비') || lower.includes('할 일') || lower.includes('투두') || lower.includes('연가') || lower.includes('휴가') || lower.includes('반차') || lower.includes('월차') || lower.includes('휴무') || lower.includes('출장') || lower.includes('외근')) {
+  if (
+    lower.includes('일정') || lower.includes('예약') || lower.includes('치과') || lower.includes('회의') || 
+    lower.includes('미팅') || lower.includes('약속') || lower.includes('모임') || lower.includes('행사') || 
+    lower.includes('원') || lower.includes('식비') || lower.includes('할 일') || lower.includes('투두') || 
+    lower.includes('연가') || lower.includes('휴가') || lower.includes('반차') || lower.includes('월차') || 
+    lower.includes('휴무') || lower.includes('출장') || lower.includes('외근') || lower.includes('등록') ||
+    /(?:(\d{1,2})월\s*)?(\d{1,2})일/.test(userText) || /(\d{1,2})시/.test(userText)
+  ) {
     const isExpense = lower.includes('원') || lower.includes('식비') || lower.includes('결제');
     const isTodo = lower.includes('할 일') || lower.includes('투두');
     const isVacation = lower.includes('연가') || lower.includes('휴가') || lower.includes('반차');
@@ -162,10 +169,28 @@ async function fallbackClientOrchestration(
       },
     };
   }
+  // 4. AI 미디어 스튜디오 (제4챕터: 이미지, 영상, 오디오, 자산 보관함) 감지
+  if (
+    lower.includes('이미지') || lower.includes('로고') || lower.includes('썸네일') || lower.includes('포스터') || 
+    lower.includes('누끼') || lower.includes('영상') || lower.includes('비디오') || lower.includes('모션') || 
+    lower.includes('음악') || lower.includes('음원') || lower.includes('bgm') || lower.includes('사운드') || 
+    lower.includes('미디어') || lower.includes('보관함') || lower.includes('스튜디오')
+  ) {
+    return {
+      intent: 'BUILDER',
+      reply_message: `🎨 [AI 미디어 스튜디오] 요청하신 미디어 크리에이티브(이미지/영상/음악) 캔버스를 준비했습니다! AI 미디어 스튜디오로 이동합니다.`,
+      needs_clarification: false,
+      redirect_url: '/media',
+      payload: {
+        sub_type: lower.includes('영상') || lower.includes('비디오') ? 'video' : lower.includes('음악') || lower.includes('음원') ? 'audio' : 'image',
+        prompt: userText,
+      },
+    };
+  }
 
   return {
     intent: 'CHAT',
-    reply_message: `안녕하세요! 무엇이든 편하게 말씀해 주세요. 일정/가계부 등록, 개발 트러블슈팅, 노션 템플릿 제작까지 한 번에 도와드릴게요.`,
+    reply_message: `안녕하세요! Notion Architect AI 올인원 스튜디오입니다. 4대 챕터(1. 템플릿 마스터, 2. 라이프 허브, 3. AI 오피스 스튜디오, 4. AI 미디어 스튜디오)의 모든 최신 기능과 작업 맥락을 완벽히 파악하고 있습니다. 무엇을 도와드릴까요?`,
     needs_clarification: false,
     redirect_url: null,
     payload: null,

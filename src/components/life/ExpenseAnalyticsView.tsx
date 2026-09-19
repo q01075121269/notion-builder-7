@@ -25,8 +25,7 @@ import {
   Home,
   Tv,
   HeartPulse,
-  HelpCircle,
-  Camera
+  HelpCircle
 } from 'lucide-react';
 import type { LifeExpenseItem, PaymentMethod, TransactionType } from '../../services/notionLifeHubSync';
 import { createNotionExpensePage } from '../../services/notionLifeHubSync';
@@ -68,13 +67,24 @@ export const ExpenseAnalyticsView: React.FC<ExpenseAnalyticsViewProps> = ({
   expenseItems,
   setExpenseItems,
   onDeleteExpense,
-  onQuickCapture,
+  onQuickCapture: _onQuickCapture,
   isCompact = false,
   notionApiKey,
   expenseDbId,
   geminiApiKey
 }) => {
   const { setCurrentView, showToast } = useApp();
+
+  // 하단 옴니 챗 포커스 및 가계부 지출 기록 가이드 인풋 자동 주입
+  const handleGuideOmniChat = () => {
+    const omniInput = document.querySelector('textarea') as HTMLTextAreaElement | null;
+    if (omniInput) {
+      omniInput.value = '오늘 점심 식사 12000원 지출 등록해 줘';
+      omniInput.focus();
+      omniInput.dispatchEvent(new Event('input', { bubbles: true }));
+      omniInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  };
   // 1. 월단위 기준 선택 (기본: 2026-09)
   const [selectedMonth, setSelectedMonth] = useState<string>('2026-09');
   const [monthlyBudget, setMonthlyBudget] = useState<number>(2500000); // 월 목표 예산 250만원
@@ -359,12 +369,12 @@ export const ExpenseAnalyticsView: React.FC<ExpenseAnalyticsViewProps> = ({
 
           {!isCompact && (
             <button
-              onClick={onQuickCapture}
-              title="영수증 OCR 촬영 및 자연어 퀵 캡처"
+              onClick={handleGuideOmniChat}
+              title="하단 옴니 챗에 말 한마디로 지출 기록"
               className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-white dark:bg-neutral-800 hover:bg-slate-50 dark:hover:bg-neutral-700 text-slate-700 dark:text-neutral-200 border border-slate-200 dark:border-neutral-700 text-xs font-semibold shadow-xs transition cursor-pointer active:scale-95 whitespace-nowrap"
             >
-              <Camera className="w-3.5 h-3.5 text-emerald-500" />
-              <span className="whitespace-nowrap hidden sm:inline">영수증 OCR</span>
+              <Zap className="w-3.5 h-3.5 text-emerald-500" />
+              <span className="whitespace-nowrap hidden sm:inline">옴니 챗 지출 기록</span>
             </button>
           )}
 

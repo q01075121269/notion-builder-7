@@ -1,12 +1,11 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { 
-  Home,
   Sparkles, 
   Leaf,
   FileText,
   Palette,
-  Layers, 
+  Clock, 
   Settings, 
   Bot,
   ChevronDown
@@ -25,7 +24,8 @@ export const Navbar: React.FC = () => {
     setCurrentView,
     notionApiKey,
     notionParentPageId,
-    apiKey
+    apiKey,
+    showToast
   } = useApp();
 
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -41,23 +41,34 @@ export const Navbar: React.FC = () => {
     'gemini-1.5-pro': { label: 'Gemini 1.5 Pro (고성능)', short: '1.5 Pro' }
   };
 
+  const handleDailyRoutine = () => {
+    setCurrentView('life');
+    const omniInput = document.querySelector('textarea') as HTMLTextAreaElement | null;
+    if (omniInput) {
+      omniInput.value = '오늘 데일리 루틴 및 핵심 일정을 한눈에 브리핑해 줘';
+      omniInput.focus();
+      omniInput.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+    showToast('⏰ 오늘의 데일리 루틴과 라이프 비서 스케줄이 준비되었습니다.', 'info');
+  };
+
   return (
     <>
       <header className="sticky top-0 z-40 w-full h-14 bg-white/95 dark:bg-notion-dark-bg/95 backdrop-blur-md border-b border-neutral-200/90 dark:border-notion-dark-border transition-colors select-none">
         <div className="max-w-7xl mx-auto px-3 sm:px-6 h-full flex items-center justify-between gap-2 sm:gap-4 flex-nowrap">
           
-          {/* [좌측]: Notion Architect 심플 로고 */}
+          {/* [좌측]: Notion Architect 심플 로고 (클릭 시 홈 대시보드로 이동) */}
           <div className="flex items-center space-x-2 sm:space-x-2.5 shrink-0">
             <button 
-              onClick={() => setCurrentView('builder')}
+              onClick={() => setCurrentView('home')}
               className="w-8 h-8 rounded-xl bg-neutral-900 dark:bg-white flex items-center justify-center text-white dark:text-neutral-900 font-bold text-base shadow-sm hover:scale-105 transition cursor-pointer shrink-0"
-              title="홈으로 이동"
+              title="홈 대시보드로 이동"
             >
               <span>N</span>
             </button>
             <div 
               className="flex items-center space-x-1.5 cursor-pointer shrink-0"
-              onClick={() => setCurrentView('builder')}
+              onClick={() => setCurrentView('home')}
             >
               <span className="font-bold text-sm sm:text-base tracking-tight text-neutral-900 dark:text-white whitespace-nowrap">
                 Notion Architect
@@ -68,92 +79,75 @@ export const Navbar: React.FC = () => {
             </div>
           </div>
 
-          {/* [중앙]: [1. 🏗️ 템플릿 마스터 | 2. 👔 라이프 비서 | 3. 📄 오피스 스튜디오 | 4. 🎨 AI 미디어 랩] 4대 글로벌 내비게이션 바 */}
+          {/* [중앙]: [🏗️ 템플릿 마스터 | 👔 라이프 비서 | 📄 오피스 스튜디오 | 🎨 AI 미디어 랩] 4대 글로벌 내비게이션 바 */}
           <div className="flex items-center bg-neutral-100/90 dark:bg-neutral-800/80 p-1 rounded-xl border border-neutral-200/70 dark:border-neutral-700/60 shrink-0">
-            {/* 홈 */}
-            <button
-              onClick={() => setCurrentView('home')}
-              className={`flex items-center space-x-1 px-2 py-1.5 text-xs font-semibold rounded-lg transition whitespace-nowrap cursor-pointer ${
-                currentView === 'home'
-                  ? 'bg-white dark:bg-notion-dark-card text-neutral-900 dark:text-white shadow-xs'
-                  : 'text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white'
-              }`}
-              title="메인 홈 대시보드"
-            >
-              <Home className="w-3.5 h-3.5 text-neutral-600 dark:text-neutral-300 shrink-0" />
-              <span className="whitespace-nowrap">홈</span>
-            </button>
-
             {/* 1. 🏗️ 템플릿 마스터 */}
             <button
               onClick={() => setCurrentView('builder')}
-              className={`flex items-center space-x-1 px-2 sm:px-2.5 py-1.5 text-xs font-semibold rounded-lg transition whitespace-nowrap cursor-pointer ${
+              className={`flex items-center space-x-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg transition whitespace-nowrap cursor-pointer ${
                 currentView === 'builder'
                   ? 'bg-white dark:bg-notion-dark-card text-amber-600 dark:text-amber-400 font-bold shadow-xs'
                   : 'text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white'
               }`}
-              title="제1챕터: 템플릿 마스터"
+              title="템플릿 마스터"
             >
               <Sparkles className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-              <span className="whitespace-nowrap">1. 🏗️ 템플릿 마스터</span>
+              <span className="whitespace-nowrap">🏗️ 템플릿 마스터</span>
             </button>
 
             {/* 2. 👔 라이프 비서 */}
             <button
               onClick={() => setCurrentView('life')}
-              className={`flex items-center space-x-1 px-2 sm:px-2.5 py-1.5 text-xs font-semibold rounded-lg transition whitespace-nowrap cursor-pointer ${
+              className={`flex items-center space-x-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg transition whitespace-nowrap cursor-pointer ${
                 currentView === 'life'
                   ? 'bg-white dark:bg-notion-dark-card text-emerald-600 dark:text-emerald-400 font-bold shadow-xs'
                   : 'text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white'
               }`}
-              title="제2챕터: 라이프 비서"
+              title="라이프 비서"
             >
               <Leaf className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-              <span className="whitespace-nowrap">2. 👔 라이프 비서</span>
+              <span className="whitespace-nowrap">👔 라이프 비서</span>
             </button>
 
             {/* 3. 📄 오피스 스튜디오 */}
             <button
               onClick={() => setCurrentView('devlab')}
-              className={`flex items-center space-x-1 px-2 sm:px-2.5 py-1.5 text-xs font-semibold rounded-lg transition whitespace-nowrap cursor-pointer ${
+              className={`flex items-center space-x-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg transition whitespace-nowrap cursor-pointer ${
                 currentView === 'devlab'
                   ? 'bg-white dark:bg-notion-dark-card text-blue-600 dark:text-blue-400 font-bold shadow-xs'
                   : 'text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white'
               }`}
-              title="제3챕터: 오피스 스튜디오"
+              title="오피스 스튜디오"
             >
               <FileText className="w-3.5 h-3.5 text-blue-500 shrink-0" />
-              <span className="whitespace-nowrap">3. 📄 오피스 스튜디오</span>
+              <span className="whitespace-nowrap">📄 오피스 스튜디오</span>
             </button>
 
             {/* 4. 🎨 AI 미디어 랩 */}
             <button
               onClick={() => setCurrentView('media_lab')}
-              className={`flex items-center space-x-1 px-2 sm:px-2.5 py-1.5 text-xs font-semibold rounded-lg transition whitespace-nowrap cursor-pointer ${
+              className={`flex items-center space-x-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg transition whitespace-nowrap cursor-pointer ${
                 currentView === 'media_lab'
                   ? 'bg-white dark:bg-notion-dark-card text-purple-600 dark:text-purple-400 font-bold shadow-xs'
                   : 'text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white'
               }`}
-              title="제4챕터: AI 미디어 랩"
+              title="AI 미디어 랩"
             >
               <Palette className="w-3.5 h-3.5 text-purple-500 shrink-0" />
-              <span className="whitespace-nowrap">4. 🎨 AI 미디어 랩</span>
+              <span className="whitespace-nowrap">🎨 AI 미디어 랩</span>
             </button>
           </div>
 
-          {/* [우측]: 보관함, Gemini 모델 셀렉터, [⚙️ 설정] 버튼, 프로필 아바타 */}
+          {/* [우측]: [⏰ 데일리 루틴], Gemini 모델 셀렉터, [⚙️ 설정] 버튼, 프로필 아바타 */}
           <div className="flex items-center space-x-1 sm:space-x-1.5 shrink-0 whitespace-nowrap">
-            {/* 보관함 숏컷 */}
+            {/* 데일리 루틴 퀵 버튼 */}
             <button
-              onClick={() => setCurrentView('dashboard')}
-              className={`p-1.5 rounded-xl border transition cursor-pointer shrink-0 ${
-                currentView === 'dashboard'
-                  ? 'bg-blue-50 dark:bg-blue-950/40 border-blue-300 text-blue-600 dark:text-blue-400 shadow-xs'
-                  : 'border-neutral-200 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-600 dark:text-neutral-300'
-              }`}
-              title="내 보관함"
+              onClick={handleDailyRoutine}
+              className="flex items-center space-x-1 px-2.5 py-1.5 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-amber-50/70 dark:bg-amber-950/30 hover:bg-amber-100 dark:hover:bg-amber-900/40 text-amber-700 dark:text-amber-300 text-xs font-bold transition whitespace-nowrap shadow-xs cursor-pointer active:scale-95"
+              title="오늘의 데일리 루틴 브리핑"
             >
-              <Layers className="w-4 h-4 text-blue-500" />
+              <Clock className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+              <span className="whitespace-nowrap">⏰ 데일리 루틴</span>
             </button>
             
             {/* 1. Gemini 모델 셀렉터 (Google AI Studio 스타일의 라운드 드롭다운) */}

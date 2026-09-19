@@ -26,6 +26,7 @@ import {
   generateGoogleCalendarUrl, 
   exportScheduleToNotionCalendar 
 } from '../../services/notionLifeHubSync';
+import { cleanTaskTitle } from '../../services/quickCaptureLocalParser';
 import { useApp } from '../../context/AppContext';
 
 interface ScheduleDrawerProps {
@@ -199,7 +200,7 @@ export const ScheduleDrawer: React.FC<ScheduleDrawerProps> = ({
             {/* 일정 제목 */}
             <div>
               <h2 className="text-xl font-bold text-slate-900 dark:text-white leading-snug">
-                {event.title}
+                {cleanTaskTitle(event.title)}
               </h2>
               {event.pageUrl && (
                 <a

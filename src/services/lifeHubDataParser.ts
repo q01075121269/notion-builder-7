@@ -4,7 +4,7 @@
 import type { LifeScheduleItem, LifeExpenseItem, LifeTodoItem } from './notionLifeHubSync';
 import { calculateDDay } from './notionLifeHubSync';
 import { getQuickCaptureRecords, getDeletedLifeItemIds } from './quickCaptureStorage';
-import { extractDateFromKoreanText } from './quickCaptureLocalParser';
+import { extractDateFromKoreanText, cleanTaskTitle } from './quickCaptureLocalParser';
 
 export function parseNotionScheduleRows(rows: any[]): LifeScheduleItem[] {
   const deletedIds = getDeletedLifeItemIds();
@@ -192,7 +192,7 @@ export function extractQuickCaptureLifeItems(): {
 
         schedules.push({
           id: `qc-s-${key}`,
-          title: task.title,
+          title: cleanTaskTitle(task.title),
           date: dateStr,
           start: startIso,
           end: endIso,
