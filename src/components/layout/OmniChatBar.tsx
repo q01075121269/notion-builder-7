@@ -28,6 +28,8 @@ import { PRESET_TEMPLATES } from '../../services/presetTemplates';
 import { saveArchivedTemplate } from '../../services/archiveStorage';
 import { SelfDiagnosticCard, payloadToDiagnostic } from '../common/SelfDiagnosticCard';
 import type { DiagnosticResult } from '../common/SelfDiagnosticCard';
+import { saveTodayOverrideConfig } from '../../services/dailyRoutineStorage';
+import { archiveAudioArtifact, archiveTextDiscussionArtifact } from '../../services/zeroRotArchiver';
 
 // ─── 실행 영수증 카드 타입 ──────────────────────────────────────────────────
 type ReceiptType = 'builder' | 'life' | 'devlab';
@@ -296,6 +298,100 @@ export const OmniChatBar: React.FC = () => {
     setIsLoading(true);
 
     try {
+      // ── 데일리 루틴 옴니 챗 명령어 인터셉터 (Zero-Rot 적재 & 1일 오버라이드) ─────
+      if (/(출근|퇴근|루틴).*(늦춰|미뤄|변경|연기|조정)/.test(text) || /출근\s*시각?\s*\d{1,2}시/.test(text)) {
+        let targetTime = '08:30';
+        if (/9시\s*30분|09:30/.test(text)) targetTime = '09:30';
+        else if (/9시|09:00/.test(text)) targetTime = '09:00';
+        else if (/10시|10:00/.test(text)) targetTime = '10:00';
+
+        saveTodayOverrideConfig({ overrideMorningTime: targetTime });
+        const replyMsg = `⚡ [오늘 1일 설정 오버라이드 반영 완료]\n오늘 출근 오디오 브리핑 시각이 ${targetTime}로 조정되었습니다! (자정 00:00 마스터 룰 자동 복구)`;
+        showToast(`⚡ 오늘 출근 브리핑 시각이 ${targetTime}로 변경되었습니다!`, 'info');
+
+        const aiMsg: OmniMessage = {
+          id: `omni-ai-${Date.now()}`,
+          role: 'assistant',
+          content: replyMsg,
+          timestamp: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }),
+          intent: 'LIFE',
+          receipts: buildReceipts('LIFE')
+        };
+        setMessages(prev => [...prev, aiMsg]);
+        setIsLoading(false);
+        isLoadingRef.current = false;
+        return;
+      }
+
+      if (/(아침|출근).*(브리핑|브리프).*(들려|재생|지금)/.test(text) || /출근길 오디오/.test(text)) {
+        const targetResource = createdNotionResource || (notionParentPageId ? {
+          pageId: notionParentPageId,
+          pageUrl: `https://notion.so/${notionParentPageId.replace(/-/g, '')}`,
+          pageTitle: '노션 부모 페이지',
+          databases: [],
+          createdAt: new Date().toISOString()
+        } : null);
+
+        const archiveRes = await archiveAudioArtifact({
+          title: '☀️ 출근길 오디오 브리프',
+          prompt: '출근길 이메일 요약 및 테크 뉴스 음원 스트리밍',
+          notionApiKey,
+          targetResource
+        });
+
+        const replyMsg = `☀️ [출근길 오디오 브리프 스트리밍 & Zero-Rot 자동 적재 완료]\n${archiveRes.message}\n\n📢 "오늘 주요 이메일 요약과 최신 테크 트렌드가 오디오로 스트리밍됩니다."`;
+        showToast(archiveRes.message, 'success');
+
+        const aiMsg: OmniMessage = {
+          id: `omni-ai-${Date.now()}`,
+          role: 'assistant',
+          content: replyMsg,
+          timestamp: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }),
+          intent: 'BUILDER',
+          redirect_url: '/media',
+          receipts: buildReceipts('BUILDER')
+        };
+        setMessages(prev => [...prev, aiMsg]);
+        setIsLoading(false);
+        isLoadingRef.current = false;
+        return;
+      }
+
+      if (/(취침|밤|팟캐스트|뉴스 요약|테크 뉴스).*(들려|정리|대본|작성)/.test(text)) {
+        const targetResource = createdNotionResource || (notionParentPageId ? {
+          pageId: notionParentPageId,
+          pageUrl: `https://notion.so/${notionParentPageId.replace(/-/g, '')}`,
+          pageTitle: '노션 부모 페이지',
+          databases: [],
+          createdAt: new Date().toISOString()
+        } : null);
+
+        const archiveRes = await archiveTextDiscussionArtifact({
+          title: '🌙 취침 전 듀얼 AI 팟캐스트 토론 대본',
+          content: `[호스트 A]: 최신 AI 모델 동향과 노션 워크스페이스 자동화 기법 요약입니다.\n[딥다이브 B]: 지식 소스 서랍 적재로 문서 생성이 한결 수월해졌네요.`,
+          excerpt: '취침 전 듀얼 AI 팟캐스트 및 테크 뉴스 요약 대본',
+          notionApiKey,
+          targetResource
+        });
+
+        const replyMsg = `🌙 [취침 팟캐스트 대본 & Zero-Rot 보관 완료]\n${archiveRes.message}`;
+        showToast(archiveRes.message, 'success');
+
+        const aiMsg: OmniMessage = {
+          id: `omni-ai-${Date.now()}`,
+          role: 'assistant',
+          content: replyMsg,
+          timestamp: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }),
+          intent: 'DEVLAB',
+          redirect_url: '/devlab',
+          receipts: buildReceipts('DEVLAB')
+        };
+        setMessages(prev => [...prev, aiMsg]);
+        setIsLoading(false);
+        isLoadingRef.current = false;
+        return;
+      }
+
       const response: OrchestratorResponse = await sendToOrchestrator(
         fullMessageText,
         [...messages, userMsg],

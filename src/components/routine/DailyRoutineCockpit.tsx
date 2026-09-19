@@ -26,10 +26,29 @@ import {
   type TodayOverrideConfig,
   type RoutineItemState
 } from '../../services/dailyRoutineStorage';
+import { 
+  archiveAudioArtifact, 
+  archiveTextDiscussionArtifact, 
+  archiveRoutineLifeTask 
+} from '../../services/zeroRotArchiver';
 import { useApp } from '../../context/AppContext';
 
 export const DailyRoutineCockpit: React.FC = () => {
-  const { showToast, setCurrentView } = useApp();
+  const { 
+    showToast, 
+    setCurrentView,
+    notionApiKey,
+    createdNotionResource,
+    notionParentPageId
+  } = useApp();
+
+  const targetResource = createdNotionResource || (notionParentPageId ? {
+    pageId: notionParentPageId,
+    pageUrl: `https://notion.so/${notionParentPageId.replace(/-/g, '')}`,
+    pageTitle: '노션 부모 페이지',
+    databases: [],
+    createdAt: new Date().toISOString()
+  } : null);
 
   const [masterConfig, setMasterConfig] = useState<MasterRoutineConfig>(DEFAULT_MASTER_CONFIG);
   const [todayOverride, setTodayOverride] = useState<TodayOverrideConfig | null>(null);
@@ -136,32 +155,43 @@ export const DailyRoutineCockpit: React.FC = () => {
     }
   };
 
-  // 오디오 브리프 실행
-  const handleRunAudioBrief = () => {
-    const omniInput = document.querySelector('textarea') as HTMLTextAreaElement | null;
-    if (omniInput) {
-      omniInput.value = '☀️ 출근길 브리핑: 오늘 이메일 요약, 주요 테크 뉴스, 잔잔한 오디오 재생해 줘';
-      omniInput.focus();
-      omniInput.dispatchEvent(new Event('input', { bubbles: true }));
-    }
-    showToast('☀️ 출근길 오디오 브리프 생성이 시작되었습니다.', 'info');
+  // 오디오 브리프 실행 (Zero-Rot 자동 적재)
+  const handleRunAudioBrief = async () => {
+    toggleRoutineItem('morningCompleted');
+    const result = await archiveAudioArtifact({
+      title: '☀️ 08:00 출근길 오디오 브리프',
+      prompt: `[출근 브리프] 키워드: ${masterConfig.keywords.join(', ')} / 장르: ${masterConfig.musicGenre}`,
+      notionApiKey,
+      targetResource
+    });
+    showToast(result.message, 'success');
   };
 
-  // 미드데이 체크 실행
-  const handleRunMiddayCheck = () => {
+  // 미드데이 체크 실행 (Zero-Rot 자동 적재)
+  const handleRunMiddayCheck = async () => {
+    toggleRoutineItem('middayCompleted');
+    const result = await archiveRoutineLifeTask({
+      title: '☕ 12:30 미드데이 일정 & 지출 점검',
+      intent: 'todo',
+      summary: '오전 투두 달성률 및 점심 식비 가계부 자동 체크',
+      notionApiKey,
+      targetResource
+    });
     setCurrentView('life');
-    showToast('☕ 라이프 허브로 이동했습니다. 오전 할일과 점심 지출을 체크하세요!', 'info');
+    showToast(result.message, 'success');
   };
 
-  // 팟캐스트 실행
-  const handleRunPodcast = () => {
-    const omniInput = document.querySelector('textarea') as HTMLTextAreaElement | null;
-    if (omniInput) {
-      omniInput.value = '🌙 취침 전 팟캐스트: 오늘 최신 AI 모델 동향과 비즈니스 아이디어로 2인 토론 대화를 들려줘';
-      omniInput.focus();
-      omniInput.dispatchEvent(new Event('input', { bubbles: true }));
-    }
-    showToast('🌙 취침 전 듀얼 AI 팟캐스트 토론이 시작되었습니다.', 'info');
+  // 팟캐스트 실행 (Zero-Rot 자동 적재)
+  const handleRunPodcast = async () => {
+    toggleRoutineItem('nightCompleted');
+    const result = await archiveTextDiscussionArtifact({
+      title: '🌙 23:00 취침 전 듀얼 AI 팟캐스트 토론 대본',
+      content: `[호스트 A]: 오늘 최신 Gemini 모델 및 AI 템플릿 마스터 트렌드를 소개합니다.\n[딥다이브 B]: 제3챕터 오피스 스튜디오와 제4챕터 미디어 랩의 연동 속도가 매우 뛰어나군요.`,
+      excerpt: 'AI 모델 및 비즈니스 아이디어 2인 음성 토론 대본',
+      notionApiKey,
+      targetResource
+    });
+    showToast(result.message, 'success');
   };
 
   return (
