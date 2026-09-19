@@ -1,5 +1,6 @@
 import React from 'react';
 import { useApp } from '../context/AppContext';
+import { DailyRoutineCockpit } from '../components/routine/DailyRoutineCockpit';
 import { 
   Sparkles, 
   ArrowRight, 
@@ -206,6 +207,9 @@ export const HomePage: React.FC = () => {
             })}
           </div>
         </div>
+
+        {/* 3. 24시간 데일리 루틴 관제 콕핏 (자정 자동 롤백 엔진 탑재) */}
+        <DailyRoutineCockpit />
 
         {/* 안내 카드 */}
         <div className="p-5 rounded-2xl bg-white dark:bg-notion-dark-card border border-neutral-200/80 dark:border-neutral-800 flex flex-col sm:flex-row items-center justify-between gap-4">
