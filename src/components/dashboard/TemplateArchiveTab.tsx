@@ -346,8 +346,8 @@ export const TemplateArchiveTab: React.FC<TemplateArchiveTabProps> = ({
 
       {/* ── 4. 템플릿 미리보기 모달 (Preview Modal) ──────────────────────────────── */}
       {selectedPreview && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn">
-          <div className="bg-white dark:bg-neutral-900 rounded-2xl max-w-2xl w-full max-h-[85vh] flex flex-col shadow-2xl border border-neutral-200 dark:border-neutral-700 overflow-hidden">
+        <div className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-fadeIn">
+          <div className="bg-white dark:bg-neutral-900 rounded-2xl max-w-2xl w-full max-h-[80vh] sm:max-h-[85vh] flex flex-col shadow-2xl border border-neutral-200 dark:border-neutral-700 overflow-hidden mb-14 md:mb-0">
             {/* Modal Header */}
             <div className="relative h-32 w-full bg-neutral-100 dark:bg-neutral-800 overflow-hidden shrink-0">
               <img
