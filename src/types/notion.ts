@@ -91,7 +91,7 @@ export interface DividerBlock extends BaseBlock {
 export interface DatabaseViewBlock extends BaseBlock {
   type: 'database_view';
   database_name: string;
-  view?: 'table' | 'board' | 'calendar';
+  view?: 'table' | 'board' | 'calendar' | 'gallery';
 }
 
 export type NotionBlock = 
