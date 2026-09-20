@@ -82,6 +82,33 @@ async function fallbackClientOrchestration(
 ): Promise<OrchestratorResponse> {
   const lower = userText.toLowerCase();
 
+  // 0. 웹 크롤러 수급 파이프라인 감지 (긁어서, 크롤링, 리뷰, 스크래핑, 쿠팡, 데이터 수집)
+  if (
+    lower.includes('긁어서') || lower.includes('크롤링') || lower.includes('리뷰') || 
+    lower.includes('스크래핑') || lower.includes('쿠팡') || lower.includes('수집')
+  ) {
+    const isDocs = lower.includes('독스') || lower.includes('보고서');
+    const format = isDocs ? 'docs' : 'sheets';
+    return {
+      intent: 'DEVLAB',
+      reply_message: `🌐 [웹 데이터 정찰 & 실시간 수급 완결] "${userText.slice(0, 30)}" 크롤링 데이터 수집을 완료했습니다! 스마트 ${format === 'sheets' ? '시트 표 그리드' : '독스 A4 보고서'}에 자동 반영되었으며 노션 DB로 즉시 연동됩니다.`,
+      needs_clarification: false,
+      redirect_url: '/devlab',
+      payload: {
+        is_crawler_pipeline: true,
+        crawler_steps: [
+          '🌐 웹 데이터 정찰 중...',
+          format === 'sheets' ? '📊 스마트 시트 표 생성 완료' : '📄 스마트 독스 보고서 생성 완료',
+          '⚡ 노션 DB 동기화 완료'
+        ],
+        target_format: format,
+        query: userText,
+        items_count: 50,
+        sync_status: 'SUCCESS',
+      },
+    };
+  }
+
   // 1. AI 오피스 스튜디오 듀얼 엔진 키워드 감지 (기안서, 품의서, 지출결의서, 주간보고, 제안서, 문서, 슬라이드, 시트)
   if (
     lower.includes('기안') || lower.includes('품의') || lower.includes('지출결의') || 

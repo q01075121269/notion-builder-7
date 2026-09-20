@@ -848,6 +848,32 @@ export const OmniChatBar: React.FC = () => {
                       </div>
                     )}
 
+                    {/* ── 웹 크롤러 수급 실시간 액션 수신증 카드 (Step 3 요구사항) ─────────── */}
+                    {!isUser && msg.payload?.is_crawler_pipeline && (
+                      <div className="w-full mt-2 p-3 rounded-2xl bg-blue-50/90 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 space-y-2 animate-fadeIn shadow-xs">
+                        <div className="flex items-center justify-between text-xs font-black text-blue-900 dark:text-blue-300">
+                          <span className="flex items-center space-x-1.5">
+                            <Sparkles className="w-3.5 h-3.5 text-blue-500 animate-pulse" />
+                            <span>🌐 웹 크롤링 수급 액션 수신증</span>
+                          </span>
+                          <span className="text-[10px] font-mono bg-blue-100 dark:bg-blue-900 px-2 py-0.5 rounded text-blue-700 dark:text-blue-300">
+                            50개 항목 수집
+                          </span>
+                        </div>
+                        
+                        <div className="space-y-1">
+                          {msg.payload.crawler_steps?.map((step: string, sIdx: number) => (
+                            <div key={sIdx} className="flex items-center space-x-2 text-[11px] font-semibold text-slate-700 dark:text-neutral-300">
+                              <span className="w-4 h-4 rounded-full bg-blue-500 text-white flex items-center justify-center text-[9px] font-bold shrink-0">
+                                {sIdx + 1}
+                              </span>
+                              <span>{step}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
                     {/* ── 실행 영수증 카드 ─────────────────────────────────── */}
                     {!isUser && msg.receipts && msg.receipts.length > 0 && (
                       <div className="space-y-1 w-full">

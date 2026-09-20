@@ -459,6 +459,40 @@ export const FIX_PROMPT_TEMPLATE_FORMAT = {
 } as const;
 
 // ─────────────────────────────────────────────────────────────────────────────
+// 5.5. 도구(Function Calling) 스키마 정의 (웹크롤러 & AI 오피스 스튜디오)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const FUNCTION_CALLING_SCHEMAS = {
+  route_web_crawler: {
+    name: 'route_web_crawler',
+    description: '웹페이지, 쇼핑몰 리뷰, 뉴스, 공고 등의 데이터를 실시간 수급하여 오피스 스튜디오 라이브 캔버스에 주입',
+    parameters: {
+      type: 'object',
+      properties: {
+        target_url: { type: 'string', description: '크롤링/수집 대상 타겟 URL' },
+        search_keywords: { type: 'string', description: '수집할 키워드 또는 서치 쿼리' },
+        max_depth: { type: 'number', description: '크롤링 탐색 깊이 (기본: 1, 최대: 5)' },
+        output_format: { type: 'string', enum: ['sheets', 'docs', 'pdf'], description: '출력 매핑 형식' },
+      },
+      required: ['target_url', 'output_format'],
+    },
+  },
+  route_office_studio: {
+    name: 'route_office_studio',
+    description: 'Docs·Sheets·Slides 라이브 캔버스로 구조화된 데이터를 주입하고 노션 DB로 즉시 연동',
+    parameters: {
+      type: 'object',
+      properties: {
+        target_mode: { type: 'string', enum: ['docs', 'sheets', 'slides'], description: '대상 오피스 스튜디오 캔버스 모드' },
+        payload_data: { type: 'object', description: '주입할 구조화 데이터 (표 행 데이터 또는 A4 리포트 본문)' },
+        sync_to_notion: { type: 'boolean', description: '노션 워크스페이스 DB 전송 여부' },
+      },
+      required: ['target_mode', 'payload_data'],
+    },
+  },
+} as const;
+
+// ─────────────────────────────────────────────────────────────────────────────
 // 6. Gemini 시스템 프롬프트 주입 디렉티브
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -531,6 +565,7 @@ export const SYSTEM_SPEC = {
   knownBugs: KNOWN_BUG_PATTERNS,
   fixPromptFormat: FIX_PROMPT_TEMPLATE_FORMAT,
   geminiDirectives: GEMINI_SYSTEM_DIRECTIVES,
+  tools: FUNCTION_CALLING_SCHEMAS,
   meta: SYSTEM_SPEC_META,
 } as const;
 
