@@ -874,6 +874,35 @@ export const OmniChatBar: React.FC = () => {
                       </div>
                     )}
 
+                    {/* ── 노션 DB 적재 완료 카드 (Step 5 요구사항) ────────────────── */}
+                    {!isUser && msg.payload?.is_notion_sync_card && (
+                      <div className="w-full mt-2 p-3.5 rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white space-y-2.5 animate-fadeIn shadow-md">
+                        <div className="flex items-center justify-between text-xs font-black">
+                          <span className="flex items-center space-x-1.5">
+                            <Sparkles className="w-4 h-4 text-amber-300 animate-pulse" />
+                            <span>⚡ 노션 마스터 DB 적재 완결</span>
+                          </span>
+                          <span className="text-[10px] bg-white/20 px-2 py-0.5 rounded font-mono">
+                            SYNCED
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-blue-100 font-medium">
+                          AI 오피스 라이브 문서 데이터가 노션 통합 허브 DB에 성공적으로 적재되었습니다.
+                        </p>
+                        {msg.payload.notion_url && (
+                          <a
+                            href={msg.payload.notion_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-white text-indigo-700 hover:bg-slate-100 text-xs font-extrabold transition cursor-pointer shadow-xs"
+                          >
+                            <ExternalLink className="w-3.5 h-3.5" />
+                            <span>[🔗 노션 페이지 바로가기]</span>
+                          </a>
+                        )}
+                      </div>
+                    )}
+
                     {/* ── 실행 영수증 카드 ─────────────────────────────────── */}
                     {!isUser && msg.receipts && msg.receipts.length > 0 && (
                       <div className="space-y-1 w-full">

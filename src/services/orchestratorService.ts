@@ -104,7 +104,33 @@ async function fallbackClientOrchestration(
         target_format: format,
         query: userText,
         items_count: 50,
+      },
+    };
+  }
+  // 0.5. 노션 마스터 DB 내보내기/동기화 자연어 감지 (노션 db로 보내, 노션으로 전송, 노션 적재, 노션 동기화)
+  if (
+    lower.includes('노션 db') || lower.includes('노션으로') || 
+    lower.includes('노션 적재') || lower.includes('노션 동기화') || lower.includes('노션 전송')
+  ) {
+    const isSheets = lower.includes('시트') || lower.includes('표') || lower.includes('지출');
+    const isSlides = lower.includes('슬라이드') || lower.includes('장표');
+    const tabName = isSheets ? 'sheets' : isSlides ? 'slides' : 'docs';
+    const rawCleanId = typeof window !== 'undefined' && localStorage.getItem('notion_parent_page_id') 
+      ? localStorage.getItem('notion_parent_page_id')!.replace(/-/g, '') 
+      : 'master-hub';
+    const notionUrl = `https://notion.so/${rawCleanId}#office-sync-${Date.now()}`;
+
+    return {
+      intent: 'DEVLAB',
+      reply_message: `⚡ [노션 마스터 DB 적재 완료] "${userText.slice(0, 30)}" AI 오피스 라이브 캔버스가 사용자의 노션 워크스페이스 DB로 원클릭 적재되었습니다!`,
+      needs_clarification: false,
+      redirect_url: '/devlab',
+      payload: {
+        is_notion_sync_card: true,
+        target_tab: tabName,
+        notion_url: notionUrl,
         sync_status: 'SUCCESS',
+        title: userText,
       },
     };
   }
