@@ -224,74 +224,89 @@ export const SmartSheetsRenderer: React.FC<SmartSheetsRendererProps> = ({
           </thead>
 
           <tbody className="divide-y divide-slate-200 dark:divide-neutral-800">
-            {filteredRows.map((row) => {
-              const subtotal = getSubtotal(row);
-              return (
-                <tr key={row.id} className="hover:bg-slate-50 dark:hover:bg-neutral-800/50 transition">
-                  {columns.map((col) => {
-                    const cellId = `${row.id}-${col.key}`;
-                    const isSelected = selectedCellIds.has(cellId);
+            {filteredRows.length === 0 ? (
+              <tr>
+                <td colSpan={columns.length + 1} className="p-8 text-center space-y-2">
+                  <div className="w-10 h-10 rounded-2xl bg-slate-100 dark:bg-neutral-800 text-slate-400 flex items-center justify-center mx-auto text-lg font-black">
+                    📊
+                  </div>
+                  <p className="text-xs font-bold text-slate-700 dark:text-neutral-300">
+                    표시할 수집 시트 데이터가 없습니다.
+                  </p>
+                  <p className="text-[11px] text-slate-400">
+                    상단 '➕ 행 추가' 버튼을 누르시거나 옴니챗으로 크롤링 요청을 입력해주세요.
+                  </p>
+                </td>
+              </tr>
+            ) : (
+              filteredRows.map((row) => {
+                const subtotal = getSubtotal(row);
+                return (
+                  <tr key={row.id} className="hover:bg-slate-50 dark:hover:bg-neutral-800/50 transition">
+                    {columns.map((col) => {
+                      const cellId = `${row.id}-${col.key}`;
+                      const isSelected = selectedCellIds.has(cellId);
 
-                    if (col.key === 'rowIdx') {
-                      return (
-                        <td key={col.key} className="p-2.5 text-center font-bold bg-slate-100/60 dark:bg-neutral-900 text-slate-500 border-r border-slate-200 dark:border-neutral-800">
-                          {row.rowIdx}
-                        </td>
-                      );
-                    }
+                      if (col.key === 'rowIdx') {
+                        return (
+                          <td key={col.key} className="p-2.5 text-center font-bold bg-slate-100/60 dark:bg-neutral-900 text-slate-500 border-r border-slate-200 dark:border-neutral-800">
+                            {row.rowIdx}
+                          </td>
+                        );
+                      }
 
-                    if (col.key === 'subtotal') {
+                      if (col.key === 'subtotal') {
+                        return (
+                          <td 
+                            key={col.key} 
+                            onClick={() => toggleSelectCell(cellId, row)}
+                            className={`p-2.5 text-right font-mono font-extrabold text-emerald-600 dark:text-emerald-400 cursor-pointer ${
+                              isSelected ? 'ring-2 ring-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/40' : ''
+                            }`}
+                          >
+                            {formatCurrency(subtotal)}
+                          </td>
+                        );
+                      }
+
                       return (
                         <td 
                           key={col.key} 
                           onClick={() => toggleSelectCell(cellId, row)}
-                          className={`p-2.5 text-right font-mono font-extrabold text-emerald-600 dark:text-emerald-400 cursor-pointer ${
-                            isSelected ? 'ring-2 ring-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/40' : ''
-                          }`}
+                          className={`p-1.5 relative ${isSelected ? 'ring-2 ring-emerald-500/80 bg-emerald-50/30' : ''}`}
                         >
-                          {formatCurrency(subtotal)}
+                          {col.key === 'item' && row.sourceBadge && (
+                            <span className="absolute top-1 right-1 text-[8px] font-black px-1 rounded bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300">
+                              {row.sourceBadge}
+                            </span>
+                          )}
+
+                          <input
+                            type={col.type === 'number' || col.type === 'currency' ? 'number' : 'text'}
+                            value={row[col.key] ?? ''}
+                            onChange={(e) => 
+                              handleCellChange(
+                                row.id, 
+                                col.key, 
+                                col.type === 'number' || col.type === 'currency' ? Number(e.target.value) : e.target.value
+                              )
+                            }
+                            className={`w-full px-2 py-1 rounded border border-transparent hover:border-slate-300 dark:hover:border-neutral-700 focus:border-emerald-500 bg-transparent text-slate-800 dark:text-neutral-200 font-medium focus:outline-none text-${col.align || 'left'}`}
+                            title="셀 클릭 시 출처 툴팁 노출"
+                          />
                         </td>
                       );
-                    }
+                    })}
 
-                    return (
-                      <td 
-                        key={col.key} 
-                        onClick={() => toggleSelectCell(cellId, row)}
-                        className={`p-1.5 relative ${isSelected ? 'ring-2 ring-emerald-500/80 bg-emerald-50/30' : ''}`}
-                      >
-                        {/* 셀 우측 상단 출처 배지 표기 */}
-                        {col.key === 'item' && row.sourceBadge && (
-                          <span className="absolute top-1 right-1 text-[8px] font-black px-1 rounded bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300">
-                            {row.sourceBadge}
-                          </span>
-                        )}
-
-                        <input
-                          type={col.type === 'number' || col.type === 'currency' ? 'number' : 'text'}
-                          value={row[col.key] ?? ''}
-                          onChange={(e) => 
-                            handleCellChange(
-                              row.id, 
-                              col.key, 
-                              col.type === 'number' || col.type === 'currency' ? Number(e.target.value) : e.target.value
-                            )
-                          }
-                          className={`w-full px-2 py-1 rounded border border-transparent hover:border-slate-300 dark:hover:border-neutral-700 focus:border-emerald-500 bg-transparent text-slate-800 dark:text-neutral-200 font-medium focus:outline-none text-${col.align || 'left'}`}
-                          title="셀 클릭 시 출처 툴팁 노출"
-                        />
-                      </td>
-                    );
-                  })}
-
-                  <td className="p-2 text-center">
-                    <button onClick={() => handleDeleteRow(row.id)} className="p-1 rounded text-slate-400 hover:text-rose-500">
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </td>
-                </tr>
-              );
-            })}
+                    <td className="p-2 text-center">
+                      <button onClick={() => handleDeleteRow(row.id)} className="p-1 rounded text-slate-400 hover:text-rose-500">
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })
+            )}
           </tbody>
         </table>
       </div>
