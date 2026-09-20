@@ -76,13 +76,13 @@ export const Navbar: React.FC = () => {
   return (
     <>
       <header className="sticky top-0 z-40 w-full h-14 bg-white/95 dark:bg-notion-dark-bg/95 backdrop-blur-md border-b border-neutral-200/90 dark:border-notion-dark-border transition-colors select-none">
-        <div className="max-w-7xl mx-auto px-3 sm:px-6 h-full flex items-center justify-between gap-2 sm:gap-4 flex-nowrap">
+        <div className="w-full max-w-[1600px] mx-auto px-2 sm:px-4 h-full flex items-center justify-between gap-1.5 sm:gap-3 flex-nowrap overflow-x-auto no-scrollbar">
           
           {/* [좌측]: Notion Architect 심플 로고 (클릭 시 홈 대시보드로 이동) */}
-          <div className="flex items-center space-x-2 sm:space-x-2.5 shrink-0">
+          <div className="flex items-center space-x-2 shrink-0">
             <button 
               onClick={() => setCurrentView('home')}
-              className="w-8 h-8 rounded-xl bg-neutral-900 dark:bg-white flex items-center justify-center text-white dark:text-neutral-900 font-bold text-base shadow-sm hover:scale-105 transition cursor-pointer shrink-0"
+              className="w-8 h-8 rounded-xl bg-neutral-900 dark:bg-white flex items-center justify-center text-white dark:text-neutral-900 font-bold text-base shadow-xs hover:scale-105 transition cursor-pointer shrink-0"
               title="홈 대시보드로 이동"
             >
               <span>N</span>
@@ -91,32 +91,21 @@ export const Navbar: React.FC = () => {
               className="flex items-center space-x-1.5 cursor-pointer shrink-0"
               onClick={() => setCurrentView('home')}
             >
-              <span className="font-bold text-sm sm:text-base tracking-tight text-neutral-900 dark:text-white whitespace-nowrap">
+              <span className="font-bold text-xs sm:text-sm md:text-base tracking-tight text-neutral-900 dark:text-white whitespace-nowrap">
                 Notion Architect
               </span>
-              <span className="hidden xl:inline-flex items-center px-1.5 py-0.2 rounded-full text-[10px] font-semibold bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 whitespace-nowrap">
+              <span className="hidden xl:inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 whitespace-nowrap">
                 AI Studio
               </span>
             </div>
           </div>
 
-          {/* [중앙]: [👑 통합 허브 | 🏗️ 템플릿 마스터 | 👔 루틴 | 📄 오피스 스튜디오 | 🎨 AI 미디어 랩] 5대 글로벌 내비게이션 바 */}
-          <div className="flex items-center bg-neutral-100/90 dark:bg-neutral-800/80 p-1 rounded-xl border border-neutral-200/70 dark:border-neutral-700/60 shrink-0">
-            {/* 0. 👑 통합 허브 (신규 노션 저장소 바로가기 버튼) */}
-            <button
-              onClick={handleOpenMasterHub}
-              className="flex items-center space-x-1 px-2.5 py-1.5 text-xs font-bold rounded-lg transition whitespace-nowrap cursor-pointer bg-gradient-to-r from-amber-500 via-indigo-600 to-purple-600 text-white hover:opacity-90 shadow-xs active:scale-95 mr-1"
-              title="내 노션 통합 허브 워크스페이스 새 탭 열기"
-            >
-              <Crown className="w-3.5 h-3.5 text-amber-300 shrink-0" />
-              <span className="whitespace-nowrap">👑 통합 허브</span>
-              <ExternalLink className="w-3 h-3 opacity-80 shrink-0" />
-            </button>
-
+          {/* [중앙]: [🏗️ 템플릿 마스터 | 🌱 라이프 Hub | 📄 오피스 스튜디오 | 🎨 AI 미디어 랩] 4대 메인 탭 */}
+          <div className="flex items-center bg-neutral-100/90 dark:bg-neutral-800/80 p-1 rounded-xl border border-neutral-200/70 dark:border-neutral-700/60 shrink-0 gap-0.5 sm:gap-1">
             {/* 1. 🏗️ 템플릿 마스터 */}
             <button
               onClick={() => setCurrentView('builder')}
-              className={`flex items-center space-x-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg transition whitespace-nowrap cursor-pointer ${
+              className={`flex items-center space-x-1 px-2 sm:px-2.5 py-1.5 text-xs font-semibold rounded-lg transition whitespace-nowrap cursor-pointer ${
                 currentView === 'builder'
                   ? 'bg-white dark:bg-notion-dark-card text-amber-600 dark:text-amber-400 font-bold shadow-xs'
                   : 'text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white'
@@ -127,24 +116,24 @@ export const Navbar: React.FC = () => {
               <span className="whitespace-nowrap">🏗️ 템플릿 마스터</span>
             </button>
 
-            {/* 2. 👔 루틴 (기존 '라이프 비서'에서 사용자의 요청으로 명칭 단순화) */}
+            {/* 2. 🌱 라이프 Hub (기존 잘못된 중복 루틴 명칭을 라이프 Hub로 정정) */}
             <button
               onClick={() => setCurrentView('life')}
-              className={`flex items-center space-x-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg transition whitespace-nowrap cursor-pointer ${
+              className={`flex items-center space-x-1 px-2 sm:px-2.5 py-1.5 text-xs font-semibold rounded-lg transition whitespace-nowrap cursor-pointer ${
                 currentView === 'life'
                   ? 'bg-white dark:bg-notion-dark-card text-emerald-600 dark:text-emerald-400 font-bold shadow-xs'
                   : 'text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white'
               }`}
-              title="루틴 및 라이프 관리"
+              title="라이프 Hub & 루틴 관리"
             >
               <Leaf className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-              <span className="whitespace-nowrap">👔 루틴</span>
+              <span className="whitespace-nowrap">🌱 라이프 Hub</span>
             </button>
 
             {/* 3. 📄 오피스 스튜디오 */}
             <button
               onClick={() => setCurrentView('devlab')}
-              className={`flex items-center space-x-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg transition whitespace-nowrap cursor-pointer ${
+              className={`flex items-center space-x-1 px-2 sm:px-2.5 py-1.5 text-xs font-semibold rounded-lg transition whitespace-nowrap cursor-pointer ${
                 currentView === 'devlab'
                   ? 'bg-white dark:bg-notion-dark-card text-blue-600 dark:text-blue-400 font-bold shadow-xs'
                   : 'text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white'
@@ -158,7 +147,7 @@ export const Navbar: React.FC = () => {
             {/* 4. 🎨 AI 미디어 랩 */}
             <button
               onClick={() => setCurrentView('media_lab')}
-              className={`flex items-center space-x-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg transition whitespace-nowrap cursor-pointer ${
+              className={`flex items-center space-x-1 px-2 sm:px-2.5 py-1.5 text-xs font-semibold rounded-lg transition whitespace-nowrap cursor-pointer ${
                 currentView === 'media_lab'
                   ? 'bg-white dark:bg-notion-dark-card text-purple-600 dark:text-purple-400 font-bold shadow-xs'
                   : 'text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white'
@@ -170,28 +159,39 @@ export const Navbar: React.FC = () => {
             </button>
           </div>
 
-          {/* [우측]: [⏰ 데일리 루틴], Gemini 모델 셀렉터, [⚙️ 설정] 버튼, 프로필 아바타 */}
-          <div className="flex items-center space-x-1 sm:space-x-1.5 shrink-0 whitespace-nowrap">
+          {/* [우측]: [👑 통합 허브] + [⏰ 루틴 브리핑], Gemini 모델 셀렉터, [⚙️ 설정] 버튼, 프로필 아바타 */}
+          <div className="flex items-center space-x-1 sm:space-x-1.5 shrink-0 whitespace-nowrap pr-1">
+            {/* 👑 통합 허브 (사용자 요청: 루틴 브리핑 옆으로 이동) */}
+            <button
+              onClick={handleOpenMasterHub}
+              className="flex items-center space-x-1 px-2 sm:px-2.5 py-1.5 text-xs font-bold rounded-xl transition whitespace-nowrap cursor-pointer bg-gradient-to-r from-amber-500 via-indigo-600 to-purple-600 text-white hover:opacity-90 shadow-xs active:scale-95 shrink-0"
+              title="내 노션 통합 허브 워크스페이스 새 탭 열기"
+            >
+              <Crown className="w-3.5 h-3.5 text-amber-300 shrink-0" />
+              <span className="whitespace-nowrap">👑 통합 허브</span>
+              <ExternalLink className="w-3 h-3 opacity-80 shrink-0" />
+            </button>
+
             {/* 데일리 루틴 퀵 버튼 */}
             <button
               onClick={handleDailyRoutine}
-              className="flex items-center space-x-1 px-2.5 py-1.5 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-amber-50/70 dark:bg-amber-950/30 hover:bg-amber-100 dark:hover:bg-amber-900/40 text-amber-700 dark:text-amber-300 text-xs font-bold transition whitespace-nowrap shadow-xs cursor-pointer active:scale-95"
+              className="flex items-center space-x-1 px-2 sm:px-2.5 py-1.5 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-amber-50/70 dark:bg-amber-950/30 hover:bg-amber-100 dark:hover:bg-amber-900/40 text-amber-700 dark:text-amber-300 text-xs font-bold transition whitespace-nowrap shadow-xs cursor-pointer active:scale-95 shrink-0"
               title="오늘의 데일리 루틴 브리핑"
             >
               <Clock className="w-3.5 h-3.5 text-amber-500 shrink-0" />
               <span className="whitespace-nowrap">⏰ 루틴 브리핑</span>
             </button>
             
-            {/* 1. Gemini 모델 셀렉터 (Google AI Studio 스타일의 라운드 드롭다운) */}
-            <div className="relative">
+            {/* 1. Gemini 모델 셀렉터 */}
+            <div className="relative shrink-0">
               <button
                 onClick={() => setIsModelDropdownOpen(prev => !prev)}
-                className="flex items-center space-x-1.5 px-2.5 py-1.5 rounded-xl border border-neutral-200 dark:border-neutral-700/80 bg-neutral-50/80 dark:bg-neutral-800/80 hover:bg-neutral-100 dark:hover:bg-neutral-700/90 text-neutral-700 dark:text-neutral-200 text-xs font-medium transition whitespace-nowrap cursor-pointer"
+                className="flex items-center space-x-1.5 px-2 sm:px-2.5 py-1.5 rounded-xl border border-neutral-200 dark:border-neutral-700/80 bg-neutral-50/80 dark:bg-neutral-800/80 hover:bg-neutral-100 dark:hover:bg-neutral-700/90 text-neutral-700 dark:text-neutral-200 text-xs font-medium transition whitespace-nowrap cursor-pointer"
                 title="Google Gemini AI 모델 변경"
               >
                 <Bot className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
-                <span className="hidden md:inline font-semibold">{modelLabels[selectedModel]?.label || 'Gemini 1.5'}</span>
-                <span className="md:hidden font-semibold">{modelLabels[selectedModel]?.short || '1.5'}</span>
+                <span className="hidden lg:inline font-semibold">{modelLabels[selectedModel]?.label || 'Gemini 1.5'}</span>
+                <span className="lg:hidden font-semibold">{modelLabels[selectedModel]?.short || '1.5'}</span>
                 <ChevronDown className="w-3 h-3 text-neutral-400 shrink-0" />
               </button>
 
@@ -227,10 +227,10 @@ export const Navbar: React.FC = () => {
               )}
             </div>
 
-            {/* 2. [⚙️ 설정] 버튼 (서랍형 모달 호출) */}
+            {/* 2. [⚙️ 설정] 버튼 */}
             <button
               onClick={() => setIsDrawerOpen(true)}
-              className="relative flex items-center space-x-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 hover:bg-neutral-100 dark:hover:bg-neutral-700/80 text-neutral-700 dark:text-neutral-200 text-xs font-semibold transition whitespace-nowrap shadow-xs cursor-pointer active:scale-95"
+              className="relative flex items-center space-x-1.5 px-2 sm:px-2.5 py-1.5 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 hover:bg-neutral-100 dark:hover:bg-neutral-700/80 text-neutral-700 dark:text-neutral-200 text-xs font-semibold transition whitespace-nowrap shadow-xs cursor-pointer active:scale-95 shrink-0"
               title="설정 및 외부 연동 관리 열기"
             >
               <Settings className="w-3.5 h-3.5 text-neutral-600 dark:text-neutral-300 shrink-0" />
@@ -240,9 +240,9 @@ export const Navbar: React.FC = () => {
               <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isConfigured ? 'bg-emerald-500' : 'bg-amber-500 animate-pulse'}`} />
             </button>
 
-            {/* 3. 프로필 아바타 */}
+            {/* 3. 프로필 아바타 (오른쪽 잘림 방지를 위해 shrink-0 및 여백 보장) */}
             {authUser && (
-              <div className="pl-1 shrink-0">
+              <div className="pl-0.5 sm:pl-1 shrink-0 flex items-center">
                 <UserProfileDropdown user={authUser} onLogout={logout} />
               </div>
             )}
