@@ -121,19 +121,22 @@ async function fallbackClientOrchestration(
     };
   }
 
-  if (lower.includes('에러') || lower.includes('오류') || lower.includes('버그') || lower.includes('프롬프트') || lower.includes('개발')) {
-    const isTrouble = lower.includes('에러') || lower.includes('오류') || lower.includes('버그');
+  if (lower.includes('독스') || lower.includes('시트') || lower.includes('슬라이드') || lower.includes('보고서') || lower.includes('결재') || lower.includes('품의서') || lower.includes('오피스') || lower.includes('문서')) {
+    const isSheets = lower.includes('시트') || lower.includes('계산') || lower.includes('지출');
+    const isSlides = lower.includes('슬라이드') || lower.includes('발표') || lower.includes('장표');
     return {
       intent: 'DEVLAB',
-      reply_message: isTrouble
-        ? '발생한 오류를 트러블슈팅 일지에 정리해 드릴게요. 개발 랩으로 이동합니다.'
-        : '새로운 개발 아이디어로 개발 랩에 안전하게 저장해 드릴게요.',
+      reply_message: isSheets
+        ? '요청하신 내용을 스마트 시트 수식 그리드에 작성해 드릴게요. AI 오피스 스튜디오로 이동합니다.'
+        : isSlides
+        ? '요청하신 내용을 스마트 슬라이드 16:9 프레젠테이션 장표로 구성해 드릴게요. AI 오피스 스튜디오로 이동합니다.'
+        : '요청하신 내용을 스마트 독스 A4 보고서 양식으로 작성해 드릴게요. AI 오피스 스튜디오로 이동합니다.',
       needs_clarification: false,
       redirect_url: '/devlab',
       payload: {
-        sub_type: isTrouble ? 'troubleshooting' : 'idea',
+        sub_type: isSheets ? 'sheets' : isSlides ? 'slides' : 'docs',
         title: userText.slice(0, 30),
-        tags: ['개발', isTrouble ? '디버깅' : '아이디어'],
+        tags: ['AI오피스', isSheets ? '스마트시트' : isSlides ? '스마트슬라이드' : '스마트독스'],
         content: userText,
       },
     };

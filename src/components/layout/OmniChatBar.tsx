@@ -11,7 +11,6 @@ import {
   ChevronDown,
   Sparkles,
   Calendar,
-  Code2,
   Construction,
   ExternalLink,
   Paperclip,
@@ -31,6 +30,9 @@ import type { DiagnosticResult } from '../common/SelfDiagnosticCard';
 import { saveTodayOverrideConfig } from '../../services/dailyRoutineStorage';
 import { archiveAudioArtifact, archiveTextDiscussionArtifact } from '../../services/zeroRotArchiver';
 import { isNotionUrlPrompt, extractNotionUrl, generateMasterHubTemplateFromUrl } from '../../services/notionLinkAnalyzer';
+import { buildDynamicTemplateFromPayload } from '../../services/notionDynamicBuilder';
+import { createNotionTemplateInWorkspace } from '../../services/notionApi';
+import type { NotionTemplate } from '../../types/notion';
 
 // ─── 실행 영수증 카드 타입 ──────────────────────────────────────────────────
 type ReceiptType = 'builder' | 'life' | 'devlab';
@@ -61,8 +63,8 @@ const RECEIPT_META: Record<ReceiptType, Omit<ActionReceipt, 'id' | 'type'>> = {
     borderColor: 'border-emerald-200 dark:border-emerald-800/60',
   },
   devlab: {
-    label: '개발 랩 아카이브 저장 완료',
-    emoji: '💻',
+    label: 'AI 오피스 스튜디오 (PPT·슬라이드·문서) 캔버스 저장 완료',
+    emoji: '📄',
     color: 'text-blue-700 dark:text-blue-300',
     bgColor: 'bg-blue-50 dark:bg-blue-950/50',
     borderColor: 'border-blue-200 dark:border-blue-800/60',
@@ -75,6 +77,8 @@ interface OmniMessage extends ChatMessage {
   /** DEVLAB troubleshooting 인텐트 시 SelfDiagnosticCard 데이터 */
   diagnostic?: DiagnosticResult;
   attachments?: string[];
+  /** BUILDER 인텐트 시 AI가 생성/개선한 동적 NotionTemplate 데이터 */
+  generatedTemplateData?: NotionTemplate;
 }
 
 function buildReceipts(intent: string): ActionReceipt[] {
@@ -130,6 +134,7 @@ export const OmniChatBar: React.FC = () => {
   const isLoadingRef = useRef(false);
   const isListeningRef = useRef(false);
   const lastSentRef = useRef<{ text: string; time: number }>({ text: '', time: 0 });
+  const baseTextRef = useRef<string>('');
   const fullTranscriptRef = useRef<string>('');
   const handleSendMessageRef = useRef<(overrideText?: string) => Promise<void>>(() => Promise.resolve());
 
@@ -162,7 +167,13 @@ export const OmniChatBar: React.FC = () => {
         fullTranscriptRef.current = (fullTranscriptRef.current + ' ' + finalStr).trim();
       }
 
-      const combined = cleanDuplicateSpeech((fullTranscriptRef.current + ' ' + interimStr).trim());
+      const voicePart = cleanDuplicateSpeech((fullTranscriptRef.current + ' ' + interimStr).trim());
+      const basePart = baseTextRef.current;
+
+      const combined = basePart
+        ? (voicePart ? `${basePart}\n\n[음성 요청]: ${voicePart}` : basePart)
+        : voicePart;
+
       if (combined) {
         setInputValue(combined);
       }
@@ -211,14 +222,15 @@ export const OmniChatBar: React.FC = () => {
     }
 
     if (isListening) {
-      // 수동으로 마이크 버튼을 눌러 깔 때 -> 녹음 중단
+      // 수동으로 마이크 버튼을 눌러 끌 때 -> 녹음 중단
       isListeningRef.current = false;
       setIsListening(false);
       try { recognitionRef.current?.stop(); } catch {}
     } else {
-      // 수동으로 마이크 버튼을 눌러 켤 때 -> 이전 텍스트 유지한 상태에서 누적
+      // 수동으로 마이크 버튼을 눌러 켤 때 -> 이전에 복사해서 붙여넣은 텍스트를 baseTextRef에 보존 후 누적
       isListeningRef.current = true;
-      fullTranscriptRef.current = inputValue.trim();
+      baseTextRef.current = inputValue.trim();
+      fullTranscriptRef.current = '';
       try {
         recognitionRef.current?.start();
         setIsListening(true);
@@ -284,7 +296,10 @@ export const OmniChatBar: React.FC = () => {
     const fullMessageText = text + attachmentSummary;
 
     setInputValue('');
+    if (inputRef.current) inputRef.current.value = '';
     fullTranscriptRef.current = '';
+    baseTextRef.current = '';
+    try { inputRef.current?.blur(); setTimeout(() => inputRef.current?.focus(), 50); } catch {}
     const currentAttachments = [...attachedFiles.map((a) => a.name)];
     setAttachedFiles([]);
     setIsExpanded(true);
@@ -458,6 +473,7 @@ export const OmniChatBar: React.FC = () => {
 
       let finalReply = response.reply_message;
       let receipts: ActionReceipt[] = [];
+      let generatedTemplateForMsg: NotionTemplate | undefined;
 
       // ── LIFE 인텐트: 노션 & 로컬 즉시 전송 및 일정 이동(RESCHEDULE) 처리 ───────
       if (response.intent === 'LIFE') {
@@ -554,26 +570,39 @@ export const OmniChatBar: React.FC = () => {
 
           receipts = buildReceipts('LIFE');
         }
-      } else if (response.intent === 'BUILDER') {
+      } else if (response.intent === 'BUILDER' || response.payload?.db_schema) {
         receipts = buildReceipts('BUILDER');
         setIsViewingCurationHub(false);
-        const targetTemplate = (response.payload?.preset_key && PRESET_TEMPLATES[response.payload.preset_key])
-          ? PRESET_TEMPLATES[response.payload.preset_key]
-          : (/자격증|수험생|시험|공부|오답노트/.test(text) && PRESET_TEMPLATES.certification_exam)
-          ? PRESET_TEMPLATES.certification_exam
-          : generateMasterHubTemplateFromUrl(extractNotionUrl(text), text);
+
+        let targetTemplate: NotionTemplate;
+        if (response.payload?.preset_key && PRESET_TEMPLATES[response.payload.preset_key]) {
+          targetTemplate = PRESET_TEMPLATES[response.payload.preset_key];
+        } else if (/자격증|수험생|시험|공부|오답노트/.test(text) && PRESET_TEMPLATES.certification_exam) {
+          targetTemplate = PRESET_TEMPLATES.certification_exam;
+        } else {
+          // AI 오케스트레이터 payload 기반 동적 템플릿 즉석 빌드
+          targetTemplate = buildDynamicTemplateFromPayload({
+            topic: (response.payload?.template_topic as string) || text,
+            title: (response.payload?.suggested_title as string) || `${text} AI 템플릿`,
+            initialPrompt: text,
+            dbSchemas: response.payload?.db_schema as any[],
+            formulas: response.payload?.formulas as any[],
+            valueAdd: response.payload?.value_add as string[],
+            complexity: response.payload?.complexity as string
+          });
+        }
 
         if (targetTemplate) {
+          generatedTemplateForMsg = targetTemplate;
           setCurrentTemplate(targetTemplate);
-          // 내 보관함에 '내가 만든 템플릿(created)'으로 자동 보관
           try {
             saveArchivedTemplate({
               id: `created-tpl-${Date.now()}`,
               title: targetTemplate.title,
               description: targetTemplate.description || '',
-              icon: targetTemplate.icon || '🎯',
-              cover_url: targetTemplate.cover_url || 'https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=1600&q=80',
-              tags: ['#내가만든템플릿', '#커스텀생성', '#AI합격스케줄러'],
+              icon: targetTemplate.icon || '✨',
+              cover_url: targetTemplate.cover_url || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1600&q=80',
+              tags: ['#AI맞춤생성', '#채팅요청', '#NotionArchitect'],
               templateData: targetTemplate,
               source: 'created',
               createdAt: Date.now(),
@@ -583,27 +612,37 @@ export const OmniChatBar: React.FC = () => {
             console.warn('Failed to auto-archive created template:', e);
           }
         }
-        // 완결 시 템플릿 빌더 라이브 캔버스로 자동 전환
+
+        finalReply = `${response.reply_message}\n\n✨ [Notion Architect AI 동적 템플릿 제작 완결]\n요청하신 "${targetTemplate.title}" 템플릿의 스키마와 수식이 성공적으로 설계되었습니다. 아래 카드 및 버튼을 통해 캔버스에서 확인하거나 노션으로 즉시 퍼블리시할 수 있습니다.`;
+        showToast(`✨ [${targetTemplate.title}] 템플릿이 캔버스에 즉시 투영되었습니다!`, 'success');
+        
+        // 템플릿 빌더 라이브 캔버스로 화면 자동 안내
         setTimeout(() => {
           setCurrentView('builder');
-          showToast('🎯 [자격증/수험생 올인원 합격 스케줄러] 템플릿이 캔버스에 즉시 투영되고 내 보관함에 저장되었습니다!', 'success');
-        }, 300);
+        }, 400);
       } else if (response.intent === 'DEVLAB') {
         receipts = buildReceipts('DEVLAB');
+        if (response.payload?.sheetsData) {
+          try {
+            localStorage.setItem('office_sheets_data', JSON.stringify(response.payload.sheetsData));
+          } catch {}
+        }
         if (response.redirect_url === '/devlab') {
           setTimeout(() => {
             setCurrentView('devlab');
-            showToast('📑 AI 오피스 스튜디오 라이브 캔버스로 자동 전환되었습니다.', 'info');
+            showToast('📊 스마트 시트 라이브 캔버스로 자동 전환되었습니다.', 'info');
           }, 300);
         }
       }
 
-      // ── 진단 카드: DEVLAB + troubleshooting 서브타입 또는 에러 키워드 ──────
+      // ── 진단 카드: 실제 에러/오류 문의 키워드가 명시적으로 포함된 경우에만 발동 ──────
       let diagnostic: DiagnosticResult | undefined;
+      const isExplicitErrorPrompt = /에러|오류|버그|crash|error|exception|fail|고장|디버그/i.test(text);
       const isErrorIntent =
         response.intent === 'DEVLAB' &&
-        (response.payload?.sub_type === 'troubleshooting' ||
-          /에러|오류|버그|crash|error|exception|fail/i.test(text));
+        response.payload?.sub_type === 'troubleshooting' &&
+        isExplicitErrorPrompt;
+
       if (isErrorIntent && response.payload) {
         diagnostic = payloadToDiagnostic(response.payload, text.slice(0, 40));
       }
@@ -617,6 +656,7 @@ export const OmniChatBar: React.FC = () => {
         redirect_url: response.redirect_url,
         receipts,
         diagnostic,
+        generatedTemplateData: generatedTemplateForMsg,
       };
 
       setMessages(prev => [...prev, aiMsg]);
@@ -633,6 +673,9 @@ export const OmniChatBar: React.FC = () => {
     } finally {
       setIsLoading(false);
       isLoadingRef.current = false;
+      setInputValue('');
+      baseTextRef.current = '';
+      if (inputRef.current) inputRef.current.value = '';
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inputValue, attachedFiles, messages, apiKey, authUser, notionApiKey, notionParentPageId, createdNotionResource, showToast]);
@@ -665,9 +708,9 @@ export const OmniChatBar: React.FC = () => {
         icon: <Calendar className="w-2.5 h-2.5" />,
       },
       DEVLAB: {
-        label: '개발 랩 액션',
+        label: '오피스 스튜디오 액션',
         cls: 'bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300',
-        icon: <Code2 className="w-2.5 h-2.5" />,
+        icon: <FileText className="w-2.5 h-2.5" />,
       },
     };
     const meta = map[intent];
@@ -826,6 +869,79 @@ export const OmniChatBar: React.FC = () => {
                       </div>
                     )}
 
+                    {/* ── AI 맞춤 동적 템플릿 결과물 카드 & 노션 즉시 생성 ────── */}
+                    {!isUser && msg.generatedTemplateData && (
+                      <div className="w-full mt-2 p-3.5 rounded-2xl bg-gradient-to-br from-indigo-50/90 via-purple-50/70 to-pink-50/50 dark:from-neutral-800 dark:via-neutral-850 dark:to-neutral-900 border border-indigo-200/80 dark:border-indigo-900/60 shadow-sm space-y-3 animate-fadeIn">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-2.5">
+                            <span className="text-xl sm:text-2xl">{msg.generatedTemplateData.icon || '✨'}</span>
+                            <div>
+                              <h4 className="font-bold text-xs sm:text-sm text-neutral-900 dark:text-white">
+                                {msg.generatedTemplateData.title}
+                              </h4>
+                              <p className="text-[11px] text-indigo-600 dark:text-indigo-400 font-medium">
+                                AI 동적 설계 완료 • DB {msg.generatedTemplateData.databases?.length || 1}개 연동
+                              </p>
+                            </div>
+                          </div>
+                          <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 shrink-0">
+                            생성 완결
+                          </span>
+                        </div>
+
+                        {/* 주요 태그 */}
+                        <div className="flex flex-wrap gap-1">
+                          {msg.generatedTemplateData.tags?.map((tag: string, tIdx: number) => (
+                            <span key={tIdx} className="px-2 py-0.5 rounded-md bg-white/80 dark:bg-neutral-800 text-[10px] text-neutral-600 dark:text-neutral-300 border border-neutral-200 dark:border-neutral-700">
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+
+                        {/* 노션 원클릭 퍼블리시 & 캔버스 편집 버튼 */}
+                        <div className="pt-1 flex flex-wrap items-center gap-2">
+                          <button
+                            onClick={async () => {
+                              if (!notionApiKey || !notionParentPageId) {
+                                showToast('노션 연동 토큰과 부모 페이지 ID 등록이 필요합니다.', 'info');
+                                setIsNotionSettingsModalOpen(true);
+                                return;
+                              }
+                              try {
+                                showToast('🚀 노션 워크스페이스에 페이지/DB를 생성합니다...', 'info');
+                                const res = await createNotionTemplateInWorkspace(
+                                  msg.generatedTemplateData!,
+                                  notionApiKey,
+                                  notionParentPageId,
+                                  (step, pct) => showToast(`[${pct}%] ${step}`, 'info')
+                                );
+                                showToast(`🎉 [${res.pageTitle}] 노션 생성이 완료되었습니다!`, 'success');
+                                if (res.pageUrl) window.open(res.pageUrl, '_blank');
+                              } catch (e: any) {
+                                showToast(`노션 생성 실패: ${e.message}`, 'error');
+                              }
+                            }}
+                            className="flex-1 py-1.5 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition flex items-center justify-center space-x-1.5 shadow-xs cursor-pointer"
+                          >
+                            <Sparkles className="w-3.5 h-3.5" />
+                            <span>🚀 노션 계정에 원클릭 자동 생성</span>
+                          </button>
+
+                          <button
+                            onClick={() => {
+                              setCurrentTemplate(msg.generatedTemplateData!);
+                              setCurrentView('builder');
+                              showToast('🎨 템플릿 빌더 캔버스로 이동했습니다.', 'info');
+                            }}
+                            className="py-1.5 px-3 rounded-xl bg-white dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 hover:bg-neutral-50 dark:hover:bg-neutral-700 text-neutral-800 dark:text-neutral-200 font-semibold text-xs transition flex items-center justify-center space-x-1 cursor-pointer"
+                          >
+                            <ExternalLink className="w-3.5 h-3.5" />
+                            <span>캔버스 보기</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
                     {/* ── 작업실 캔버스 이동 버튼 ──────────────────────────── */}
                     {!isUser && msg.redirect_url && (
                       <button
@@ -842,21 +958,24 @@ export const OmniChatBar: React.FC = () => {
                           const targetView = viewMap[urlKey];
                           if (targetView) {
                             setCurrentView(targetView);
-                            showToast(`${targetView === 'builder' ? '✨ 템플릿 빌더' : targetView === 'life' ? '🌿 라이프 허브' : targetView === 'devlab' ? '💻 개발 랩' : '🎨 AI 미디어 랩'} 캔버스로 이동했습니다.`, 'info');
+                            showToast(`${targetView === 'builder' ? '✨ 템플릿 마스터' : targetView === 'life' ? '👔 라이프 비서' : targetView === 'devlab' ? '📄 AI 오피스 스튜디오 (PPT/슬라이드)' : '🎨 AI 미디어 랩'} 캔버스로 이동했습니다.`, 'info');
                           }
                         }}
                         className="
                           mt-1 flex items-center space-x-1.5
-                          px-2.5 py-1 rounded-lg
-                          text-[11px] font-semibold
-                          bg-indigo-50 text-indigo-700 border border-indigo-200
-                          hover:bg-indigo-100
-                          dark:bg-indigo-950/60 dark:text-indigo-300 dark:border-indigo-800
-                          transition-all cursor-pointer shadow-sm
+                          px-3 py-1.5 rounded-xl
+                          text-xs font-bold
+                          bg-gradient-to-r from-blue-600 to-indigo-600 text-white
+                          hover:from-blue-700 hover:to-indigo-700
+                          transition-all cursor-pointer shadow-xs active:scale-95
                         "
                       >
-                        <ExternalLink className="w-3 h-3" />
-                        <span>작업실 캔버스로 즉시 이동</span>
+                        <ExternalLink className="w-3.5 h-3.5" />
+                        <span>
+                          {msg.redirect_url === '/devlab' 
+                            ? '📄 AI 오피스 스튜디오 (PPT/슬라이드) 캔버스 열기' 
+                            : '✨ 해당 작업실 캔버스로 즉시 이동'}
+                        </span>
                       </button>
                     )}
 
@@ -1075,7 +1194,7 @@ export const OmniChatBar: React.FC = () => {
         {/* 안내 텍스트 */}
         <p className="mt-1.5 px-1 text-[10px] text-neutral-400 dark:text-neutral-500 flex items-center space-x-1">
           <Sparkles className="w-2.5 h-2.5 text-amber-400 shrink-0" />
-          <span>옴니 챗 — 템플릿 빌더 · 라이프 허브 · 개발 랩을 말 한마디로 통합 제어</span>
+          <span>옴니 챗 — 템플릿 빌더 · 라이프 허브 · 오피스 스튜디오를 말 한마디로 통합 제어</span>
         </p>
       </div>
     </div>

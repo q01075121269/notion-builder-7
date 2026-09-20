@@ -1,4 +1,4 @@
-﻿/**
+/**
  * src/lib/system_spec.ts
  *
  * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -146,28 +146,26 @@ export const CANVAS_LIFE_HUB = {
   },
 } as const;
 
-export const CANVAS_DEV_LAB = {
+export const CANVAS_OFFICE_STUDIO = {
   id: 'devlab',
-  label: '③ 개발 랩 (Dev Lab)',
-  icon: '⚗️',
+  label: '③ AI 오피스 스튜디오 (Office Studio)',
+  icon: '📄',
   route: '/devlab',
-  corePurpose: '웹/모바일 개발 코드 스니펫, 오류 일지, 기술 문서 AI 아카이브',
+  corePurpose: '3대 비즈니스 문서(Docs·Sheets·Slides) 및 NotebookLM 지식 연동 라이브 캔버스',
   features: [
-    'AI 코드 스니펫 생성 (React, Next.js, TypeScript, Python)',
-    '런타임 오류 로그 AI 진단 (스택 트레이스 분석)',
-    'MDN/공식 문서 기반 기술 아카이브',
-    'Git 커밋 메시지 자동 생성',
-    '노션 DB 개발일지 자동 기록',
-    'AI 사서 통합 검색 (librarianService)',
+    '📄 스마트 독스 (Napkin AI 규격 개조식 보고서 & A4 뷰어)',
+    '📊 스마트 시트 (Rows 연산 =SUM/=AVERAGE 수식 실시간 그리드)',
+    '📑 스마트 슬라이드 (Gamma 스타일 16:9 프레젠테이션 프리뷰)',
+    '📚 NotebookLM 참고 소스 RAG 팩트 인용 뱃지 연동',
+    '⚡ 노션 워크스페이스 원클릭 라이브 내보내기',
+    '📋 자유 기획 / 표준 회사 양식 듀얼 모드 토글',
   ],
   techStackCoverage: [
     'React 18 / Next.js App Router',
     'TypeScript / JavaScript ES2024',
     'Tailwind CSS / Vanilla CSS',
-    'Node.js / Vercel Serverless',
     'Notion API / Gemini API',
-    'Web Speech API / WebRTC',
-    'Flutter / Dart (모바일)',
+    'Rows / Napkin AI / Gamma Benchmark Specs',
   ],
 } as const;
 
@@ -526,7 +524,8 @@ export const SYSTEM_SPEC = {
   canvases: {
     templateMaster: CANVAS_TEMPLATE_MASTER,
     lifeHub: CANVAS_LIFE_HUB,
-    devLab: CANVAS_DEV_LAB,
+    officeStudio: CANVAS_OFFICE_STUDIO,
+    devLab: CANVAS_OFFICE_STUDIO,
   },
   commercialMechanisms: COMMERCIAL_TEMPLATE_MECHANISMS,
   knownBugs: KNOWN_BUG_PATTERNS,

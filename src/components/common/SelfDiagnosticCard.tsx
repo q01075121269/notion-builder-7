@@ -325,18 +325,21 @@ export const SelfDiagnosticCard: React.FC<SelfDiagnosticCardProps> = ({
   );
 };
 
-// ─── 헬퍼: 오케스트레이터 페이로드 → DiagnosticResult 변환 ─────────────────
 export function payloadToDiagnostic(
   payload: Record<string, any>,
   fallbackTitle?: string
 ): DiagnosticResult {
+  const errorTitle = payload?.error_class || payload?.title || fallbackTitle || '시스템 디버깅 및 예외 검증';
+  const cause = payload?.root_cause || payload?.content || `[${errorTitle}] 모듈 실행 및 데이터 가드레일 검증이 필요합니다.`;
+  const fixPrompt = payload?.fix_prompt || `[안티그래비티 디버그 조치 프롬프트]\n- 감지 대상: "${errorTitle}"\n- 분석 내용: ${cause}\n위 항목에 대한 예외 처리와 데이터 유효성 가드레일을 즉시 적용해 주세요.`;
+
   return {
-    error_class: payload?.error_class || payload?.title || fallbackTitle || '시스템 오류 감지',
-    root_cause: payload?.root_cause || payload?.content || '원인을 분석 중입니다...',
+    error_class: errorTitle,
+    root_cause: cause,
     severity: payload?.severity || 'medium',
     reproduction: payload?.reproduction,
-    fix_prompt: payload?.fix_prompt || payload?.content || '이 오류에 대한 해결 방법을 안티그래비티에서 찾아드립니다.',
+    fix_prompt: fixPrompt,
     affected_files: payload?.affected_files || payload?.files || undefined,
-    effort: payload?.effort,
+    effort: payload?.effort || 'low',
   };
 }

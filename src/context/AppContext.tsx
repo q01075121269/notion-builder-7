@@ -637,7 +637,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       setCreatedNotionResource(result);
       triggerCelebration();
       setIsPublishSuccessModalOpen(true);
-      showToast(`노션 워크스페이스에 "${currentTemplate.title}" 템플릿이 성공적으로 배포되었습니다!`, 'success');
+      showToast(`🎉 노션 워크스페이스에 "${currentTemplate.title}" 배포 완결! 새 탭으로 이동합니다.`, 'success');
+
+      // 배포 완결 후 생성된 노션 페이지 새 탭 즉시 자동 오픈
+      if (result.pageUrl) {
+        try { window.open(result.pageUrl, '_blank'); } catch {}
+      }
 
       // 4단계: 배포 성공 시 내 보관함에도 자동 아카이빙 영구 보존
       saveArchivedTemplate({
@@ -656,7 +661,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       const successMsg: ChatMessage = {
         id: `publish-success-${Date.now()}`,
         role: 'assistant',
-        content: `🎉 **노션 워크스페이스에 템플릿이 성공적으로 배포되었습니다!**\n\n- **페이지 제목**: [${result.pageTitle}](${result.pageUrl})\n- **생성된 데이터베이스**: ${result.databases.map(d => `\`${d.name}\``).join(', ')}\n\n(내 보관함의 [노션 템플릿 보관함]에도 자동으로 안전하게 저장되었습니다.)`,
+        content: `🎉 **노션 워크스페이스에 템플릿이 성공적으로 배포되었습니다!**\n\n- **🔗 바로가기 페이지**: [${result.pageTitle}](${result.pageUrl})\n- **생성된 데이터베이스**: ${result.databases.map(d => `\`${d.name}\``).join(', ')}\n\n💡 *노션 부모 페이지 우측 상단 '···' -> [연결(Connect to)]에 내 통합이 추가되어 있어야 정상 노출됩니다.*`,
         timestamp: Date.now()
       };
       setMessages(prev => [...prev, successMsg]);
@@ -665,6 +670,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       console.error('노션 배포 실패:', err);
       const errMsg = err?.message || '노션 API 연동 중 알 수 없는 오류가 발생했습니다.';
       setPublishError(errMsg);
+      showToast(errMsg, 'error');
     } finally {
       setIsPublishing(false);
     }
@@ -680,7 +686,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
     setIsBuildingMasterWorkspace(true);
     try {
-      showToast('👑 노션 3대 마스터 허브 자동 구축을 시작합니다...', 'info');
+      showToast('👑 노션 5대 마스터 허브 자동 구축을 시작합니다...', 'info');
       const resource = await buildMasterWorkspaceInNotion(
         notionApiKey,
         notionParentPageId,
@@ -689,18 +695,23 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
       setCreatedNotionResource(resource);
       triggerCelebration();
-      showToast('🎉 노션 마스터 허브(3대 DB) 구축이 완료되었습니다!', 'success');
+      showToast('🎉 노션 마스터 허브(5대 DB) 구축 완료! 새 탭으로 페이지를 엽니다.', 'success');
+
+      // 구축 완료 후 즉시 생성된 노션 마스터 허브 페이지 새 탭 오픈
+      if (resource.pageUrl) {
+        try { window.open(resource.pageUrl, '_blank'); } catch {}
+      }
 
       const successMsg: ChatMessage = {
         id: `master-hub-success-${Date.now()}`,
         role: 'assistant',
-        content: `👑 **노션 마스터 허브(3대 DB) 구축 완료!**\n\n- **마스터 페이지**: [${resource.pageTitle}](${resource.pageUrl})\n- **생성된 3대 DB**: ${resource.databases.map(d => `\`${d.name}\``).join(', ')}\n\n이제 퀵 캡처와 라이프 허브, 템플릿 보관함의 데이터가 이 마스터 DB에 안전하게 자동 저장됩니다!`,
+        content: `👑 **노션 마스터 허브(5대 DB) 구축 완결!**\n\n- **🔗 마스터 페이지 바로가기**: [${resource.pageTitle}](${resource.pageUrl})\n- **생성된 5대 마스터 DB**: ${resource.databases.map(d => `\`${d.name}\``).join(', ')}\n\n📌 *부모 페이지 하위에 **'${resource.pageTitle}'** 하위 페이지가 새로 생성되었습니다. 노션 페이지 우측 상단 '···' -> [연결(Connect to)]에서 내 통합이 허용되어 있는지 확인해 주세요!*`,
         timestamp: Date.now()
       };
       setMessages(prev => [...prev, successMsg]);
     } catch (err: any) {
       console.error('마스터 허브 구축 실패:', err);
-      showToast(err.message || '마스터 허브 구축 중 오류가 발생했습니다.', 'error');
+      showToast(err.message || '마스터 허브 구축 중 오류가 발생했습니다. 노션 페이지 [연결] 설정을 확인해주세요.', 'error');
     } finally {
       setIsBuildingMasterWorkspace(false);
     }

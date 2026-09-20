@@ -277,9 +277,61 @@ export function generateFixedFormOfficeDoc(formType: FixedFormType, rawText: str
   };
 }
 
-// 4. 통합 오케스트레이터 듀얼 처리기 (Orchestrator Adapter)
+// 4. 스마트 시트 체크리스트 생성 전용 처리기
+export function generateChecklistSheetDoc(prompt: string): OfficeDocPayload {
+  const cleanPrompt = prompt.trim() || '스마트 업무 및 프로젝트 실행 체크리스트';
+
+  // 1. [음성 요청] 태그 분리 및 본문 텍스트 파싱
+  const bodyText = cleanPrompt.replace(/\[음성 요청\]:.*$/s, '').trim() || cleanPrompt;
+  const lines = bodyText
+    .split(/\n+|\. (?=[가-힣A-Za-z0-9])|;/)
+    .map(l => l.replace(/^[-*•\d.\s]+/, '').trim())
+    .filter(l => l.length > 2 && !l.includes('스마트 시트') && !l.includes('체크리스트') && !l.includes('만들어 줘'));
+
+  let parsedItems = lines.slice(0, 8).map((line, idx) => ({
+    item: `${idx + 1}. ${line.slice(0, 45)}`,
+    qty: 1,
+    price: 100000 + idx * 20000,
+    tax: (100000 + idx * 20000) * 0.1,
+    total: (100000 + idx * 20000) * 1.1,
+    note: idx === 0 ? '필수 검수 완료' : idx % 2 === 0 ? '검수 대기' : '진행 중'
+  }));
+
+  if (parsedItems.length === 0) {
+    parsedItems = [
+      { item: '1. AI 오피스 스튜디오 연동 및 템플릿 검수', qty: 1, price: 100000, tax: 10000, total: 110000, note: '필수 체크 (완료)' },
+      { item: '2. 스마트 시트 자동 수식(=SUM/=COUNTIF) 가드레일 작동', qty: 1, price: 150000, tax: 15000, total: 165000, note: '검수 완료' },
+      { item: '3. 업무/임무 관련 세부 실행 항목 파싱 및 슬롯 배치', qty: 1, price: 200000, tax: 20000, total: 220000, note: '진행 중' },
+      { item: '4. 노션 마스터 DB 통합 및 원클릭 데이터 최종 푸시', qty: 1, price: 100000, tax: 10000, total: 110000, note: '대기 중' },
+    ];
+  }
+
+  const maxRow = parsedItems.length;
+  const formulaCheck = validateSheetFormulas(`=SUM(E1:E${maxRow})`, maxRow);
+
+  return {
+    mode: 'CREATIVE',
+    targetTab: 'sheets',
+    title: `📊 [스마트 시트] ${cleanPrompt.slice(0, 30)} 체크리스트`,
+    summary: `제출하신 업무 본문 텍스트(${parsedItems.length}개 세부 실행 항목)를 정밀 파싱하여 스마트 시트 라이브 체크리스트로 완벽 구율했습니다.`,
+    sheetsData: {
+      templateName: `${cleanPrompt.slice(0, 20)} 마스터 체크리스트`,
+      rows: parsedItems,
+      sumFormula: formulaCheck.correctedFormula,
+      averageFormula: `=AVERAGE(E1:E${maxRow})`,
+      isValidFormula: formulaCheck.isValid
+    }
+  };
+}
+
+// 5. 통합 오케스트레이터 듀얼 처리기 (Orchestrator Adapter)
 export function processOfficeOrchestration(userPrompt: string): OfficeDocPayload {
   const lower = userPrompt.toLowerCase();
+
+  // 체크리스트, 시트, 스마트 시트, 엑셀, 표 키워드가 있으면 체크리스트 스마트 시트 생성 엔진 실행
+  if (lower.includes('시트') || lower.includes('체크리스트') || lower.includes('표') || lower.includes('엑셀') || lower.includes('sheet')) {
+    return generateChecklistSheetDoc(userPrompt);
+  }
 
   // 지출결의서, 기획품의서, 주간보고, 양식, 품의 등의 표준 양식 키워드가 있으면 모드 B (FIXED_FORM)
   if (lower.includes('양식') || lower.includes('지출결의서') || lower.includes('품의서') || lower.includes('주간') || lower.includes('결재') || lower.includes('서식')) {

@@ -61,6 +61,28 @@ export const SmartDocsRenderer: React.FC<SmartDocsRendererProps> = ({
         )}
       </div>
 
+      {/* 목차 (Table of Contents) */}
+      <div className="p-4 rounded-2xl bg-slate-50 dark:bg-neutral-800/40 border border-slate-200 dark:border-neutral-800 space-y-2 text-xs">
+        <h3 className="font-extrabold text-slate-800 dark:text-neutral-200 flex items-center space-x-1.5">
+          <span className="text-blue-500">📑</span>
+          <span>목차 (Table of Contents)</span>
+        </h3>
+        <ul className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-slate-600 dark:text-neutral-400 font-medium pt-1">
+          <li className="flex items-center space-x-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" />
+            <span>1. 핵심 추진 배경 및 도입 효과</span>
+          </li>
+          <li className="flex items-center space-x-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-purple-500 shrink-0" />
+            <span>2. 레거시 vs AI 오피스 비교</span>
+          </li>
+          <li className="flex items-center space-x-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
+            <span>3. 3단계 자동화 프로세스 흐름도</span>
+          </li>
+        </ul>
+      </div>
+
       {/* 2. 본문 개조식 기호 & 팩트 인용 뱃지 ([1], [2]) */}
       <section className="space-y-4">
         <h2 className="text-lg font-bold text-slate-900 dark:text-white flex items-center space-x-2">

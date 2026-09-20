@@ -93,7 +93,7 @@ export const MediaVaultDrawer: React.FC<MediaVaultDrawerProps> = ({
 
   // 3. 크로스 챕터 전송 브릿지: [📄 3챕터 슬라이드 장표에 삽입]
   const handleInsertToOfficeStudio = (item: MediaItem) => {
-    setCurrentView('devlab'); // 3챕터 오피스 스튜디오 / 개발 랩으로 이동
+    setCurrentView('devlab'); // 3챕터 오피스 스튜디오로 이동
     showToast(`📄 [${item.prompt || '미디어 에셋'}]이 제3챕터 슬라이드 장표에 삽입되었습니다!`, 'success');
     onClose();
   };

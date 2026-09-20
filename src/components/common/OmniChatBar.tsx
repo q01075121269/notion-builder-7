@@ -54,8 +54,8 @@ const INTENT_META: Record<
     bgColor: "bg-emerald-50 dark:bg-emerald-950/30",
   },
   DEVLAB: {
-    icon: "💻",
-    label: "개발 랩 아카이브 저장 완료",
+    icon: "📄",
+    label: "AI 오피스 문서 생성 완료",
     color: "text-blue-700 dark:text-blue-300",
     borderColor: "border-blue-200 dark:border-blue-800/60",
     bgColor: "bg-blue-50 dark:bg-blue-950/30",
@@ -372,7 +372,7 @@ export const OmniChatBar: React.FC = () => {
                             ? "🏗️ 노션 빌더 작업실로 이동"
                             : r.intent === "LIFE"
                             ? "🌿 라이프 허브로 이동"
-                            : "⚗️ 개발 랩으로 이동"}
+                            : "📄 오피스 스튜디오로 이동"}
                         </button>
                       )}
                     </div>

@@ -23,8 +23,13 @@ export type FormMode = 'free' | 'template'; // 자유 기획 모드 vs 표준 �
 export const DevLabPage: React.FC = () => {
   const { showToast } = useApp();
 
-  // 1. 상태 관리
-  const [activeTab, setActiveTab] = useState<OfficeTab>('docs');
+  // 1. 상태 관리 (office_sheets_data 감지 시 스마트 시트 탭 자동 우선 활성화)
+  const [activeTab, setActiveTab] = useState<OfficeTab>(() => {
+    if (typeof window !== 'undefined' && localStorage.getItem('office_sheets_data')) {
+      return 'sheets';
+    }
+    return 'docs';
+  });
   const [formMode, setFormMode] = useState<FormMode>('free');
   const [isNotebookLMOpen, setIsNotebookLMOpen] = useState(false);
   const [activeCitationId, setActiveCitationId] = useState<number | null>(null);

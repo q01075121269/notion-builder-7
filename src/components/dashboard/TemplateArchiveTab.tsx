@@ -85,19 +85,6 @@ export const TemplateArchiveTab: React.FC<TemplateArchiveTabProps> = ({
           </div>
 
           <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
-            {/* 노션 실제 저장소 워크스페이스 바로가기 버튼 */}
-            <a
-              href={targetNotionUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex-1 md:flex-none px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold flex items-center justify-center space-x-1.5 transition shadow-sm cursor-pointer"
-              title="실제 내 노션 저장소(Workspace)로 이동하여 전체 페이지 열람"
-            >
-              <LinkIcon className="w-3.5 h-3.5 text-amber-300" />
-              <span>내 노션 저장소 바로가기</span>
-              <ExternalLink className="w-3 h-3 opacity-80" />
-            </a>
-
             {/* 현재 작업물 보관함에 저장 버튼 */}
             <button
               onClick={onArchiveCurrent}

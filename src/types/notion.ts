@@ -105,13 +105,17 @@ export type NotionBlock =
   | DatabaseViewBlock;
 
 export interface NotionTemplate {
+  id?: string;
   title: string;
   icon: string;
   cover_query: string;
   cover_url?: string;
   description?: string;
+  tags?: string[];
   databases: NotionDatabase[];
   page_layout: NotionBlock[];
+  formulas2Specs?: any[];
+  valueAddList?: string[];
   created_at?: string;
 }
 

@@ -8,7 +8,9 @@ import {
   Clock, 
   Settings, 
   Bot,
-  ChevronDown
+  ChevronDown,
+  Crown,
+  ExternalLink
 } from 'lucide-react';
 import { UserProfileDropdown } from '../auth/UserProfileDropdown';
 import { SettingsDrawer } from './SettingsDrawer';
@@ -24,6 +26,8 @@ export const Navbar: React.FC = () => {
     setCurrentView,
     notionApiKey,
     notionParentPageId,
+    createdNotionResource,
+    setIsNotionSettingsModalOpen,
     apiKey,
     showToast
   } = useApp();
@@ -32,6 +36,23 @@ export const Navbar: React.FC = () => {
   const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
 
   const isConfigured = Boolean(notionApiKey && notionParentPageId && apiKey);
+
+  // 노션 통합 허브 바로가기 URL
+  const targetNotionUrl = createdNotionResource?.pageUrl || (
+    notionParentPageId 
+      ? `https://notion.so/${notionParentPageId.replace(/-/g, '')}` 
+      : null
+  );
+
+  const handleOpenMasterHub = () => {
+    if (targetNotionUrl) {
+      window.open(targetNotionUrl, '_blank');
+      showToast('👑 내 노션 통합 허브 마스터 워크스페이스로 이동합니다!', 'success');
+    } else {
+      setIsNotionSettingsModalOpen(true);
+      showToast('노션 연동 설정이 필요합니다. 토큰과 부모 페이지 ID를 등록해 주세요.', 'info');
+    }
+  };
 
   const modelLabels: Record<GeminiModelType, { label: string; short: string }> = {
     'gemini-3.6-flash': { label: 'Gemini 3.6 Flash (권장)', short: '3.6 Flash' },
@@ -79,8 +100,19 @@ export const Navbar: React.FC = () => {
             </div>
           </div>
 
-          {/* [중앙]: [🏗️ 템플릿 마스터 | 👔 라이프 비서 | 📄 오피스 스튜디오 | 🎨 AI 미디어 랩] 4대 글로벌 내비게이션 바 */}
+          {/* [중앙]: [👑 통합 허브 | 🏗️ 템플릿 마스터 | 👔 루틴 | 📄 오피스 스튜디오 | 🎨 AI 미디어 랩] 5대 글로벌 내비게이션 바 */}
           <div className="flex items-center bg-neutral-100/90 dark:bg-neutral-800/80 p-1 rounded-xl border border-neutral-200/70 dark:border-neutral-700/60 shrink-0">
+            {/* 0. 👑 통합 허브 (신규 노션 저장소 바로가기 버튼) */}
+            <button
+              onClick={handleOpenMasterHub}
+              className="flex items-center space-x-1 px-2.5 py-1.5 text-xs font-bold rounded-lg transition whitespace-nowrap cursor-pointer bg-gradient-to-r from-amber-500 via-indigo-600 to-purple-600 text-white hover:opacity-90 shadow-xs active:scale-95 mr-1"
+              title="내 노션 통합 허브 워크스페이스 새 탭 열기"
+            >
+              <Crown className="w-3.5 h-3.5 text-amber-300 shrink-0" />
+              <span className="whitespace-nowrap">👑 통합 허브</span>
+              <ExternalLink className="w-3 h-3 opacity-80 shrink-0" />
+            </button>
+
             {/* 1. 🏗️ 템플릿 마스터 */}
             <button
               onClick={() => setCurrentView('builder')}
@@ -95,7 +127,7 @@ export const Navbar: React.FC = () => {
               <span className="whitespace-nowrap">🏗️ 템플릿 마스터</span>
             </button>
 
-            {/* 2. 👔 라이프 비서 */}
+            {/* 2. 👔 루틴 (기존 '라이프 비서'에서 사용자의 요청으로 명칭 단순화) */}
             <button
               onClick={() => setCurrentView('life')}
               className={`flex items-center space-x-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg transition whitespace-nowrap cursor-pointer ${
@@ -103,10 +135,10 @@ export const Navbar: React.FC = () => {
                   ? 'bg-white dark:bg-notion-dark-card text-emerald-600 dark:text-emerald-400 font-bold shadow-xs'
                   : 'text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white'
               }`}
-              title="라이프 비서"
+              title="루틴 및 라이프 관리"
             >
               <Leaf className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-              <span className="whitespace-nowrap">👔 라이프 비서</span>
+              <span className="whitespace-nowrap">👔 루틴</span>
             </button>
 
             {/* 3. 📄 오피스 스튜디오 */}
@@ -147,7 +179,7 @@ export const Navbar: React.FC = () => {
               title="오늘의 데일리 루틴 브리핑"
             >
               <Clock className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-              <span className="whitespace-nowrap">⏰ 데일리 루틴</span>
+              <span className="whitespace-nowrap">⏰ 루틴 브리핑</span>
             </button>
             
             {/* 1. Gemini 모델 셀렉터 (Google AI Studio 스타일의 라운드 드롭다운) */}

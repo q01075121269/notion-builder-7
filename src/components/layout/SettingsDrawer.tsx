@@ -174,7 +174,7 @@ export const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ isOpen, onClose 
                         <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-teal-600 text-white">추천</span>
                       </h4>
                       <p className="text-[10px] text-neutral-500 dark:text-neutral-400">
-                        라이프 허브·템플릿 보관함·개발 랩 3대 DB 원스톱 자동 생성
+                        라이프 허브·템플릿 보관함·오피스 스튜디오 3대 DB 원스톱 자동 생성
                       </p>
                     </div>
                   </div>
