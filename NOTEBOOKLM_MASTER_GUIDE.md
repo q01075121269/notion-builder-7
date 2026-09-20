@@ -1,41 +1,42 @@
 # Notion Architect AI Master Workspace v2.0 - NotebookLM 시스템 마스터 분석 가이드
 
-본 문서는 **Notion Architect AI Master Workspace v2.0** 전 영역의 아키텍처, 4대 핵심 챕터, 데일리 루틴 콕핏, 자정 자동 롤백 엔진, Zero-Rot 자산 아카이빙 파이프라인, 노션 DB 6대 스키마 및 AI 오케스트레이션 로직을 빠짐없이 집약한 **NotebookLM 최적화 지식 베이스(Knowledge Base)** 문서입니다.
+본 문서는 **Notion Architect AI Master Workspace v2.0** 전 영역의 아키텍처, 4대 핵심 챕터, 데일리 루틴 콕핏, 자정 자동 롤백 엔진, Zero-Rot 자산 아카이빙 파이프라인, 노션 5대 마스터 DB 원클릭 구축 스키마 및 AI 오케스트레이션 로직을 빠짐없이 집약한 **NotebookLM 최적화 지식 베이스(Knowledge Base)** 문서입니다.
 
 ---
 
 ## 📌 1. 시스템 아키텍처 & 글로벌 레이아웃 (System Overview & Architecture)
 
 ### 1.1 기술 스택 (Technology Stack)
-- **Core & UI Framework**: Next.js (App Router) / React 18, TypeScript, TailwindCSS, Lucide Icons.
+- **Core & UI Framework**: Vite / React 18, TypeScript, TailwindCSS, Lucide Icons.
 - **AI Engines**: Google Gemini 3.6 Flash (기본 권장), Gemini 3.8 Flash, Gemini 2.0 / 1.5 시리즈.
 - **Client Storage & Cache**: 
   - **IndexedDB (`MediaLabDB`)**: 1계층 대용량 미디어 에셋(Base64/Blob 이미지·영상·오디오) 캐시 스토리지.
-  - **localStorage**: 마스터 루틴 룰, 1일 오버라이드 캐시, QuickCapture 기록, 오피스 지식 소스 서랍 스토리지.
-- **Integration Bridge**: Notion API 2.0 (원격 데이터베이스 생성 및 페이지 배포 커넥터).
+  - **localStorage**: 마스터 루틴 룰, 1일 오버라이드 캐시, QuickCapture 기록, 오피스 지식 소스 서랍 스토리지, 노션 5대 마스터 DB 연동 키.
+- **Integration Bridge**: Notion API 2.0 (원격 5대 마스터 데이터베이스 자동 생성 및 페이지 배포 커넥터).
 
 ### 1.2 글로벌 뷰 모드 및 레이아웃 통제 (`AppContext.tsx` & `App.tsx`)
 - `currentView` 상태값에 따라 전체 애플리케이션 화면이 동적으로 스위칭됩니다:
   1. `home`: 메인 홈 대시보드 (4대 챕터 퀵 런처 & 24시간 데일리 루틴 관제 콕핏).
   2. `builder`: 제1챕터 템플릿 마스터 (서브 스위처: `🔨 템플릿 빌더` ↔ `🗂️ 템플릿 보관함`).
-  3. `life`: 제2챕터 라이프 비서 (일정 캘린더, 이메일 요약, 가계부 지출, 투두 관리).
-  4. `devlab`: 제3챕터 AI 오피스 스튜디오 (스마트 Docs, Sheets, Slides 라이브 렌더러 & NotebookLM 서랍).
-  5. `media_lab`: 제4챕터 AI 미디어 랩 (이미지, 영상 시퀀서, 오디오 믹서, 미디어 보관함 Drawer).
+  3. `life`: 제2챕터 라이프 Hub (일정 캘린더, 이메일 요약, 가계부 지출, 데일리 루틴 관리).
+  4. `devlab`: 제3챕터 AI 오피스 스튜디오 (스마트 Docs, Sheets, Slides 라이브 렌더러 & NotebookLM Source Vault 서랍).
+  5. `media_lab`: 제4챕터 AI 미디어 랩 (이미지 스튜디오, 씬 타임라인 영상 스튜디오, 4대 오디오 믹서, 미디어 보관함 Drawer).
   6. `dashboard`: 템플릿 보관함 호환 뷰.
   7. `quick_capture`: 1초 퀵 캡처 허브 뷰.
 
 ### 1.3 최상단 글로벌 내비게이션 바 (`Navbar.tsx`)
-- **[좌측] Notion Architect 로고**: 클릭 시 메인 홈 대시보드 (`setCurrentView('home')`)로 즉시 이동. 첫 접속/새로고침 시 홈 대시보드를 기본 유지.
-- **[중앙] 4대 챕터 탭 스위처**: 
+- **[좌측] Notion Architect 로고**: 클릭 시 메인 홈 대시보드 (`setCurrentView('home')`)로 즉시 이동.
+- **[중앙] 4대 챕터 메인 탭**:
   - `[🏗️ 템플릿 마스터]` (`builder`)
-  - `[👔 라이프 비서]` (`life`)
+  - `[🌱 라이프 Hub]` (`life`)
   - `[📄 오피스 스튜디오]` (`devlab`)
   - `[🎨 AI 미디어 랩]` (`media_lab`)
-  - `whitespace-nowrap` 알약 형태 고정.
 - **[우측] 퀵 유틸리티 바**:
-  - `[⏰ 데일리 루틴]` 버튼: 오늘 데일리 루틴 브리핑 자동 발동 및 라이프 비서 연결.
+  - `[👑 통합 허브]` 버튼: 내 노션 마스터 워크스페이스 새 탭 열기 (마스터 허브 구축 페이지 직행).
+  - `[⏰ 루틴 브리핑]` 버튼: 오늘 데일리 루틴 브리핑 자동 발동 및 라이프 Hub 연결.
   - Gemini 모델 셀렉터 (`Gemini 3.6 Flash`, `3.8 Flash` 등 선택).
-  - `[⚙️ 설정]` 버튼 (Notion API 키 및 Google Sync 설정 모달).
+  - `[⚙️ 설정]` 버튼: 노션 5대 마스터 DB 원클릭 구축, Notion API 키 등록, Google Calendar 싱크 및 쉬운 사용설명서 모달 호출.
+  - 프로필 아바타: 사용자 프로필 관리 및 로그아웃.
 
 ---
 
@@ -44,7 +45,7 @@
 ### 2.1 4대 핵심 챕터 퀵 런처 그리드 (`src/app/page.tsx`)
 - Slate-50 배경, Slate-200 테두리, `hover:shadow-md` 규격의 4개 카드 그리드 배치:
   1. `[🏗️ 템플릿 마스터]`: AI 대화형 템플릿 자동 생성, 수식/DB 설계 & 보관함 서브 스위처.
-  2. `[👔 라이프 비서]`: 캘린더 동기화, 이메일 브리핑, 지출 가계부 및 스마트 데일리 할 일.
+  2. `[🌱 라이프 Hub]`: 캘린더 동기화, 이메일 브리핑, 지출 가계부 및 데일리 투두 관리.
   3. `[📄 오피스 스튜디오]`: Docs/Sheets/Slides 라이브 렌더링, 잼스형 표준 양식 & NotebookLM RAG 지식 소스.
   4. `[🎨 AI 미디어 랩]`: 멀티스타일 이미지 생성, 씬 타임라인 영상 스튜디오, 4대 오디오 믹서.
 
