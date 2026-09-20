@@ -23,13 +23,8 @@ export type FormMode = 'free' | 'template'; // 자유 기획 모드 vs 표준 �
 export const DevLabPage: React.FC = () => {
   const { showToast } = useApp();
 
-  // 1. 상태 관리 (office_sheets_data 감지 시 스마트 시트 탭 자동 우선 활성화)
-  const [activeTab, setActiveTab] = useState<OfficeTab>(() => {
-    if (typeof window !== 'undefined' && localStorage.getItem('office_sheets_data')) {
-      return 'sheets';
-    }
-    return 'docs';
-  });
+  // 1. 상태 관리 (탭 스위칭 & 듀얼 서식 모드)
+  const [activeTab, setActiveTab] = useState<OfficeTab>('docs');
   const [formMode, setFormMode] = useState<FormMode>('free');
   const [isNotebookLMOpen, setIsNotebookLMOpen] = useState(false);
   const [activeCitationId, setActiveCitationId] = useState<number | null>(null);
@@ -39,12 +34,12 @@ export const DevLabPage: React.FC = () => {
   const handleSelectCitation = (id: number) => {
     setActiveCitationId(id);
     setIsNotebookLMOpen(true);
-    showToast(`📚 [인용 뱃지 ${id}] NotebookLM 원천 소스로 이동했습니다.`, 'info');
+    showToast(`📚 [각주 인용 ${id}] NotebookLM 원천 소스 지점으로 이동했습니다.`, 'info');
   };
 
   // 내보내기 & 복사 동작
   const handleExportToNotion = () => {
-    showToast('⚡ AI 오피스 전문 라이브 문서가 노션 워크스페이스에 즉시 내보내졌습니다!', 'success');
+    showToast('⚡ AI 오피스 라이브 문서가 노션 통합 허브 워크스페이스에 즉시 내보내졌습니다!', 'success');
   };
 
   const handleDownload = () => {
@@ -60,13 +55,13 @@ export const DevLabPage: React.FC = () => {
   const handleCopyClipboard = () => {
     setIsCopied(true);
     setTimeout(() => setIsCopied(false), 2000);
-    showToast(`📋 [${activeTab.toUpperCase()}] 라이브 캔버스 내용이 클립보드에 복사되었습니다.`, 'info');
+    showToast(`📋 [${activeTab.toUpperCase()}] 라이브 캔버스 데이터가 클립보드에 복사되었습니다.`, 'info');
   };
 
   return (
-    <div className="flex-1 flex flex-col h-full w-full overflow-hidden bg-neutral-50 dark:bg-notion-dark-bg text-neutral-900 dark:text-white select-none relative">
+    <div className="flex-1 flex flex-col h-full w-full overflow-hidden bg-slate-50 dark:bg-notion-dark-bg text-neutral-900 dark:text-white select-none relative">
       
-      {/* 0. 노트북LM형 지식 소스 서랍 & 2인 오디오 브리핑 위젯 모달 */}
+      {/* 0. 노트북LM형 지식 소스 서랍 & 모달 */}
       <NotebookLMDrawer
         isOpen={isNotebookLMOpen}
         onClose={() => setIsNotebookLMOpen(false)}
@@ -104,7 +99,7 @@ export const DevLabPage: React.FC = () => {
                 AI 오피스 스튜디오
               </h1>
               <p className="text-[10px] text-slate-500 dark:text-neutral-400 whitespace-nowrap">
-                Docs • Sheets • Slides 전문 렌더러 라이브 캔버스
+                Docs • Sheets • Slides 전문 인터랙티브 라이브 캔버스
               </p>
             </div>
           </div>
@@ -207,18 +202,22 @@ export const DevLabPage: React.FC = () => {
 
       </div>
 
-      {/* 본문 레이아웃: 중앙 전문 렌더러 라이브 캔버스 (Slate-50 배경) */}
+      {/* 본문 레이아웃: 탭 전환 시 데이터 휘발 방지를 위한 상태 격리 컴포넌트 마운트 유지 (hidden style) */}
       <div className="flex-1 overflow-y-auto p-4 sm:p-8 bg-slate-50 dark:bg-neutral-900/60 flex justify-center">
-        {activeTab === 'docs' ? (
+        <div className={`w-full ${activeTab === 'docs' ? 'block' : 'hidden'}`}>
           <SmartDocsRenderer
             formMode={formMode}
             onSelectCitation={handleSelectCitation}
           />
-        ) : activeTab === 'sheets' ? (
+        </div>
+
+        <div className={`w-full ${activeTab === 'sheets' ? 'block' : 'hidden'}`}>
           <SmartSheetsRenderer formMode={formMode} />
-        ) : (
+        </div>
+
+        <div className={`w-full ${activeTab === 'slides' ? 'block' : 'hidden'}`}>
           <SmartSlidesRenderer formMode={formMode} />
-        )}
+        </div>
       </div>
 
     </div>
