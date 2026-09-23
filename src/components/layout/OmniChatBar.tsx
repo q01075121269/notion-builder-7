@@ -147,6 +147,7 @@ export interface OmniAttachment {
   sizeFormatted?: string;
   type: 'file' | 'link';
   parsedContent?: string;
+  sheets?: any[];
   isParsing?: boolean;
   error?: string;
 }
@@ -164,6 +165,7 @@ export const OmniChatBar: React.FC = () => {
     selectedModel,
     currentView,
     setCurrentView,
+    currentTemplate,
     setCurrentTemplate,
     setIsViewingCurationHub,
   } = useApp();
@@ -334,6 +336,7 @@ export const OmniChatBar: React.FC = () => {
           sizeFormatted: parsed.sizeFormatted,
           type: 'file',
           parsedContent: parsed.parsedContent,
+          sheets: parsed.sheets,
           isParsing: false,
           error: parsed.error,
         });
@@ -1155,8 +1158,9 @@ export const OmniChatBar: React.FC = () => {
                               }
                               try {
                                 showToast('🚀 노션 워크스페이스에 페이지/DB를 생성합니다...', 'info');
+                                const targetToDeploy = currentTemplate || msg.generatedTemplateData!;
                                 const res = await createNotionTemplateInWorkspace(
-                                  msg.generatedTemplateData!,
+                                  targetToDeploy,
                                   notionApiKey,
                                   notionParentPageId,
                                   (step, pct) => showToast(`[${pct}%] ${step}`, 'info')

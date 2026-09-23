@@ -617,33 +617,44 @@ const PropertyValueCell: React.FC<{
     );
   }
 
-  if (value === undefined || value === null || value === '') {
+  let actualValue = value;
+  if ((actualValue === undefined || actualValue === null || actualValue === '') && row) {
+    const normalizedName = property.name.replace(/\s+/g, '').toLowerCase();
+    const matchingKey = Object.keys(row).find(k => k.replace(/\s+/g, '').toLowerCase() === normalizedName);
+    if (matchingKey) {
+      actualValue = row[matchingKey];
+    }
+  }
+
+  if (actualValue === undefined || actualValue === null || actualValue === '') {
     return <span className="text-neutral-300 dark:text-neutral-600">-</span>;
   }
 
+  const displayVal = actualValue;
+
   switch (property.type) {
     case 'title':
-      return <span className="font-semibold text-neutral-900 dark:text-neutral-100">{String(value)}</span>;
+      return <span className="font-semibold text-neutral-900 dark:text-neutral-100">{String(displayVal)}</span>;
 
     case 'date':
       return (
         <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded text-[11px] font-medium bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 border border-blue-200/50 dark:border-blue-900/50">
           <Calendar className="w-3.5 h-3.5" />
-          <span>{String(value)}</span>
+          <span>{String(displayVal)}</span>
         </span>
       );
 
     case 'status':
       return (
         <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200/50 dark:border-emerald-900/50">
-          <span>{String(value)}</span>
+          <span>{String(displayVal)}</span>
         </span>
       );
 
     case 'select':
       return (
         <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 border border-neutral-200/60 dark:border-neutral-700">
-          <span>{String(value)}</span>
+          <span>{String(displayVal)}</span>
         </span>
       );
 
@@ -651,7 +662,7 @@ const PropertyValueCell: React.FC<{
       return (
         <input 
           type="checkbox" 
-          checked={Boolean(value)} 
+          checked={Boolean(displayVal)} 
           readOnly 
           className="rounded border-neutral-300 text-indigo-600 focus:ring-indigo-500 h-3.5 w-3.5" 
         />
@@ -661,6 +672,6 @@ const PropertyValueCell: React.FC<{
       return <span className="font-mono text-neutral-700 dark:text-neutral-300 font-medium">{Number(value).toLocaleString()}</span>;
 
     default:
-      return <span>{String(value)}</span>;
+      return <span>{String(displayVal)}</span>;
   }
 };

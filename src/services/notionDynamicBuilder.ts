@@ -711,7 +711,8 @@ export function buildDynamicTemplateFromPayload(params: DynamicBuildParams): Not
   // 1. 단일 DB 원천 차단 & 다중 관계형 DB 생태계 강제 팽창
   let databases: NotionDatabase[] = [];
 
-  if (Array.isArray(dbSchemas) && dbSchemas.length >= 2) {
+  // [Pipeline Passthrough] 전달된 dbSchemas가 1개 이상이면 100% 무손실 직결
+  if (Array.isArray(dbSchemas) && dbSchemas.length >= 1) {
     dbSchemas.forEach((schema, idx) => {
       const props: NotionProperty[] = [];
 
@@ -720,33 +721,43 @@ export function buildDynamicTemplateFromPayload(params: DynamicBuildParams): Not
           if (p.name) {
             const rawType = (p.type || 'text').toLowerCase();
             const validTypes = ['title', 'date', 'status', 'formula', 'relation', 'select', 'multi_select', 'checkbox', 'number', 'url', 'text', 'person'];
-            const propType = validTypes.includes(rawType) ? rawType as any : 'text';
+            const propType = validTypes.includes(rawType) ? (rawType as any) : 'text';
 
             props.push({
               name: p.name,
               type: propType,
               expression: p.formula || p.expression,
-              options: Array.isArray(p.options) ? p.options : undefined
+              options: Array.isArray(p.options) ? p.options : undefined,
             });
           }
         });
       }
 
-      if (!props.some(p => p.type === 'title')) {
-        props.unshift({ name: '제목', type: 'title' });
+      // 첫 번째 컬럼이 title이 아니면 첫 번째 컬럼을 title로 승격 (불필요한 '제목' 컬럼 강제 추가 방지)
+      if (!props.some((p) => p.type === 'title')) {
+        if (props.length > 0) {
+          props[0].type = 'title';
+        } else {
+          props.unshift({ name: '제목', type: 'title' });
+        }
       }
 
       const finalProps = injectQualityGateProperties(props);
+
+      // 실제 엑셀 행 데이터(sample_rows)가 있으면 100% 온전히 보존
+      const realSampleRows = Array.isArray(schema.sample_rows) && schema.sample_rows.length > 0
+        ? schema.sample_rows
+        : [
+            { [props[0].name]: `${cleanTitle} 예시 가이드 데이터 1`, 'Quality_Status': '초안', 'Verified': false },
+            { [props[0].name]: `${cleanTitle} 핵심 완료 목표 2`, 'Quality_Status': '승인', 'Verified': true },
+          ];
 
       databases.push({
         name: schema.db_name || (idx === 0 ? `🏢 ${cleanTitle.replace(/^\[.*?\]\s*/, '')} 마스터 DB` : idx === 1 ? `📋 세부 점검 & 실행 트래커 DB` : `🛠️ 조치 및 리스크 관리 DB`),
         description: `AI가 동적으로 맞춤 구성한 ${schema.db_name || '마스터 DB'}입니다.`,
         view_type: 'table',
         properties: finalProps,
-        sample_rows: [
-          { '제목': `${cleanTitle} 예시 가이드 데이터 1`, '진행 상태': '진행 중', 'Quality_Status': '초안', 'Verified': false },
-          { '제목': `${cleanTitle} 핵심 완료 목표 2`, '진행 상태': '완료', 'Quality_Status': '승인', 'Verified': true }
-        ]
+        sample_rows: realSampleRows,
       });
     });
   } else {

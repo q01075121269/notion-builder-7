@@ -366,32 +366,41 @@ async function insertSampleRows(
   headers: any, 
   onProgress?: PublishProgressCallback
 ) {
-  // 웹 캔버스에 표시된 행 데이터 또는 도메인 기반 지능형 1~2행 데이터 확보
+  // 웹 캔버스에 표시된 엑셀 실제 행 데이터(sample_rows)를 1순위로 채택
   const sampleRows = (db.sample_rows && db.sample_rows.length > 0)
     ? db.sample_rows
     : generateIntelligentSampleRows(db);
 
-  const rowsToInsert = sampleRows.slice(0, 3);
+  const rowsToInsert = sampleRows.slice(0, 10); // 상위 최대 10개 행 무손실 삽입
   const totalRows = rowsToInsert.length;
 
-  // DB의 title 속성명 찾기 (기본값: '이름')
-  const titleProp = db.properties.find(p => p.type === 'title') || { name: '이름', type: 'title' };
+  // DB의 title 속성명 찾기 (기본값: 첫 번째 속성 또는 '이름')
+  const titleProp = db.properties.find(p => p.type === 'title') || db.properties[0] || { name: '이름', type: 'title' };
 
   for (let i = 0; i < totalRows; i++) {
     const row = rowsToInsert[i];
     if (onProgress) {
-      onProgress(`[${db.name}] 초기 상용급 샘플 데이터 채우는 중 (${i + 1}/${totalRows})...`, 60 + Math.round(((i + 1) / totalRows) * 15));
+      onProgress(`[${db.name}] 엑셀 실제 행 데이터 1:1 삽입 중 (${i + 1}/${totalRows})...`, 60 + Math.round(((i + 1) / totalRows) * 15));
     }
 
     const rowProperties: Record<string, any> = {};
 
     db.properties.forEach(prop => {
-      const val = row[prop.name];
+      // 1) 정확한 키 매칭, 2) 공백/특수문자 무시 유연 매칭
+      let val = row[prop.name];
+      if (val === undefined || val === null || val === '') {
+        const normalizedPropName = prop.name.replace(/\s+/g, '').toLowerCase();
+        const foundKey = Object.keys(row).find(k => k.replace(/\s+/g, '').toLowerCase() === normalizedPropName);
+        if (foundKey) {
+          val = row[foundKey];
+        }
+      }
+
       if (val === undefined || val === null || val === '') return;
 
       if (prop.type === 'title') {
         rowProperties[prop.name] = {
-          title: [{ type: 'text', text: { content: String(val) } }]
+          title: [{ type: 'text', text: { content: String(val).slice(0, 1500) } }]
         };
       } else if (prop.type === 'date') {
         const rawDate = String(val).split(' ')[0].trim();
@@ -403,9 +412,9 @@ async function insertSampleRows(
       } else if (prop.type === 'status') {
         const stringVal = String(val).trim();
         let statusName = '시작 전';
-        if (stringVal.includes('완료') || stringVal.includes('Done') || stringVal.includes('Complete') || stringVal.includes('양호')) {
+        if (stringVal.includes('완료') || stringVal.includes('Done') || stringVal.includes('Complete') || stringVal.includes('양호') || stringVal.includes('정상')) {
           statusName = '완료';
-        } else if (stringVal.includes('진행') || stringVal.includes('In progress') || stringVal.includes('접수') || stringVal.includes('조치')) {
+        } else if (stringVal.includes('진행') || stringVal.includes('In progress') || stringVal.includes('접수') || stringVal.includes('조치') || stringVal.includes('점검')) {
           statusName = '진행 중';
         } else {
           statusName = '시작 전';
@@ -414,11 +423,8 @@ async function insertSampleRows(
           status: { name: statusName }
         };
       } else if (prop.type === 'select') {
-        const validOptions = prop.options || ['선택 1', '선택 2'];
-        const stringVal = String(val).trim();
-        const matched = validOptions.find(opt => opt.toLowerCase() === stringVal.toLowerCase()) || validOptions[0] || stringVal;
         rowProperties[prop.name] = {
-          select: { name: String(matched).slice(0, 100) }
+          select: { name: String(val).slice(0, 100) }
         };
       } else if (prop.type === 'multi_select') {
         const items = Array.isArray(val) ? val : String(val).split(',').map(s => s.trim());
@@ -427,13 +433,18 @@ async function insertSampleRows(
         };
       } else if (prop.type === 'checkbox') {
         rowProperties[prop.name] = {
-          checkbox: Boolean(val)
+          checkbox: Boolean(val) && String(val).toLowerCase() !== 'false'
         };
       } else if (prop.type === 'number') {
         const numVal = Number(String(val).replace(/[^0-9.-]+/g, ''));
         if (!isNaN(numVal)) {
           rowProperties[prop.name] = {
             number: numVal
+          };
+        } else {
+          // 숫자로 변환 불가 시 rich_text에 보존
+          rowProperties[prop.name] = {
+            rich_text: [{ type: 'text', text: { content: String(val).slice(0, 2000) } }]
           };
         }
       } else if (prop.type === 'url') {
@@ -447,10 +458,16 @@ async function insertSampleRows(
       }
     });
 
-    // 타이틀 속성 누락 방지 가드
+    // [Aa 타이틀 무손실 가드] DB 이름이 타이틀로 복사되는 버그 원천 차단: 엑셀 실제 첫 번째 열 값 채택
     if (!rowProperties[titleProp.name]) {
+      const firstRowVal = Object.values(row)[0];
+      const validTitleVal = (row[titleProp.name] || firstRowVal || '').toString().trim();
+      const finalTitleContent = (validTitleVal && !validTitleVal.includes('마스터 DB') && !validTitleVal.includes('데이터베이스'))
+        ? validTitleVal
+        : `객실 점검 데이터 ${i + 1}`;
+
       rowProperties[titleProp.name] = {
-        title: [{ type: 'text', text: { content: String(row[titleProp.name] || `${db.name} 샘플 ${i + 1}`) } }]
+        title: [{ type: 'text', text: { content: finalTitleContent } }]
       };
     }
 
