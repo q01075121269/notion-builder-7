@@ -104,6 +104,48 @@ export type NotionBlock =
   | DividerBlock
   | DatabaseViewBlock;
 
+// ─────────────────────────────────────────────────────────────────────────────
+// 커스텀 에이전트 3.0 (Notion Agent 3.0) 셋업 블루프린트 인터페이스
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface AgentSkillItem {
+  id?: string;
+  name: string;
+  trigger: string;
+  targetDb?: string;
+  logic: string;
+  action: string;
+}
+
+export interface SubAgentItem {
+  name: string;
+  role: string;
+  responsibility: string;
+}
+
+export interface AgentBlueprint {
+  version: string;
+  persona: {
+    role: string;
+    objective: string;
+    scope: string;
+  };
+  multiTriggers: {
+    schedule: string;
+    notionEvents: string[];
+    externalEvents: string[];
+  };
+  skills: AgentSkillItem[];
+  subAgents: SubAgentItem[];
+  workslopGuardrails: {
+    doneDefinition: string[];
+    verifiedSourcesOnly: boolean;
+    verificationMetrics: string[];
+    verificationTableMarkdown: string;
+  };
+  setupPromptMarkdown: string; // 노션 공식 커스텀 에이전트 1-클릭 복사용 프롬프트 전문
+}
+
 export interface NotionTemplate {
   id?: string;
   title: string;
@@ -116,6 +158,7 @@ export interface NotionTemplate {
   page_layout: NotionBlock[];
   formulas2Specs?: any[];
   valueAddList?: string[];
+  agentBlueprint?: AgentBlueprint; // 에이전트 3.0 공식 셋업 블루프린트 규격
   created_at?: string;
 }
 

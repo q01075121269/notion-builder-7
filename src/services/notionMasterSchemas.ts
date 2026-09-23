@@ -1,5 +1,5 @@
 // src/services/notionMasterSchemas.ts
-// 노션 마스터 데이터베이스 통합 최신 스키마 정의 (웹 앱 기능 100% 동기화)
+// 노션 마스터 데이터베이스 통합 최신 스키마 정의 (웹 앱 기능 100% 동기화 + 에이전트 3.0 품질 게이트 & 감사 로그 연동)
 
 export interface MasterDbSchema {
   name: string;
@@ -7,6 +7,21 @@ export interface MasterDbSchema {
   description?: string;
   properties: Record<string, any>;
 }
+
+// 공통 품질 게이트 (Quality Gate) 속성 정의
+export const QUALITY_GATE_SCHEMA_PROPERTIES = {
+  Quality_Status: {
+    select: {
+      options: [
+        { name: '초안', color: 'gray' },
+        { name: '검수 중', color: 'yellow' },
+        { name: '승인', color: 'green' },
+        { name: '반려', color: 'red' }
+      ]
+    }
+  },
+  Verified: { checkbox: {} }
+};
 
 // 1. 라이프 허브 DB 스키마 (24시간 데일리 일정·할일·루틴 통합)
 export const LIFE_HUB_DB_SCHEMA: MasterDbSchema = {
@@ -57,6 +72,17 @@ export const LIFE_HUB_DB_SCHEMA: MasterDbSchema = {
         ]
       }
     },
+    'Quality_Status': {
+      select: {
+        options: [
+          { name: '초안', color: 'gray' },
+          { name: '검수 중', color: 'yellow' },
+          { name: '승인', color: 'green' },
+          { name: '반려', color: 'red' }
+        ]
+      }
+    },
+    'Verified': { checkbox: {} },
     '진행률 Formula': {
       formula: {
         expression: 'if(prop("진행 상태") == "완료", "100% 🟢", if(prop("진행 상태") == "진행 중", "50% 🟡", "0% ⚪"))'
@@ -109,6 +135,17 @@ export const EXPENSE_LEDGER_DB_SCHEMA: MasterDbSchema = {
         ]
       }
     },
+    'Quality_Status': {
+      select: {
+        options: [
+          { name: '초안', color: 'gray' },
+          { name: '검수 중', color: 'yellow' },
+          { name: '승인', color: 'green' },
+          { name: '반려', color: 'red' }
+        ]
+      }
+    },
+    'Verified': { checkbox: {} },
     '영수증/캡처 URL': { url: {} },
     'AI 이상 소비 진단 메모': { rich_text: {} }
   }
@@ -141,6 +178,17 @@ export const TEMPLATE_ARCHIVE_DB_SCHEMA: MasterDbSchema = {
         ]
       }
     },
+    'Quality_Status': {
+      select: {
+        options: [
+          { name: '초안', color: 'gray' },
+          { name: '검수 중', color: 'yellow' },
+          { name: '승인', color: 'green' },
+          { name: '반려', color: 'red' }
+        ]
+      }
+    },
+    'Verified': { checkbox: {} },
     '관계형 DB 수': { number: { format: 'number' } },
     'Formulas 2.0 수식': { rich_text: {} },
     '스키마 명세 요약': { rich_text: {} },
@@ -186,12 +234,23 @@ export const DEV_LAB_DB_SCHEMA: MasterDbSchema = {
         ]
       }
     },
+    'Quality_Status': {
+      select: {
+        options: [
+          { name: '초안', color: 'gray' },
+          { name: '검수 중', color: 'yellow' },
+          { name: '승인', color: 'green' },
+          { name: '반려', color: 'red' }
+        ]
+      }
+    },
+    'Verified': { checkbox: {} },
     '본문 및 소스코드': { rich_text: {} },
     '오류 조치 프롬프트': { rich_text: {} }
   }
 };
 
-// 5. (신규) AI 미디어 & 지식 스크랩 DB 스키마 (오디오·이미지·웹 스크랩)
+// 5. AI 미디어 & 지식 스크랩 DB 스키마 (오디오·이미지·웹 스크랩)
 export const MEDIA_SCRAP_DB_SCHEMA: MasterDbSchema = {
   name: '🎨 AI 미디어 & 지식 스크랩 (오디오·에셋·아카이브)',
   icon: '🎨',
@@ -209,9 +268,43 @@ export const MEDIA_SCRAP_DB_SCHEMA: MasterDbSchema = {
         ]
       }
     },
+    'Quality_Status': {
+      select: {
+        options: [
+          { name: '초안', color: 'gray' },
+          { name: '검수 중', color: 'yellow' },
+          { name: '승인', color: 'green' },
+          { name: '반려', color: 'red' }
+        ]
+      }
+    },
+    'Verified': { checkbox: {} },
     '원본 미디어/웹 URL': { url: {} },
     '핵심 요약 메모': { rich_text: {} },
     '아카이빙 시각': { created_time: {} }
+  }
+};
+
+// 6. 에이전트 감사 로그 DB 스키마 (Agent_Heartbeat_Log)
+export const AGENT_HEARTBEAT_LOG_DB_SCHEMA: MasterDbSchema = {
+  name: '🤖 에이전트 감사 로그 (Agent_Heartbeat_Log)',
+  icon: '🤖',
+  description: '노션 커스텀 에이전트 3.0의 자율 실행 내역, 트리거 로그 및 무손실 무결성 감사 기록 DB',
+  properties: {
+    '에이전트명': { title: {} },
+    '실행시각': { date: {} },
+    '실행상태': {
+      select: {
+        options: [
+          { name: '✅ 정상', color: 'green' },
+          { name: '⚠️ 경고', color: 'yellow' },
+          { name: '❌ 실패', color: 'red' }
+        ]
+      }
+    },
+    '처리건수': { number: { format: 'number' } },
+    '실행요약': { rich_text: {} },
+    '관련 태스크/데이터': { relation: {} }
   }
 };
 
@@ -220,5 +313,6 @@ export const ALL_MASTER_SCHEMAS: MasterDbSchema[] = [
   EXPENSE_LEDGER_DB_SCHEMA,
   TEMPLATE_ARCHIVE_DB_SCHEMA,
   DEV_LAB_DB_SCHEMA,
-  MEDIA_SCRAP_DB_SCHEMA
+  MEDIA_SCRAP_DB_SCHEMA,
+  AGENT_HEARTBEAT_LOG_DB_SCHEMA
 ];

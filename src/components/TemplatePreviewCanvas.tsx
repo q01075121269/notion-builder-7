@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import type { NotionTemplate, NotionDatabase } from '../types/notion';
 import { ResizableSplitLayout } from './ui/ResizableSplitLayout';
 import { NotionCover } from './preview/NotionCover';
@@ -8,6 +8,8 @@ import { NotionDatabaseView } from './preview/NotionDatabaseView';
 import { TemplateSchemaTable } from './preview/TemplateSchemaTable';
 import { TemplateBenchmarkCard } from './preview/TemplateBenchmarkCard';
 import { StructureTreeView } from './preview/StructureTreeView';
+import { AgentBlueprintCallout } from './preview/AgentBlueprintCallout';
+import { ensureTemplateAgentBlueprint } from '../services/notionDynamicBuilder';
 import { useApp } from '../context/AppContext';
 import {
   Layers,
@@ -52,10 +54,13 @@ export const TemplatePreviewCanvas: React.FC<TemplatePreviewCanvasProps> = ({ te
 
   const [selectedDbId, setSelectedDbId] = useState<string | null>(null);
 
+  // [Step 3]: 에이전트 3.0 블루프린트, 품질 게이트 속성 및 Heartbeat 감사 DB 무손실 통합
+  const activeTemplate = useMemo(() => ensureTemplateAgentBlueprint(template), [template]);
+
   // 통계 계산: DB 수, 총 속성 수, Formulas 2.0 수식 수
-  const totalDatabases = template.databases.length;
-  const totalProperties = template.databases.reduce((sum, db) => sum + db.properties.length, 0);
-  const totalFormulas = template.databases.reduce(
+  const totalDatabases = activeTemplate.databases.length;
+  const totalProperties = activeTemplate.databases.reduce((sum, db) => sum + db.properties.length, 0);
+  const totalFormulas = activeTemplate.databases.reduce(
     (sum, db) => sum + db.properties.filter((p) => p.type === 'formula').length,
     0
   );
@@ -71,7 +76,7 @@ export const TemplatePreviewCanvas: React.FC<TemplatePreviewCanvasProps> = ({ te
 
   // 대화창 수정 유도
   const handleModifyWithChat = () => {
-    const promptText = `"${template.title}" 템플릿의 데이터베이스 속성을 고도화하고 맞춤형 수식을 추가해줘.`;
+    const promptText = `"${activeTemplate.title}" 템플릿의 데이터베이스 속성을 고도화하고 맞춤형 수식을 추가해줘.`;
     setPendingChatPrompt(promptText);
     setActiveMobileTab('chat');
     showToast('💬 대화창에 템플릿 수정 프롬프트가 자동 입력되었습니다.', 'info');
@@ -79,7 +84,7 @@ export const TemplatePreviewCanvas: React.FC<TemplatePreviewCanvasProps> = ({ te
 
   // 에이전트 스킬 프리셋 주입 핸들러
   const handleApplySkill = (skillPrompt: string, skillName: string) => {
-    setPendingChatPrompt(`현재 "${template.title}" 템플릿에 [${skillName}]을 무손실 업그레이드로 적용해줘: ${skillPrompt}`);
+    setPendingChatPrompt(`현재 "${activeTemplate.title}" 템플릿에 [${skillName}]을 무손실 업그레이드로 적용해줘: ${skillPrompt}`);
     setActiveMobileTab('chat');
     showToast(`💬 "${skillName}" 요청이 대화창에 준비되었습니다.`, 'info');
   };
@@ -166,7 +171,7 @@ export const TemplatePreviewCanvas: React.FC<TemplatePreviewCanvasProps> = ({ te
                 </div>
 
                 <div className="space-y-1 max-h-48 overflow-y-auto pr-0.5">
-                  {template.databases.map((db, idx) => (
+                  {activeTemplate.databases.map((db, idx) => (
                     <button
                       key={idx}
                       onClick={() => scrollToDb(db.name)}
@@ -284,82 +289,72 @@ export const TemplatePreviewCanvas: React.FC<TemplatePreviewCanvasProps> = ({ te
                   </button>
                 )}
 
-                {/* [노션 페이지 뷰 | 구조 트리 뷰] 토글 */}
-                <div className="flex items-center p-0.5 rounded-xl bg-neutral-100 dark:bg-neutral-800 text-xs shrink-0">
+                {/* 뷰 모드 전환 토글 (페이지 뷰 vs 구조 트리 뷰) */}
+                <div className="flex items-center bg-slate-100 dark:bg-slate-800/80 p-0.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-medium">
                   <button
                     onClick={() => setPreviewMode('notion')}
-                    className={`flex items-center space-x-1.5 px-2.5 sm:px-3 py-1 rounded-lg font-medium transition whitespace-nowrap cursor-pointer ${
+                    className={`flex items-center space-x-1 px-2.5 py-1 rounded-md transition whitespace-nowrap cursor-pointer ${
                       previewMode === 'notion'
-                        ? 'bg-white dark:bg-notion-dark-card text-neutral-900 dark:text-white shadow-xs font-semibold'
-                        : 'text-neutral-500 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200'
+                        ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white font-bold shadow-xs'
+                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
                     }`}
                   >
-                    <FileText className="w-3.5 h-3.5 shrink-0" />
-                    <span className="hidden md:inline">노션 페이지 뷰</span>
-                    <span className="md:hidden">페이지</span>
+                    <FileText className="w-3.5 h-3.5" />
+                    <span>노션 페이지</span>
                   </button>
                   <button
                     onClick={() => setPreviewMode('tree')}
-                    className={`flex items-center space-x-1.5 px-2.5 sm:px-3 py-1 rounded-lg font-medium transition whitespace-nowrap cursor-pointer ${
+                    className={`flex items-center space-x-1 px-2.5 py-1 rounded-md transition whitespace-nowrap cursor-pointer ${
                       previewMode === 'tree'
-                        ? 'bg-white dark:bg-notion-dark-card text-neutral-900 dark:text-white shadow-xs font-semibold'
-                        : 'text-neutral-500 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200'
+                        ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white font-bold shadow-xs'
+                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
                     }`}
                   >
-                    <GitBranch className="w-3.5 h-3.5 shrink-0" />
-                    <span className="hidden md:inline">구조 트리 뷰</span>
-                    <span className="md:hidden">트리</span>
+                    <GitBranch className="w-3.5 h-3.5" />
+                    <span>구조 트리</span>
                   </button>
                 </div>
               </div>
 
-              {/* 우측 액션 버튼: [공유], [</> JSON], [⚡ 내 노션에 템플릿 생성하기(Primary)] */}
-              <div className="flex items-center space-x-1.5 sm:space-x-2 text-xs shrink-0 flex-nowrap">
+              {/* 우측 유틸리티 버튼 (JSON 보기, 배포, 내보내기) */}
+              <div className="flex items-center space-x-1.5 sm:space-x-2 shrink-0">
                 <button
-                  onClick={() => setIsExportModalOpen(true)}
-                  className="flex items-center space-x-1.5 px-2.5 py-1 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-700 dark:text-neutral-200 hover:bg-neutral-50 dark:hover:bg-neutral-700 transition whitespace-nowrap cursor-pointer shadow-2xs"
-                  title="템플릿 공유 및 마크다운 내보내기"
+                  onClick={() => setIsRawJsonModalOpen(true)}
+                  className="flex items-center space-x-1 px-2.5 py-1 rounded-lg text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 transition cursor-pointer whitespace-nowrap"
+                  title="템플릿 JSON 원본 코드 확인"
                 >
-                  <Share2 className="w-3.5 h-3.5 text-neutral-500 shrink-0" />
-                  <span className="hidden lg:inline">공유</span>
+                  <Code2 className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">JSON</span>
                 </button>
 
                 <button
-                  onClick={() => setIsRawJsonModalOpen(true)}
-                  className="flex items-center space-x-1.5 px-2.5 py-1 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-700 dark:text-neutral-200 hover:bg-neutral-50 dark:hover:bg-neutral-700 transition whitespace-nowrap cursor-pointer shadow-2xs"
-                  title="원시 JSON 데이터 확인 및 다운로드"
+                  onClick={() => setIsExportModalOpen(true)}
+                  className="flex items-center space-x-1 px-2.5 py-1 rounded-lg text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 transition cursor-pointer whitespace-nowrap"
+                  title="PDF / 마크다운 / HTML 내보내기"
                 >
-                  <Code2 className="w-3.5 h-3.5 text-neutral-500 shrink-0" />
-                  <span className="hidden lg:inline">&lt;/&gt; JSON</span>
-                  <span className="lg:hidden">&lt;/&gt;</span>
+                  <Share2 className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">내보내기</span>
                 </button>
 
                 <button
                   onClick={publishToNotion}
                   disabled={isPublishing}
-                  className="flex items-center space-x-1.5 px-3 sm:px-3.5 py-1 rounded-xl font-bold text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 dark:from-emerald-500 dark:to-teal-500 dark:hover:from-emerald-600 dark:hover:to-teal-600 shadow-sm transition disabled:opacity-50 whitespace-nowrap cursor-pointer shrink-0 active:scale-95"
-                  title="현재 설계된 템플릿을 내 노션 워크스페이스에 실제로 생성합니다"
+                  className="flex items-center space-x-1.5 px-3 py-1 rounded-lg text-xs font-bold text-white bg-slate-900 hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 shadow-xs transition disabled:opacity-50 cursor-pointer whitespace-nowrap"
                 >
                   {isPublishing ? (
-                    <>
-                      <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
-                      <span>노션에 생성 중...</span>
-                    </>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
                   ) : (
-                    <>
-                      <Zap className="w-3.5 h-3.5 text-amber-300 shrink-0 fill-amber-300" />
-                      <span className="hidden sm:inline">내 노션에 템플릿 생성하기</span>
-                      <span className="sm:hidden">노션 생성</span>
-                    </>
+                    <Zap className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
                   )}
+                  <span>{isPublishing ? '배포 중...' : '노션에 바로 배포'}</span>
                 </button>
               </div>
             </div>
 
-            {/* 2. 상단 모노톤 KPI 메트릭 요약 바 - 고정 Header */}
-            <div className="px-4 sm:px-8 py-2 bg-slate-50/95 dark:bg-slate-900/90 backdrop-blur-xs border-b border-slate-200/90 dark:border-slate-800 flex items-center justify-between gap-3 overflow-x-auto select-none shrink-0 shadow-2xs z-10">
-              <div className="flex items-center space-x-3 sm:space-x-4 shrink-0">
-                {/* KPI 1: 진행률 게이지 */}
+            {/* 2. 상단 KPI 요약 헤더 바 - 고정 Subheader */}
+            <div className="h-10 px-4 sm:px-6 bg-slate-50/80 dark:bg-slate-900/40 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between text-xs overflow-x-auto shrink-0 select-none scrollbar-none z-10">
+              <div className="flex items-center space-x-3 sm:space-x-5 shrink-0">
+                {/* KPI 1: 설계 진척도 */}
                 <div className="flex items-center space-x-2">
                   <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 whitespace-nowrap">
                     설계 진척도
@@ -411,37 +406,47 @@ export const TemplatePreviewCanvas: React.FC<TemplatePreviewCanvasProps> = ({ te
               </div>
             </div>
 
-            {/* 3. [가장 중요] 세로 휠 스크롤(Vertical Scroll) 해제된 메인 캔버스 뷰 */}
+            {/* 3. 세로 휠 스크롤(Vertical Scroll) 해제된 메인 캔버스 뷰 */}
             <div className="w-full h-full min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
               {previewMode === 'tree' ? (
                 <div className="p-4 sm:p-8 pb-32">
-                  <StructureTreeView template={template} />
+                  <StructureTreeView template={activeTemplate} />
                 </div>
               ) : (
                 <div className="pb-32">
+                  {/* [Step 3] 최상단 커스텀 에이전트 3.0 원클릭 셋업 콜아웃 카드 */}
+                  {activeTemplate.agentBlueprint && (
+                    <div className="px-4 sm:px-10 md:px-12 pt-4">
+                      <AgentBlueprintCallout
+                        blueprint={activeTemplate.agentBlueprint}
+                        templateTitle={activeTemplate.title}
+                      />
+                    </div>
+                  )}
+
                   {/* 상용 베스트셀러 대비 고도화 분석 아코디언 */}
-                  <div className="px-4 sm:px-10 md:px-12 pt-4">
-                    <TemplateBenchmarkCard template={template} />
+                  <div className="px-4 sm:px-10 md:px-12 pt-2">
+                    <TemplateBenchmarkCard template={activeTemplate} />
                   </div>
 
                   {/* 커버 이미지 */}
-                  <NotionCover coverUrl={template.cover_url} />
+                  <NotionCover coverUrl={activeTemplate.cover_url} />
 
                   {/* 노션 페이지 헤더 (이모지, 제목, 설명, 메타) */}
                   <NotionHeader
-                    title={template.title}
-                    icon={template.icon}
-                    description={template.description}
+                    title={activeTemplate.title}
+                    icon={activeTemplate.icon}
+                    description={activeTemplate.description}
                   />
 
                   {/* 페이지 레이아웃 블록들 */}
                   <div className="px-6 sm:px-10 md:px-12">
-                    <NotionBlocks blocks={template.page_layout} />
+                    <NotionBlocks blocks={activeTemplate.page_layout} />
                   </div>
 
                   {/* 다중 데이터베이스 섹션 */}
                   <div className="px-6 sm:px-10 md:px-12 mt-6 space-y-6">
-                    {template.databases.map((db: NotionDatabase, idx: number) => (
+                    {activeTemplate.databases.map((db: NotionDatabase, idx: number) => (
                       <div key={idx} id={`db-section-${db.name}`}>
                         <NotionDatabaseView database={db} />
                       </div>
@@ -450,7 +455,7 @@ export const TemplatePreviewCanvas: React.FC<TemplatePreviewCanvasProps> = ({ te
 
                   {/* 스키마 명세 테이블 */}
                   <div className="px-6 sm:px-10 md:px-12 mt-8">
-                    <TemplateSchemaTable databases={template.databases} />
+                    <TemplateSchemaTable databases={activeTemplate.databases} />
                   </div>
 
                   {/* 하단 통합 액션 배너 */}
@@ -458,9 +463,9 @@ export const TemplatePreviewCanvas: React.FC<TemplatePreviewCanvasProps> = ({ te
                     <div className="p-5 sm:p-6 rounded-2xl bg-gradient-to-br from-neutral-900 via-indigo-950 to-neutral-900 text-white shadow-xl border border-indigo-800/40 flex flex-col md:flex-row md:items-center justify-between gap-4">
                       <div>
                         <div className="flex items-center space-x-2">
-                          <span className="text-xl">{template.icon || '📑'}</span>
+                          <span className="text-xl">{activeTemplate.icon || '📑'}</span>
                           <h4 className="text-base sm:text-lg font-extrabold text-white">
-                            {template.title}
+                            {activeTemplate.title}
                           </h4>
                         </div>
                         <p className="text-xs text-neutral-300 mt-1 max-w-xl leading-relaxed">
