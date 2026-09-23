@@ -63,8 +63,64 @@ export async function parseSpreadsheet(file: File): Promise<{
     const rawData: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
     if (!rawData || rawData.length === 0) continue;
 
-    const headers: string[] = (rawData[0] || []).map((h, i) => String(h || `열_${i + 1}`).trim());
-    const dataRows = rawData.slice(1).filter(row => row.some(cell => cell !== '' && cell !== null && cell !== undefined));
+    // [스마트 헤더 행 감지 알고리즘 (Smart Header Row Detection)]
+    // 1행이 전체 병합 제목("아덴힐 리조트앤골프...")일 경우를 감지하여 1~5행 중 유효 텍스트 셀이 3개 이상인 행을 진짜 헤더 행으로 자동 채택
+    let headerRowIndex = 0;
+    let maxValidCells = 0;
+
+    const checkLimit = Math.min(rawData.length, 6);
+    for (let r = 0; r < checkLimit; r++) {
+      const row = rawData[r] || [];
+      const validCells = row.filter((cell: any) => {
+        const str = String(cell ?? '').trim();
+        return str !== '' && !str.startsWith('__EMPTY') && !str.startsWith('열_');
+      }).length;
+
+      // 3개 이상 유효 셀이 있으면 진짜 표 헤더 행으로 즉시 채택
+      if (validCells >= 3) {
+        headerRowIndex = r;
+        maxValidCells = validCells;
+        break;
+      }
+      if (validCells > maxValidCells) {
+        maxValidCells = validCells;
+        headerRowIndex = r;
+      }
+    }
+
+    const rawHeaderRow = rawData[headerRowIndex] || [];
+    
+    // 유효한 열 인덱스 추출 (내용이 있는 열만 선별하여 '열_2', '열_3', '__EMPTY' 생성 원천 금지)
+    const validColIndices: number[] = [];
+    rawHeaderRow.forEach((h: any, idx: number) => {
+      const colTitle = String(h ?? '').trim();
+      // 헤더명이 있거나, 해당 열 아래 데이터에 유효값이 하나라도 있는 경우만 포함
+      const hasHeader = colTitle !== '' && !colTitle.startsWith('__EMPTY');
+      const hasColumnData = rawData.slice(headerRowIndex + 1, headerRowIndex + 10).some((row) => {
+        const val = String((row || [])[idx] ?? '').trim();
+        return val !== '';
+      });
+
+      if (hasHeader || hasColumnData) {
+        validColIndices.push(idx);
+      }
+    });
+
+    // 헤더명 정제 (빈 이름은 도메인 추론 또는 안전한 기본명 부여)
+    const headers: string[] = validColIndices.map((colIdx, i) => {
+      let title = String(rawHeaderRow[colIdx] ?? '').trim();
+      if (!title || title.startsWith('__EMPTY') || /^열_d+$/i.test(title)) {
+        // 첫 번째 열이면 '구분/항목', 날짜나 상태가 아래에 보이면 유추
+        title = i === 0 ? '항목명' : `속성_${i + 1}`;
+      }
+      return title;
+    });
+
+    // 헤더 행 다음 행부터 실제 데이터 행 추출
+    const dataRows = rawData
+      .slice(headerRowIndex + 1)
+      .filter((row) => row && row.some((cell: any) => cell !== '' && cell !== null && cell !== undefined))
+      .map((row) => validColIndices.map((colIdx) => row[colIdx] ?? ''));
 
     // 적용된 수식 셀 탐색
     const formulas: Array<{ cell: string; formula: string }> = [];

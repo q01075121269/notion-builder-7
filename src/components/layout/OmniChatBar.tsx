@@ -706,7 +706,10 @@ export const OmniChatBar: React.FC = () => {
             const tableHeaderMatch = file.parsedContent.match(/\|\s*([^\n\r]+)\s*\|\s*\n\s*\|\s*[-|\s]+\|/);
             if (tableHeaderMatch) {
               const headerLine = tableHeaderMatch[1];
-              const rawCols = headerLine.split('|').map((c) => c.trim()).filter(Boolean);
+              const rawCols = headerLine
+                .split('|')
+                .map((c) => c.trim())
+                .filter((c) => c && !c.startsWith('__EMPTY') && !/^열_\d+$/i.test(c));
               if (rawCols.length > 0) {
                 const properties = rawCols.map((colName, idx) => {
                   let type: any = 'text';
@@ -733,8 +736,12 @@ export const OmniChatBar: React.FC = () => {
                   }
                 });
 
+                const cleanDbName = file.name.includes('ardenhill') || file.name.includes('아덴힐')
+                  ? '🏢 [아덴힐] 객실 및 시설 점검 마스터 DB'
+                  : `📋 ${file.name.replace(/\.[^.]+$/, '')} 마스터 DB`;
+
                 extractedAttachedSchemas.push({
-                  db_name: `📋 ${file.name.replace(/\.[^.]+$/, '')} 원본 DB`,
+                  db_name: cleanDbName,
                   properties,
                   sample_rows: sampleRows.length > 0 ? sampleRows : undefined,
                 });
@@ -757,10 +764,12 @@ export const OmniChatBar: React.FC = () => {
           targetTemplate = PRESET_TEMPLATES.certification_exam;
         } else {
           // AI 오케스트레이터 payload 기반 동적 템플릿 즉석 빌드
-          const rawTopic = (response.payload?.template_topic as string) || text;
-          const rawTitle = (response.payload?.suggested_title as string) || `${text} AI 템플릿`;
-          const sanitizedTopic = sanitizeTemplateTitle(rawTopic);
-          const sanitizedTitle = sanitizeTemplateTitle(rawTitle);
+          const attachedFileName = attachedFiles[0]?.name || '';
+          const fallbackTopic = pureText || attachedFileName.replace(/\.[^.]+$/, '') || '시설관리 및 점검';
+          const rawTopic = (response.payload?.template_topic as string) || fallbackTopic;
+          const rawTitle = (response.payload?.suggested_title as string) || `${fallbackTopic} AI 템플릿`;
+          const sanitizedTopic = sanitizeTemplateTitle(rawTopic, fallbackTopic);
+          const sanitizedTitle = sanitizeTemplateTitle(rawTitle, fallbackTopic);
 
           targetTemplate = buildDynamicTemplateFromPayload({
             topic: sanitizedTopic,

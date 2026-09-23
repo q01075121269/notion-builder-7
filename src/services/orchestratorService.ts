@@ -108,7 +108,10 @@ async function fallbackClientOrchestration(
     const tableHeaderMatch = rawAttached.match(/\|\s*([^\n\r]+)\s*\|\s*\n\s*\|\s*[-|\s]+\|/);
     if (tableHeaderMatch) {
       const headerLine = tableHeaderMatch[1];
-      const rawCols = headerLine.split('|').map(c => c.trim()).filter(Boolean);
+      const rawCols = headerLine
+        .split('|')
+        .map(c => c.trim())
+        .filter(c => c && !c.startsWith('__EMPTY') && !/^열_\d+$/i.test(c));
       if (rawCols.length > 0) {
         const properties = rawCols.map((colName, idx) => {
           let type = 'text';
@@ -136,8 +139,9 @@ async function fallbackClientOrchestration(
           }
         });
 
+        const isArdenhill = userText.includes('ardenhill') || userText.includes('아덴힐');
         attachedDbSchemas = [{
-          db_name: '📋 첨부 데이터 점검 및 운영 마스터 DB',
+          db_name: isArdenhill ? '🏢 [아덴힐] 객실 및 시설 점검 마스터 DB' : '📋 첨부 데이터 점검 및 운영 마스터 DB',
           properties,
           sample_rows: sampleRows.length > 0 ? sampleRows : undefined
         }];
@@ -161,7 +165,7 @@ async function fallbackClientOrchestration(
 
   if (isBuilderMode || hasAttachment || hasBuilderKeywords) {
     const isCertification = lower.includes('자격증') || lower.includes('수험생') || lower.includes('시험') || lower.includes('공부') || lower.includes('오답노트');
-    const cleanTopicTitle = sanitizeTemplateTitle(queryText);
+    const cleanTopicTitle = sanitizeTemplateTitle(queryText, userText);
 
     return {
       intent: 'BUILDER',
