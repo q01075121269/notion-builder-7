@@ -247,7 +247,18 @@ export const TemplateSchemaTable: React.FC<TemplateSchemaTableProps> = ({ databa
 
                           {/* 속성명 */}
                           <td className="py-3 px-4 font-semibold text-neutral-800 dark:text-neutral-200">
-                            <span className="font-mono text-[12px]">{prop.name}</span>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="font-mono text-[12px]">{prop.name}</span>
+                              {prop.type === 'formula' ? (
+                                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-300/80 dark:border-emerald-700/80 whitespace-nowrap shadow-2xs">
+                                  +신규 수식
+                                </span>
+                              ) : (prop.name.startsWith('AI_') || prop.name.startsWith('F2_') || prop.name === 'Quality_Status' || prop.name === 'Verified') ? (
+                                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-cyan-50 dark:bg-cyan-950/60 text-cyan-700 dark:text-cyan-300 border border-cyan-300/80 dark:border-cyan-700/80 whitespace-nowrap shadow-2xs">
+                                  +신규 속성
+                                </span>
+                              ) : null}
+                            </div>
                           </td>
 
                           {/* 타입 배지 */}

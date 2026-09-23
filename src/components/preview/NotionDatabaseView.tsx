@@ -211,6 +211,14 @@ const TableView: React.FC<{
                 <div className="flex items-center space-x-1.5">
                   <PropertyTypeIcon type={prop.type} />
                   <span>{prop.name}</span>
+                  {prop.type === 'formula' && (
+                    <span 
+                      title="무손실 업그레이드로 추가된 Formulas 2.0 수식입니다" 
+                      className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-300/80 dark:border-emerald-700/80 whitespace-nowrap shadow-2xs ml-1"
+                    >
+                      +신규 수식
+                    </span>
+                  )}
                   {isModified && (
                     <span 
                       title="방금 대화를 통해 추가/수정된 속성입니다" 
