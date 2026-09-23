@@ -87,7 +87,61 @@ async function fallbackClientOrchestration(
   _apiKey?: string,
   _userEmail?: string
 ): Promise<OrchestratorResponse> {
-  const lower = userText.toLowerCase();
+  // 첨부 문서 데이터 블록 분리 및 순수 사용자 텍스트 추출
+  let pureUserText = userText
+    .replace(/\[ATTACHED_DOCUMENT_DATA\][\s\S]*?\[\/ATTACHED_DOCUMENT_DATA\]/gi, '')
+    .replace(/\[첨부:[^\]]*\]/gi, '')
+    .trim();
+
+  // 첨부 데이터가 있으면 마크다운 표 컬럼 및 샘플 데이터 파싱
+  let attachedDbSchemas: any[] | null = null;
+  const attachedMatch = userText.match(/\[ATTACHED_DOCUMENT_DATA\]([\s\S]*?)\[\/ATTACHED_DOCUMENT_DATA\]/i);
+  if (attachedMatch) {
+    const rawAttached = attachedMatch[1];
+    const tableHeaderMatch = rawAttached.match(/\|\s*([^\n\r]+)\s*\|\s*\n\s*\|\s*[-|\s]+\|/);
+    if (tableHeaderMatch) {
+      const headerLine = tableHeaderMatch[1];
+      const rawCols = headerLine.split('|').map(c => c.trim()).filter(Boolean);
+      if (rawCols.length > 0) {
+        const properties = rawCols.map((colName, idx) => {
+          let type = 'text';
+          if (idx === 0) type = 'title';
+          else if (/일자|날짜|일시|기한|마감/i.test(colName)) type = 'date';
+          else if (/상태|진행|결과/i.test(colName)) type = 'status';
+          else if (/금액|비용|가격|단가|수량|점수|율/i.test(colName)) type = 'number';
+          else if (/담당|책임|관리자/i.test(colName)) type = 'person';
+          else if (/구분|분류|타입|종류|유형/i.test(colName)) type = 'select';
+          return { name: colName, type };
+        });
+
+        // 1~2개 행 데이터 추출
+        const sampleRows: Record<string, any>[] = [];
+        const linesAfterDivider = rawAttached.split(/\|\s*[-|\s]+\|/)[1] || '';
+        const rowLines = linesAfterDivider.split('\n').map(l => l.trim()).filter(l => l.startsWith('|') && !l.includes('생략'));
+        rowLines.slice(0, 3).forEach(rl => {
+          const cells = rl.split('|').map(c => c.trim()).filter((_, i, arr) => i > 0 && i < arr.length - 1);
+          if (cells.length > 0) {
+            const rowObj: Record<string, any> = {};
+            rawCols.forEach((col, cIdx) => {
+              rowObj[col] = cells[cIdx] || '';
+            });
+            sampleRows.push(rowObj);
+          }
+        });
+
+        attachedDbSchemas = [{
+          db_name: '📊 첨부 파일 원본 데이터 마스터 DB',
+          properties,
+          sample_rows: sampleRows.length > 0 ? sampleRows : undefined
+        }];
+      }
+    }
+  }
+
+  const queryText = pureUserText || userText;
+  const lower = queryText.toLowerCase();
+
+  
 
   // 0. 웹 크롤러 수급 파이프라인 감지 (긁어서, 크롤링, 리뷰, 스크래핑, 쿠팡, 데이터 수집)
   if (
@@ -165,7 +219,7 @@ async function fallbackClientOrchestration(
     lower.includes('시설') || lower.includes('객실') || lower.includes('하자') || lower.includes('아덴힐')
   ) {
     const isCertification = lower.includes('자격증') || lower.includes('수험생') || lower.includes('시험') || lower.includes('공부') || lower.includes('오답노트');
-    const cleanTopicTitle = sanitizeTemplateTitle(userText);
+    const cleanTopicTitle = sanitizeTemplateTitle(queryText);
 
     return {
       intent: 'BUILDER',
@@ -181,6 +235,7 @@ async function fallbackClientOrchestration(
         title: cleanTopicTitle,
         complexity: 'intermediate',
         initial_prompt: cleanTopicTitle,
+        ...(attachedDbSchemas ? { db_schema: attachedDbSchemas } : {}),
       },
     };
   }

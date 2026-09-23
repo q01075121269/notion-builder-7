@@ -106,10 +106,7 @@ function buildCompactHeaderBlocks(template: NotionTemplate): any[] {
 
   // 1. [Fix: 시각적 강조 및 직관적 2단계 뷰 전환 가이드] - 눈에 띄는 노란색 틴트(yellow_background)
   const guideContent = 
-    `💡 [1초 뷰 전환 뷰어 가이드]\n` +
-    `현재 데이터베이스는 노션 API 규격상 '기본 표(Table)'로 생성되었습니다. 아래 2단계로 칸반 보드나 캘린더를 1초 만에 켜보세요!\n\n` +
-    `1️⃣ 생성된 표(Table)의 상단 제목 바로 우측에 있는 [ ▼ (기본 뷰 드롭다운)] 또는 [+ 뷰 추가] 버튼을 클릭하세요.\n` +
-    `2️⃣ 메뉴에서 [보드(Board)] 또는 [캘린더(Calendar)]를 선택하고, 그룹화 기준을 [운영 상태] 또는 [목표 일정]으로 지정하면 대시보드가 완성됩니다!\n\n` +
+    `💡 [1초 세팅] 표 우측의 [+ 뷰 추가]를 누르고 '보드' 또는 '캘린더'를 선택하시면 대시보드가 완성됩니다.\n` +
     `🏷️ Schema Version: ${template.schema_version || '1.0'} (Commercial Dynamic Multi-DB Engine)`;
 
   blocks.push({

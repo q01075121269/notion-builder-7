@@ -26,63 +26,69 @@ export interface DynamicBuildParams {
  * 도메인에 걸맞은 격조 높은 공식 프로젝트 명칭을 추출합니다.
  */
 export function sanitizeTemplateTitle(rawInput: string, topic?: string): string {
-  let cleaned = (rawInput || topic || '').trim();
+  let text = (rawInput || topic || '').trim();
+  
+  // 1. 첨부 블록 및 파일명 선제거
+  text = text.replace(/\[ATTACHED_DOCUMENT_DATA\][\s\S]*?\[\/ATTACHED_DOCUMENT_DATA\]/gi, ' ');
+  text = text.replace(/\[첨부:[^\]]*\]/gi, ' ');
+  text = text.replace(/[\w\-가-힣]+\.(xlsx|xls|csv|docx|doc|pdf|txt|md|json|hwp|hwpx)/gi, ' ');
 
-  // [Step 5-B 완벽 수정] 사용자의 음성 말버릇, 불필요한 조사, 요청/명령형 서술어 패턴 정규식 완벽 제거
-  // "아덴힐 시설관리 템플릿 만들어 줘" -> "만들어 줘", "템플릿" 등을 완벽히 도려내고 핵심 명사구만 추출
-  const fillerPatterns = [
-    /^(어|음|저기|그|아|그냥|지금s*그|어s*참고해서|참고해서|그s*템플릿|이번에|요번에|혹시|저)s+/gi,
-    /\s*(만들어\s*줘|만들어줘|만들어\s*주세요|만들어\s*줄래|만들어\s*주라|만들어\s*봐|만들어\s*보자|제작해\s*줘|제작해줘|제작해\s*주세요|생성해\s*줘|생성해줘|생성해\s*주세요|보완해\s*줘|보완해줘|추가해\s*줘|추가해줘|설계해\s*줘|설계해줘|작성해\s*줘|작성해줘|짜\s*줘|짜줘|구축해\s*줘|구축해줘|뽑아\s*줘|뽑아줘|해\s*줘|해줘|해\s*주세요|해주세요|해\s*봐|해봐|부탁해)\s*$/gi,
-    /\b(만들어\s*줘|만들어줘|만들어\s*주세요|만들어\s*줄래|만들어\s*주라|제작해\s*줘|생성해\s*줘|설계해\s*줘|작성해\s*줘|짜\s*줘|해\s*줘|해줘)\b/gi,
-    /\s*(노션\s*템플릿|노션\s*페이지|템플릿|대시보드)\s*$/gi,
-    /^(노션\s*템플릿|템플릿|대시보드)\s+/gi,
-    /[!?,.~^`'"@#$%^&*()_+={}\[\]:;<>/\\|]/g
+  // 2. 대괄호 태그 선제거
+  text = text.replace(/^\[.*?\]\s*/g, ' ');
+
+  // 3. 특수문자 및 기호 먼저 제거 (마침표, 쉼표, 느낌표, 괄호 등)
+  text = text.replace(/[!?,.~^@#$%&*_+={}\[\]:;<>/\\|`'"()]/g, ' ');
+
+  // 4. 서술어 및 요청어 전역 제거 (공백 유연 매칭)
+  const phrasesToRemove = [
+    /만들어\s*(줘(요)?|주세요|줄래|주라|봐|보자)/gi,
+    /제작해\s*(줘(요)?|주세요|줄래|주라|봐)/gi,
+    /생성해\s*(줘(요)?|주세요|줄래|주라|봐)/gi,
+    /설계해\s*(줘(요)?|주세요|줄래|주라|봐)/gi,
+    /작성해\s*(줘(요)?|주세요|줄래|주라|봐)/gi,
+    /반영해\s*(주고|줘(요)?|주세요|줄래|주라|봐|서|하여)/gi,
+    /추가해\s*(줘(요)?|주세요|줄래|주라|봐)/gi,
+    /보완해\s*(줘(요)?|주세요|줄래|주라|봐)/gi,
+    /짜\s*(줘(요)?|주세요|줄래|주라|봐)/gi,
+    /뽑아\s*(줘(요)?|주세요|줄래|주라|봐)/gi,
+    /해\s*(줘(요)?|주세요|봐|보자)/gi,
+    /(해주세요|해줘|해봐|부탁해요|부탁해)/gi,
+    /(참고해서|참고하여|참고|기반으로|기반한|기반|첨부|파일)/gi,
+    /(노션\s*템플릿|노션\s*페이지|템플릿|대시보드|워크스페이스|마스터\s*OS|통합\s*관리|올인원\s*OS|관제\s*OS|시스템)/gi,
+    /^(어|음|저기|그|아|그냥|지금|이번에|요번에|혹시|저)\s+/gi
   ];
 
-  fillerPatterns.forEach(pattern => {
-    cleaned = cleaned.replace(pattern, ' ').trim();
+  phrasesToRemove.forEach(p => {
+    text = text.replace(p, ' ');
   });
 
-  // 다중 공백 정리
-  cleaned = cleaned.replace(/\s+/g, ' ').trim();
+  text = text.replace(/\s+/g, ' ').trim();
+  const lower = text.toLowerCase();
 
   // 도메인별 고품격 공식 타이틀 포맷팅
-  const lower = cleaned.toLowerCase();
-
-  // 1. 아덴힐 및 시설/리조트/객실/하자 관리 도메인
-  if (lower.includes('아덴힐') || ((lower.includes('시설') || lower.includes('객실') || lower.includes('하자')) && lower.includes('아덴힐'))) {
+  if (lower.includes('아덴힐') || (lower.includes('리조트') && (lower.includes('시설') || lower.includes('객실')))) {
     return '[아덴힐 리조트] 객실 시설관리 통합 관제 OS';
   }
   if (lower.includes('시설') || lower.includes('객실') || lower.includes('하자') || lower.includes('리조트') || lower.includes('호텔') || lower.includes('건물')) {
-    return `[시설 & 자산 관리] ${cleaned || '객실 점검 및 하자보수 관제'} OS`;
+    const sub = text.replace(/(시설|객실|하자|리조트|호텔|건물|관리|점검)/g, '').trim();
+    return sub ? ('[시설 & 자산 관리] ' + sub + ' 시설점검 관제 OS') : '[시설 & 자산 관리] 객실 점검 및 하자보수 관제 OS';
   }
-
-  // 2. 프로젝트/스타트업/애자일/기획 도메인
   if (lower.includes('프로젝트') || lower.includes('개발') || lower.includes('스프린트') || lower.includes('스타트업') || lower.includes('기획') || lower.includes('okr')) {
-    return `[프로젝트 OS] ${cleaned || '애자일 로드맵 & 스프린트 마스터'} OS`;
+    return '[프로젝트 OS] ' + (text || '애자일 로드맵 & 스프린트 마스터') + ' OS';
   }
-
-  // 3. 자격증/수험생/시험/공부 도메인
   if (lower.includes('합격') || lower.includes('시험') || lower.includes('자격증') || lower.includes('공부') || lower.includes('수험') || lower.includes('고시')) {
-    return `[합격 패스] ${cleaned || '수험 로드맵 & 기출 오답노트'} 올인원 OS`;
+    return '[합격 패스] ' + (text || '수험 로드맵 & 기출 오답노트') + ' 올인원 OS';
   }
-
-  // 4. 재무/가계부/자산/소비 도메인
-  if (lower.includes('가계부') || lower.includes('지출') || lower.includes('소비') || lower.includes('돈') || lower.includes('재무') || lower.includes('자산')) {
-    return `[스마트 파이낸스] ${cleaned || '월간 소비 분석 & 고정비 가드'} OS`;
+  if (lower.includes('결산') || lower.includes('회계') || lower.includes('가계부') || lower.includes('지출') || lower.includes('소비') || lower.includes('돈') || lower.includes('재무') || lower.includes('자산')) {
+    return '[스마트 파이낸스] ' + (text || '월간 소비 분석 & 고정비 가드') + ' OS';
   }
-
-  // 5. 루틴/해빗/습관 도메인
   if (lower.includes('루틴') || lower.includes('해빗') || lower.includes('습관') || lower.includes('건강') || lower.includes('헬스') || lower.includes('피트니스')) {
-    return `[라이프 & 웰니스] ${cleaned || '24H 데일리 루틴 & 해빗 트래커'} OS`;
+    return '[라이프 & 웰니스] ' + (text || '24H 데일리 루틴 & 해빗 트래커') + ' OS';
   }
-
-  // 6. 독서/서재 도메인
   if (lower.includes('독서') || lower.includes('책') || lower.includes('서재') || lower.includes('인용구') || lower.includes('도서')) {
-    return `[지식 아카이브] ${cleaned || '디지털 서재 & 독서 인사이트'} OS`;
+    return '[지식 아카이브] ' + (text || '디지털 서재 & 독서 인사이트') + ' OS';
   }
-
-  return cleaned.length > 2 ? `[통합 관리] ${cleaned} 마스터 OS` : '비즈니스 & 라이프 통합 관제 OS';
+  return text.length >= 2 ? ('[통합 관리] ' + text + ' 관제 OS') : '[통합 관리] 비즈니스 & 라이프 통합 관제 OS';
 }
 
 /**
@@ -694,7 +700,7 @@ export function buildDynamicTemplateFromPayload(params: DynamicBuildParams): Not
       const finalProps = injectQualityGateProperties(props);
 
       databases.push({
-        name: schema.db_name || `${cleanTitle} 마스터 DB ${idx + 1}`,
+        name: schema.db_name || (idx === 0 ? `🏢 ${cleanTitle.replace(/^\[.*?\]\s*/, '')} 마스터 DB` : idx === 1 ? `📋 세부 점검 & 실행 트래커 DB` : `🛠️ 조치 및 리스크 관리 DB`),
         description: `AI가 동적으로 맞춤 구성한 ${schema.db_name || '마스터 DB'}입니다.`,
         view_type: 'table',
         properties: finalProps,
@@ -728,7 +734,7 @@ export function buildDynamicTemplateFromPayload(params: DynamicBuildParams): Not
     {
       type: 'callout',
       icon: icon,
-      content: `${cleanTitle} AI 맞춤형 노션 템플릿에 오신 것을 환영합니다!\nNotion Architect v2.0 AI 오케스트레이터가 사용자의 요청("${params.initialPrompt || topic}")을 완벽히 분석하여 자동 인스턴스화했습니다.`,
+      content: `${cleanTitle} AI 맞춤형 노션 템플릿에 오신 것을 환영합니다!\nNotion Architect v2.0 AI 오케스트레이터가 워크스페이스 구조를 최적화하여 자동 구축했습니다.`,
       color: 'blue'
     },
     {

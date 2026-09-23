@@ -18,7 +18,7 @@ try {
 export function getFileCategory(extension: string): FileTypeCategory {
   const ext = extension.toLowerCase().replace('.', '');
   if (['xlsx', 'xls', 'csv'].includes(ext)) return 'spreadsheet';
-  if (['docx', 'doc', 'txt', 'md'].includes(ext)) return 'document';
+  if (['docx', 'doc', 'txt', 'md', 'json'].includes(ext)) return 'document';
   if (['pdf'].includes(ext)) return 'pdf';
   if (['png', 'jpg', 'jpeg', 'webp', 'gif'].includes(ext)) return 'image';
   if (['hwp', 'hwpx'].includes(ext)) return 'hwp';
@@ -163,9 +163,10 @@ export async function parseWordOrTextDocument(file: File): Promise<string> {
     return `📄 [워드 문서 구조 및 본문: "${file.name}"]\n\n${markdown}`;
   }
 
-  // 텍스트 파일 (.txt, .md)
+  // 텍스트 파일 (.txt, .md, .json)
   const textContent = await file.text();
-  return `📝 [텍스트 문서 내용: "${file.name}"]\n\n${textContent}`;
+  const docLabel = ext === 'json' ? 'JSON 데이터' : '텍스트 문서';
+  return `📝 [${docLabel} 내용: "${file.name}"]\n\n${textContent.slice(0, 15000)}`;
 }
 
 /**

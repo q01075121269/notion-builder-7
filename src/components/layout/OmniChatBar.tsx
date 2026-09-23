@@ -31,6 +31,7 @@ import { saveTodayOverrideConfig } from '../../services/dailyRoutineStorage';
 import { archiveAudioArtifact, archiveTextDiscussionArtifact } from '../../services/zeroRotArchiver';
 import { isNotionUrlPrompt, extractNotionUrl, generateMasterHubTemplateFromUrl } from '../../services/notionLinkAnalyzer';
 import { buildDynamicTemplateFromPayload, sanitizeTemplateTitle } from '../../services/notionDynamicBuilder';
+import { parseUploadedFile } from '../../services/fileParserService';
 import { createNotionTemplateInWorkspace } from '../../services/notionApi';
 import type { NotionTemplate } from '../../types/notion';
 
@@ -139,6 +140,17 @@ const CHAT_MODES: ChatModeConfig[] = [
   },
 ];
 
+
+export interface OmniAttachment {
+  id: string;
+  name: string;
+  sizeFormatted?: string;
+  type: 'file' | 'link';
+  parsedContent?: string;
+  isParsing?: boolean;
+  error?: string;
+}
+
 // ─── OmniChatBar 컴포넌트 ────────────────────────────────────────────────────
 export const OmniChatBar: React.FC = () => {
   const {
@@ -180,7 +192,8 @@ export const OmniChatBar: React.FC = () => {
   const [isExpanded, setIsExpanded] = useState(false);
 
   // 첨부 파일 상태
-  const [attachedFiles, setAttachedFiles] = useState<{ name: string; size?: string; type: string }[]>([]);
+  const [attachedFiles, setAttachedFiles] = useState<OmniAttachment[]>([]);
+  const [isParsingFiles, setIsParsingFiles] = useState(false);
   const [showLinkModal, setShowLinkModal] = useState(false);
   const [linkInput, setLinkInput] = useState('');
 
@@ -303,26 +316,62 @@ export const OmniChatBar: React.FC = () => {
     }
   };
 
-  // ── 파일 첨부 핸들러 ────────────────────────────────────────────────────────
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    // ── 범용 다중 파일 첨부 (Universal File Ingestion) 파이프라인 ───────────────
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
-    const newAttachments = Array.from(files).map((f) => ({
-      name: f.name,
-      size: `${(f.size / 1024).toFixed(1)}KB`,
-      type: 'file',
-    }));
+    setIsParsingFiles(true);
+    const newItems: OmniAttachment[] = [];
 
-    setAttachedFiles((prev) => [...prev, ...newAttachments]);
-    showToast(`📎 ${newAttachments.length}개 파일이 첨부되었습니다.`, 'info');
+    for (const file of Array.from(files)) {
+      try {
+        showToast(`⏳ [${file.name}] 파일 데이터를 정밀 분석 중...`, 'info');
+        const parsed = await parseUploadedFile(file);
+        newItems.push({
+          id: parsed.id,
+          name: parsed.name,
+          sizeFormatted: parsed.sizeFormatted,
+          type: 'file',
+          parsedContent: parsed.parsedContent,
+          isParsing: false,
+          error: parsed.error,
+        });
+
+        if (parsed.error) {
+          showToast(`⚠️ [${file.name}] ${parsed.error}`, 'error');
+        } else {
+          showToast(`📊 [${file.name}] 데이터 분석 완료 (표/텍스트 추출 성공)`, 'success');
+        }
+      } catch (err: any) {
+        newItems.push({
+          id: `file_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+          name: file.name,
+          sizeFormatted: `${(file.size / 1024).toFixed(1)}KB`,
+          type: 'file',
+          isParsing: false,
+          error: err.message,
+        });
+      }
+    }
+
+    setAttachedFiles((prev) => [...prev, ...newItems]);
+    setIsParsingFiles(false);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const addLinkAttachment = () => {
     if (!linkInput.trim()) return;
     const url = linkInput.trim().startsWith('http') ? linkInput.trim() : `https://${linkInput.trim()}`;
-    setAttachedFiles((prev) => [...prev, { name: url, type: 'link' }]);
+    setAttachedFiles((prev) => [
+      ...prev,
+      {
+        id: `link_${Date.now()}`,
+        name: url,
+        type: 'link',
+        parsedContent: `🔗 [웹 링크 분석 데이터]: ${url}`,
+      },
+    ]);
     setLinkInput('');
     setShowLinkModal(false);
     showToast('🔗 링크가 첨부되었습니다.', 'info');
@@ -352,10 +401,18 @@ export const OmniChatBar: React.FC = () => {
     isLoadingRef.current = true;
     lastSentRef.current = { text, time: now };
 
-    const attachmentSummary = attachedFiles.length > 0
-      ? `\n[첨부: ${attachedFiles.map((a) => a.name).join(', ')}]`
+    const pureText = text;
+    const attachedDataBlocks = attachedFiles
+      .filter((a) => a.parsedContent)
+      .map((a) => `[ATTACHED_DOCUMENT_DATA]\n파일명: ${a.name}\n${a.parsedContent}\n[/ATTACHED_DOCUMENT_DATA]`)
+      .join('\n\n');
+
+    const promptGuidance = attachedDataBlocks
+      ? `\n\n[지침: 사용자가 첨부한 표/문서의 실제 시트명, 컬럼 헤더, 샘플 행 데이터를 1:1로 노션 DB 속성(Properties) 및 샘플 행에 반드시 반영하여 설계하십시오.]\n\n${attachedDataBlocks}`
       : '';
-    const fullMessageText = text + attachmentSummary;
+
+    const fullMessageText = pureText + promptGuidance;
+    const displayContent = pureText + (attachedFiles.length > 0 ? `\n[첨부: ${attachedFiles.map((a) => a.name).join(', ')}]` : '');
 
     setInputValue('');
     if (inputRef.current) inputRef.current.value = '';
@@ -369,7 +426,7 @@ export const OmniChatBar: React.FC = () => {
     const userMsg: OmniMessage = {
       id: `omni-user-${Date.now()}`,
       role: 'user',
-      content: fullMessageText,
+      content: displayContent,
       timestamp: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }),
       attachments: currentAttachments,
     };
@@ -1167,15 +1224,29 @@ export const OmniChatBar: React.FC = () => {
           <div className="flex flex-wrap gap-1.5 mb-2 px-1">
             {attachedFiles.map((file, idx) => (
               <div
-                key={idx}
-                className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-[11px] bg-slate-200 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 border border-slate-300 dark:border-neutral-700"
+                key={file.id || idx}
+                className={`inline-flex items-center space-x-1.5 px-3 py-1 rounded-full text-[11px] border transition ${
+                  file.error
+                    ? 'bg-rose-50 dark:bg-rose-950/50 border-rose-300 dark:border-rose-800 text-rose-700 dark:text-rose-300'
+                    : file.parsedContent
+                    ? 'bg-emerald-50 dark:bg-emerald-950/50 border-emerald-300 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 font-medium'
+                    : 'bg-slate-200 dark:bg-neutral-800 border-slate-300 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300'
+                }`}
               >
-                {file.type === 'link' ? <LinkIcon className="w-3 h-3 text-indigo-500" /> : <FileText className="w-3 h-3 text-amber-500" />}
+                {file.type === 'link' ? (
+                  <LinkIcon className="w-3 h-3 text-indigo-500" />
+                ) : file.isParsing ? (
+                  <Loader2 className="w-3 h-3 text-amber-500 animate-spin" />
+                ) : (
+                  <FileText className="w-3 h-3 text-emerald-500" />
+                )}
                 <span className="max-w-[140px] truncate">{file.name}</span>
-                {file.size && <span className="text-[9px] text-neutral-400">({file.size})</span>}
+                {file.sizeFormatted && <span className="text-[9px] opacity-70">({file.sizeFormatted})</span>}
+                {file.parsedContent && <span className="text-[9px] px-1 py-0.2 rounded bg-emerald-200/60 dark:bg-emerald-800/60 text-emerald-800 dark:text-emerald-200">분석완료</span>}
                 <button
+                  type="button"
                   onClick={() => removeAttachment(idx)}
-                  className="p-0.5 hover:text-rose-500 rounded-full"
+                  className="p-0.5 hover:text-rose-500 rounded-full ml-0.5"
                 >
                   <X className="w-3 h-3" />
                 </button>
@@ -1210,7 +1281,7 @@ export const OmniChatBar: React.FC = () => {
                 e.preventDefault();
                 setShowLinkModal(true);
               }}
-              disabled={isLoading}
+              disabled={isLoading || isParsingFiles}
               title="파일 드래그/선택 (우클릭: 웹 링크 첨부)"
               className="
                 w-9 h-9 flex items-center justify-center
@@ -1235,7 +1306,9 @@ export const OmniChatBar: React.FC = () => {
             onKeyDown={handleKeyDown}
             onFocus={() => hasMessages && setIsExpanded(true)}
             placeholder={
-              isLoading
+              isParsingFiles
+                ? '⏳ 첨부 파일 데이터를 정밀 분석하고 있습니다... 잠시만 기다려주세요.'
+                : isLoading
                 ? '🧠 Gemini가 요청을 분석하고 화면을 업데이트하고 있습니다...'
                 : isListening
                 ? '🎙️ 단방향 음성 인식 중... (말을 멈춰도 유지됨, 전송 또는 마이크 재클릭)'
@@ -1284,7 +1357,7 @@ export const OmniChatBar: React.FC = () => {
           <button
             type="button"
             onClick={() => handleSendMessage()}
-            disabled={(!inputValue.trim() && attachedFiles.length === 0) || isLoading}
+            disabled={(!inputValue.trim() && attachedFiles.length === 0) || isLoading || isParsingFiles}
             className="
               w-10 h-10 min-w-[40px] shrink-0
               flex items-center justify-center

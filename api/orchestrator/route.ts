@@ -72,6 +72,18 @@ const ORCHESTRATOR_SYSTEM_PROMPT = `
          "initial_prompt": "빌더 AI에게 즉시 전달할 구체적 프롬프트"
        }
 
+
+[핵심 규칙 1: 첨부 문서 데이터(ATTACHED_DOCUMENT_DATA) 1:1 스키마 반영]
+- 사용자의 메시지에 [ATTACHED_DOCUMENT_DATA]...[/ATTACHED_DOCUMENT_DATA] 블록이 포함되어 있는 경우:
+  * 이는 사용자가 첨부한 엑셀(.xlsx, .csv), 워드(.docx), 텍스트(.txt, .md, .json), PDF 문서의 실제 내부 데이터입니다.
+  * BUILDER 인텐트인 경우: payload 내 "db_schema"에 첨부된 표의 시트명(Sheet Name)을 DB 이름으로, 실제 컬럼 헤더들을 Notion DB 속성(Properties - title, select, status, date, number, text 등)으로 1:1 정확히 반영하고, 상위 1~2개 행의 실제 데이터 값을 sample_rows에 반드시 포함하여 설계하십시오.
+  * 첨부 파일 데이터의 원본 컬럼 구조를 임의로 훼손하거나 단순 표 1개로 축소하지 말고 충실히 반영하십시오.
+
+[핵심 규칙 2: Title Sanitizer (제목 도배 및 서술어 회귀 원천 차단)]
+- "suggested_title" 및 payload 내 "title" 작성 시:
+  * 절대로 사용자의 발화 전체나 서술어("만들어 줘", "반영해 주고", "해줘", "짜줘", "제작해줘"), 요청어("첨부", "참고하여"), 파일명("ardenhill.xlsx", ".csv" 등)을 제목에 그대로 넣지 마십시오!
+  * 무조건 핵심 업무 도메인만을 담은 1줄의 고품격 공식 명사형(예: "[아덴힐 리조트] 객실 시설관리 통합 관제 OS", "[스마트 파이낸스] 회계 결산 지출 내역서 관제 OS", "[프로젝트 OS] 애자일 스프린트 마일스톤 OS")으로만 정제하여 출력하십시오.
+
 [최종 출력 규격]
 반드시 마크다운 따옴표(\`\`\`json) 없이 오직 파싱 가능한 순수 JSON 객체 1개만 출력하세요:
 {
