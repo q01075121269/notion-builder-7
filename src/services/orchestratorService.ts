@@ -116,11 +116,11 @@ async function fallbackClientOrchestration(
         const properties = rawCols.map((colName, idx) => {
           let type = 'text';
           if (idx === 0) type = 'title';
-          else if (/일자|날짜|일시|기한|마감/i.test(colName)) type = 'date';
-          else if (/상태|진행|결과/i.test(colName)) type = 'status';
-          else if (/금액|비용|가격|단가|수량|점수|율/i.test(colName)) type = 'number';
+          else if (/일자|날짜|일시|시간|시각|기한|마감/i.test(colName)) type = 'date';
+          else if (/상태|진행|결과|통신/i.test(colName)) type = 'status';
+          else if (/전기|수도|가스|온수|난방|지침|사용량|금액|비용|가격|단가|수량|점수|율/i.test(colName)) type = 'number';
           else if (/담당|책임|관리자/i.test(colName)) type = 'person';
-          else if (/구분|분류|타입|종류|유형/i.test(colName)) type = 'select';
+          else if (/동|호|구분|분류|타입|종류|유형|위치/i.test(colName)) type = 'select';
           return { name: colName, type };
         });
 
@@ -143,7 +143,7 @@ async function fallbackClientOrchestration(
         const isMetering = userText.includes('검침') || userText.includes('계량기') || userText.includes('에너지') || userText.includes('전력') || userText.includes('수도');
         let attachedDbName = '📋 첨부 데이터 점검 및 운영 마스터 DB';
         if (isMetering) {
-          attachedDbName = '⚡ [시설 & 에너지] 실시간 검침 및 사용량 마스터 DB';
+          attachedDbName = '⚡ [시설 & 에너지] 원격검침 실시간 모니터링 관리 DB';
         } else if (isArdenhill) {
           attachedDbName = '🏢 [아덴힐] 객실 및 시설 점검 마스터 DB';
         }

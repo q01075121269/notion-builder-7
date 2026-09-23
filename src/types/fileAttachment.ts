@@ -28,6 +28,7 @@ export interface AttachedFile {
   base64?: string; // 이미지 Gemini Vision API 전송용 순수 base64
   parsedContent?: string; // 텍스트/마크다운 추출 결과
   sheets?: ParsedSheetData[]; // 스프레드시트 시트별 파싱 데이터
+  summaryBadge?: string;
   isParsing: boolean;
   error?: string;
   isUnsupportedHwp?: boolean;

@@ -15,21 +15,17 @@ export async function getSafeXLSX(): Promise<any> {
   }
   try {
     const rawModule = await import('xlsx');
-    let mod = (rawModule as any).default || rawModule;
-    if (!mod.utils && (rawModule as any).utils) {
-      mod = rawModule;
+    const mod = (rawModule as any).utils ? rawModule : ((rawModule as any).default || rawModule);
+    if (mod && mod.utils) {
+      cachedXLSX = mod;
+      return cachedXLSX;
     }
-    cachedXLSX = mod;
-    return cachedXLSX;
   } catch (err) {
     console.warn('[SheetJS Dynamic Import Warning, using static fallback]', err);
-    let staticMod = (XLSXRaw as any).default || XLSXRaw;
-    if (!staticMod.utils && (XLSXRaw as any).utils) {
-      staticMod = XLSXRaw;
-    }
-    cachedXLSX = staticMod;
-    return cachedXLSX;
   }
+  const staticMod = (XLSXRaw as any).utils ? XLSXRaw : ((XLSXRaw as any).default || XLSXRaw);
+  cachedXLSX = staticMod;
+  return cachedXLSX;
 }
 
 // PDF.js 워커 경로 설정 (안전한 CDN 워커 fallback 설정)
@@ -66,16 +62,190 @@ export function formatFileSize(bytes: number): string {
 }
 
 /**
+ * HTML 기반 위장 .xls 파일 여부 자가 감지 (첫 2048바이트 검사)
+ */
+export async function isHtmlDisguisedSpreadsheet(file: File): Promise<boolean> {
+  try {
+    const slice = file.slice(0, 2048);
+    const buf = await slice.arrayBuffer();
+    const text = new TextDecoder('utf-8', { fatal: false }).decode(buf).toLowerCase();
+    return (
+      text.includes('<table') ||
+      text.includes('<html') ||
+      text.includes('<tr') ||
+      text.includes('<td') ||
+      text.includes('xmlns:x="urn:schemas-microsoft-com:office:excel') ||
+      text.includes('application/vnd.ms-excel')
+    );
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * 브라우저 내장 DOMParser를 사용한 HTML 테이블 스프레드시트 파서 (라이브러리 의존성 제로 고속 추출)
+ */
+export async function parseHtmlSpreadsheet(file: File): Promise<{
+  markdownReport: string;
+  sheets: ParsedSheetData[];
+}> {
+  const fullBuffer = await file.arrayBuffer();
+  let htmlText = '';
+  try {
+    const utf8Decoder = new TextDecoder('utf-8', { fatal: true });
+    htmlText = utf8Decoder.decode(fullBuffer);
+  } catch {
+    try {
+      const eucKrDecoder = new TextDecoder('euc-kr', { fatal: false });
+      htmlText = eucKrDecoder.decode(fullBuffer);
+    } catch {
+      htmlText = new TextDecoder('utf-8', { fatal: false }).decode(fullBuffer);
+    }
+  }
+
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(htmlText, 'text/html');
+  const tables = Array.from(doc.querySelectorAll('table'));
+
+  if (!tables || tables.length === 0) {
+    throw new Error('HTML 테이블 태그(<table>)를 찾을 수 없습니다.');
+  }
+
+  const parsedSheets: ParsedSheetData[] = [];
+  const reportParts: string[] = [];
+
+  reportParts.push(`📊 [HTML 변종 .xls 스프레드시트 분석 데이터: "${file.name}"]`);
+  reportParts.push('- 브라우저 표준 DOMParser 고속 안전 추출 모드 적용 (라이브러리 프리 무손실)\n');
+
+  tables.forEach((table, tIdx) => {
+    const sheetName = tables.length === 1 ? 'Sheet1' : `Table_${tIdx + 1}`;
+    const rawRows: string[][] = [];
+
+    const trElements = Array.from(table.querySelectorAll('tr'));
+    for (const tr of trElements) {
+      const cellElements = Array.from(tr.querySelectorAll('th, td'));
+      if (cellElements.length === 0) continue;
+      const row = cellElements.map((cell) => (cell.textContent || '').replace(/\s+/g, ' ').trim());
+      if (row.some((c) => c !== '')) {
+        rawRows.push(row);
+      }
+    }
+
+    if (rawRows.length === 0) return;
+
+    // 스마트 헤더 행 감지 (1~6행 중 유효 텍스트 셀이 3개 이상인 행 선택)
+    let headerRowIndex = 0;
+    let maxValid = 0;
+    const checkLimit = Math.min(rawRows.length, 6);
+    for (let r = 0; r < checkLimit; r++) {
+      const validCount = rawRows[r].filter((c) => c !== '' && !c.startsWith('__EMPTY')).length;
+      if (validCount >= 3) {
+        headerRowIndex = r;
+        maxValid = validCount;
+        break;
+      }
+      if (validCount > maxValid) {
+        maxValid = validCount;
+        headerRowIndex = r;
+      }
+    }
+
+    const rawHeaders = rawRows[headerRowIndex] || [];
+    const validColIndices: number[] = [];
+    rawHeaders.forEach((h, idx) => {
+      const hasHeader = h !== '' && !h.startsWith('__EMPTY');
+      const hasData = rawRows.slice(headerRowIndex + 1, headerRowIndex + 20).some((r) => (r[idx] || '').trim() !== '');
+      if (hasHeader || hasData) {
+        validColIndices.push(idx);
+      }
+    });
+
+    const headers: string[] = validColIndices.map((colIdx, i) => {
+      let title = rawHeaders[colIdx] || '';
+      if (!title || title.startsWith('__EMPTY') || /^열_\d+$/i.test(title)) {
+        title = i === 0 ? '항목명' : `속성_${i + 1}`;
+      }
+      return title;
+    });
+
+    const dataRows = rawRows
+      .slice(headerRowIndex + 1)
+      .map((row) => validColIndices.map((colIdx) => row[colIdx] || ''))
+      .filter((row) => row.some((c) => c !== ''));
+
+    const objectRows: Record<string, any>[] = dataRows.map((row) => {
+      const obj: Record<string, any> = {};
+      headers.forEach((h, idx) => {
+        obj[h] = row[idx] || '';
+      });
+      return obj;
+    });
+
+    // 마크다운 테이블 생성 (최대 상위 40행)
+    let mdTable = `| ${headers.join(' | ')} |\n`;
+    mdTable += `| ${headers.map(() => '---').join(' | ')} |\n`;
+    const previewRows = dataRows.slice(0, 40);
+    previewRows.forEach((row) => {
+      const cells = headers.map((_, idx) => (row[idx] || '').replace(/\|/g, '\\|').replace(/\n/g, ' '));
+      mdTable += `| ${cells.join(' | ')} |\n`;
+    });
+    if (dataRows.length > 40) {
+      mdTable += `*... 외 ${dataRows.length - 40}개 데이터 행 생략*\n`;
+    }
+
+    reportParts.push(`### 시트: ${sheetName} (총 ${dataRows.length}개 행)`);
+    reportParts.push(`- 컬럼 목록: ${headers.join(', ')}`);
+    reportParts.push(mdTable);
+
+    parsedSheets.push({
+      sheetName,
+      headers,
+      rows: objectRows,
+      formulas: [],
+      markdownTable: mdTable,
+      rowCount: dataRows.length,
+    });
+  });
+
+  return {
+    markdownReport: reportParts.join('\n\n'),
+    sheets: parsedSheets,
+  };
+}
+
+/**
  * 1. 스프레드시트 (.xlsx, .xls, .csv) 파싱 파이프라인
  */
 export async function parseSpreadsheet(file: File): Promise<{
   markdownReport: string;
   sheets: ParsedSheetData[];
 }> {
-  const XLSX = await getSafeXLSX();
+  // 1. HTML 테이블 기반 위장 .xls 파일 여부 1차 자가 감지 (라이브러리 프리 고속 파싱)
+  const isHtml = await isHtmlDisguisedSpreadsheet(file);
+  if (isHtml) {
+    try {
+      return await parseHtmlSpreadsheet(file);
+    } catch (htmlErr) {
+      console.warn('[HTML Spreadsheet Parser Failed, trying SheetJS fallback]', htmlErr);
+    }
+  }
 
-  if (!XLSX || !XLSX.read || !XLSX.utils) {
-    throw new Error('SheetJS(xlsx) 라이브러리를 초기화할 수 없습니다.');
+  // 2. 순수 바이너리 엑셀(.xlsx / 진짜 .xls) 안전 파싱 처리
+  let XLSX: any;
+  try {
+    const XLSXModule = await import('xlsx');
+    XLSX = (XLSXModule as any).utils ? XLSXModule : ((XLSXModule as any).default || XLSXModule);
+  } catch (impErr) {
+    console.warn('[SheetJS import fail, trying static fallback]', impErr);
+    XLSX = (XLSXRaw as any).utils ? XLSXRaw : ((XLSXRaw as any).default || XLSXRaw);
+  }
+
+  if (!XLSX || !XLSX.utils) {
+    try {
+      return await parseHtmlSpreadsheet(file);
+    } catch {
+      throw new Error('Excel parser engine init failed');
+    }
   }
 
   // .xls 및 .xlsx 포맷 안전 파싱 파이프라인 (ArrayBuffer -> BinaryString 2단계 fallback)
@@ -94,7 +264,11 @@ export async function parseSpreadsheet(file: File): Promise<{
       });
       workbook = XLSX.read(binaryStr, { type: 'binary', cellFormula: true });
     } catch (binErr: any) {
-      throw new Error(`엑셀 파일 파싱 실패: ${binErr.message || readErr.message || '파일이 손상되었거나 지원되지 않는 형식입니다.'}`);
+      try {
+        return await parseHtmlSpreadsheet(file);
+      } catch {
+        throw new Error(`엑셀 파일 파싱 실패: ${binErr.message || readErr.message || '파일이 손상되었거나 지원되지 않는 형식입니다.'}`);
+      }
     }
   }
 
@@ -125,8 +299,7 @@ export async function parseSpreadsheet(file: File): Promise<{
 
     if (!rawData || rawData.length === 0) continue;
 
-    // [스마트 헤더 행 감지 알고리즘 (Smart Header Row Detection)]
-    // 1행이 전체 병합 제목("아덴힐 리조트앤골프...", "실시간 검침정보...")일 경우 감지하여 1~5행 중 유효 텍스트 셀이 3개 이상인 행 채택
+    // 스마트 헤더 행 감지
     let headerRowIndex = 0;
     let maxValidCells = 0;
 
@@ -150,13 +323,11 @@ export async function parseSpreadsheet(file: File): Promise<{
     }
 
     const rawHeaderRow = rawData[headerRowIndex] || [];
-
-    // 유효한 열 인덱스 추출 (내용이 있는 열만 선별하여 '열_2', '열_3', '__EMPTY' 생성 원천 금지)
     const validColIndices: number[] = [];
     rawHeaderRow.forEach((h: any, idx: number) => {
       const colTitle = String(h ?? '').trim();
       const hasHeader = colTitle !== '' && !colTitle.startsWith('__EMPTY');
-      const hasColumnData = rawData.slice(headerRowIndex + 1, headerRowIndex + 15).some((row) => {
+      const hasColumnData = rawData.slice(headerRowIndex + 1, headerRowIndex + 20).some((row) => {
         const val = String((row || [])[idx] ?? '').trim();
         return val !== '';
       });
@@ -166,7 +337,6 @@ export async function parseSpreadsheet(file: File): Promise<{
       }
     });
 
-    // 헤더명 정제
     const headers: string[] = validColIndices.map((colIdx, i) => {
       let title = String(rawHeaderRow[colIdx] ?? '').trim();
       if (!title || title.startsWith('__EMPTY') || /^열_\d+$/i.test(title)) {
@@ -175,13 +345,11 @@ export async function parseSpreadsheet(file: File): Promise<{
       return title;
     });
 
-    // 헤더 행 다음 행부터 실제 데이터 행 추출
     const dataRows = rawData
       .slice(headerRowIndex + 1)
       .filter((row) => row && row.some((cell: any) => cell !== '' && cell !== null && cell !== undefined))
       .map((row) => validColIndices.map((colIdx) => row[colIdx] ?? ''));
 
-    // 수식 셀 탐색
     const formulas: Array<{ cell: string; formula: string }> = [];
     try {
       Object.keys(worksheet).forEach((cellKey) => {
@@ -193,7 +361,6 @@ export async function parseSpreadsheet(file: File): Promise<{
       });
     } catch {}
 
-    // 객체 행 데이터 구성
     const objectRows: Record<string, any>[] = dataRows.map((row) => {
       const obj: Record<string, any> = {};
       headers.forEach((h, idx) => {
@@ -202,7 +369,6 @@ export async function parseSpreadsheet(file: File): Promise<{
       return obj;
     });
 
-    // Markdown Table 생성 (최대 상위 40행 요약으로 AI 컨텍스트 주입)
     let mdTable = `| ${headers.join(' | ')} |\n`;
     mdTable += `| ${headers.map(() => '---').join(' | ')} |\n`;
 
@@ -219,6 +385,10 @@ export async function parseSpreadsheet(file: File): Promise<{
       mdTable += `*... 외 ${dataRows.length - 40}개 데이터 행 생략*\n`;
     }
 
+    reportParts.push(`### 시트명: ${sheetName} (총 ${dataRows.length}개 행)`);
+    reportParts.push(`- 컬럼 목록: ${headers.join(', ')}`);
+    reportParts.push(mdTable);
+
     parsedSheets.push({
       sheetName,
       headers,
@@ -227,31 +397,14 @@ export async function parseSpreadsheet(file: File): Promise<{
       markdownTable: mdTable,
       rowCount: dataRows.length,
     });
-
-    reportParts.push(`### [시트: "${sheetName}"] (총 ${dataRows.length}개 행)`);
-    reportParts.push(mdTable);
-
-    if (formulas.length > 0) {
-      reportParts.push(`📌 적용된 주요 수식 셀:`);
-      formulas.slice(0, 8).forEach((f) => {
-        reportParts.push(`- 셀 ${f.cell}: \`${f.formula}\``);
-      });
-      if (formulas.length > 8) {
-        reportParts.push(`- 외 ${formulas.length - 8}개 수식 적용됨`);
-      }
-    }
-    reportParts.push('');
   }
 
   return {
-    markdownReport: reportParts.join('\n'),
+    markdownReport: reportParts.join('\n\n'),
     sheets: parsedSheets,
   };
 }
 
-/**
- * 2. 워드 (.docx) 및 텍스트 (.txt, .md) 문서 파싱 파이프라인
- */
 export async function parseWordOrTextDocument(file: File): Promise<string> {
   const ext = file.name.split('.').pop()?.toLowerCase() || '';
 
@@ -467,6 +620,20 @@ export async function parseUploadedFile(file: File): Promise<AttachedFile> {
     attached.error = err.message || '파일 파싱 중 오류가 발생했습니다.';
   } finally {
     attached.isParsing = false;
+
+    // [칩(Badge) 요약 텍스트 정밀 산출]
+    const totalRows = attached.sheets?.reduce((acc, s) => acc + (s.rowCount || 0), 0) || 0;
+    const isMetering = /검침|계량기|수도|전기|가스|원격|meter|energy/i.test(attached.name + ' ' + (attached.parsedContent || ''));
+
+    if (isMetering && totalRows > 0) {
+      attached.summaryBadge = `[실시간 검침정보] ${totalRows}개 행 파싱 완료`;
+    } else if (isMetering) {
+      attached.summaryBadge = '[실시간 검침정보] 파싱 완료';
+    } else if (totalRows > 0) {
+      attached.summaryBadge = `${totalRows}개 행 파싱 완료`;
+    } else if (attached.parsedContent) {
+      attached.summaryBadge = '파싱 완료';
+    }
   }
 
   return attached;

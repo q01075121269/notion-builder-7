@@ -36,7 +36,7 @@ export function sanitizeTemplateTitle(rawInput: string, topic?: string): string 
     lowerCombined.includes('에너지') ||
     (lowerCombined.includes('시설') && (lowerCombined.includes('수도') || lowerCombined.includes('전기') || lowerCombined.includes('가스')))
   ) {
-    return '[시설 & 에너지 관제] 실시간 검침 관리 및 시설 점검 OS';
+    return '[원격검침 & 시설 관제] 실시간 검침 모니터링 관리 OS';
   }
   // 첨부 파일명이 ardenhill_room_maintenance_checklist 이거나 아덴힐 관련인 경우 무조건 강제 치환
   if (
@@ -61,7 +61,7 @@ export function sanitizeTemplateTitle(rawInput: string, topic?: string): string 
   // 오염되었거나 텍스트가 30자 이상으로 길면 즉시 폐기 후 도메인 추론 fallback 가동
   if (isContaminated || text.length > 30) {
     if (lowerCombined.includes('검침') || lowerCombined.includes('계량기') || lowerCombined.includes('에너지')) {
-      return '[시설 & 에너지 관제] 실시간 검침 관리 및 시설 점검 OS';
+      return '[원격검침 & 시설 관제] 실시간 검침 모니터링 관리 OS';
     }
     if (lowerCombined.includes('시설') || lowerCombined.includes('객실') || lowerCombined.includes('하자') || lowerCombined.includes('호텔') || lowerCombined.includes('건물')) {
       return '[시설 & 자산 관리] 객실 점검 및 하자보수 관제 OS';
@@ -117,7 +117,7 @@ export function sanitizeTemplateTitle(rawInput: string, topic?: string): string 
 
   // 도메인별 고품격 공식 타이틀 포맷팅
   if (lower.includes('검침') || lower.includes('계량기') || lower.includes('에너지')) {
-    return '[시설 & 에너지 관제] 실시간 검침 관리 및 시설 점검 OS';
+    return '[원격검침 & 시설 관제] 실시간 검침 모니터링 관리 OS';
   }
   if (lower.includes('아덴힐') || (lower.includes('리조트') && (lower.includes('시설') || lower.includes('객실')))) {
     return '[아덴힐 리조트] 객실 시설관리 및 정기 점검 OS';
@@ -155,28 +155,24 @@ export function getDomainEcoDatabases(domainOrTopic: string, title: string): Not
   if (t.includes('검침') || t.includes('계량기') || t.includes('에너지') || (t.includes('시설') && (t.includes('수도') || t.includes('전기') || t.includes('가스')))) {
     return [
       {
-        name: '⚡ 실시간 에너지 & 검침 관리 마스터 DB',
-        description: '동/호수별 계량기 지침 및 전력/수도/가스 실시간 사용량과 이상 과다 사용 경보를 관제하는 마스터 DB',
+        name: '⚡ 원격검침 실시간 모니터링 관리 DB',
+        description: '동/호수별 검침시간, 전기, 수도, 가스, 온수 사용량 및 통신상태와 이상 경보를 실시간 관제하는 마스터 DB',
         view_type: 'table',
         properties: [
-          { name: '호수/계량기 위치', type: 'title' },
-          { name: '에너지 구분', type: 'select', options: ['⚡ 전기', '🚰 상수도', '🔥 도시가스', '♨️ 온수/난방'] },
-          { name: '계량기 번호', type: 'text' },
-          { name: '전월 지침', type: 'number' },
-          { name: '당월 지침', type: 'number' },
+          { name: '호수/위치', type: 'title' },
+          { name: '동', type: 'select', options: ['101동', '102동', '103동', '관리동/공용부'] },
+          { name: '호', type: 'text' },
+          { name: '검침시간', type: 'date' },
+          { name: '전기(kWh)', type: 'number' },
+          { name: '수도(m³)', type: 'number' },
+          { name: '가스(m³)', type: 'number' },
+          { name: '통신상태', type: 'status', options: ['정상 수신 🟢', '수신 지연 🟡', '통신 장애 🔴'] },
           { 
-            name: '당월 사용량(수식)', 
+            name: '이상 경보(수식)', 
             type: 'formula', 
-            expression: 'prop("당월 지침") - prop("전월 지침")' 
+            expression: 'ifs(prop("통신상태") == "통신 장애 🔴", "🚨 통신 단절 경보", prop("전기(kWh)") > 450, "⚠️ 전기 과다 사용", prop("수도(m³)") > 80, "💧 누수 의심", "🟢 정상")' 
           },
-          { 
-            name: '사용량 이상 경보(수식)', 
-            type: 'formula', 
-            expression: 'ifs(prop("당월 사용량(수식)") > 500, "🚨 누수/과부하 의심", prop("당월 사용량(수식)") > 350, "⚠️ 주의 사용", "🟢 정상 사용")' 
-          },
-          { name: '검침 일자', type: 'date' },
-          { name: '검침 담당자', type: 'person' },
-          { name: '설비 점검 연계', type: 'relation', target: '🛠️ 계량기 및 시설 설비 점검 DB' },
+          { name: '계량기 점검 연계', type: 'relation', target: '🛠️ 계량기 및 시설 설비 점검 DB' },
           { name: '이상 조치 티켓', type: 'relation', target: '🚨 이상 징후 및 긴급 보수 티켓 DB' },
           { name: 'Quality_Status', type: 'select', options: ['초안', '검수 중', '승인', '반려'] },
           { name: 'Verified', type: 'checkbox' }

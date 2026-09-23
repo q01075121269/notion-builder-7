@@ -16,6 +16,7 @@ import {
   Paperclip,
   FileText,
   Link as LinkIcon,
+  CheckCircle2,
 } from 'lucide-react';
 import { sendToOrchestrator } from '../../services/orchestratorService';
 import type { ChatMessage, OrchestratorResponse } from '../../services/orchestratorService';
@@ -148,6 +149,7 @@ export interface OmniAttachment {
   type: 'file' | 'link';
   parsedContent?: string;
   sheets?: any[];
+  summaryBadge?: string;
   isParsing?: boolean;
   error?: string;
 }
@@ -338,6 +340,7 @@ export const OmniChatBar: React.FC = () => {
           type: 'file',
           parsedContent: parsed.parsedContent,
           sheets: parsed.sheets,
+          summaryBadge: parsed.summaryBadge,
           isParsing: false,
           error: parsed.error,
         });
@@ -345,7 +348,7 @@ export const OmniChatBar: React.FC = () => {
         if (parsed.error) {
           showToast(`⚠️ [${file.name}] ${parsed.error}`, 'error');
         } else {
-          showToast(`📊 [${file.name}] 데이터 분석 완료 (표/텍스트 추출 성공)`, 'success');
+          showToast(`📊 [${file.name}] 데이터 분석 완료 (${parsed.summaryBadge || '추출 성공'})`, 'success');
         }
       } catch (err: any) {
         newItems.push({
@@ -415,7 +418,20 @@ export const OmniChatBar: React.FC = () => {
     const pureText = text;
     const attachedDataBlocks = attachedFiles
       .filter((a) => a.parsedContent)
-      .map((a) => `[ATTACHED_DOCUMENT_DATA]\n파일명: ${a.name}\n${a.parsedContent}\n[/ATTACHED_DOCUMENT_DATA]`)
+      .map((a) => {
+        let block = `[ATTACHED_DOCUMENT_DATA]\n파일명: ${a.name}`;
+        if (a.sheets && a.sheets.length > 0) {
+          const firstSheet = a.sheets[0];
+          if (firstSheet.headers && firstSheet.headers.length > 0) {
+            block += `\n추출 컬럼 목록: [${firstSheet.headers.join(', ')}]`;
+          }
+          if (firstSheet.rows && firstSheet.rows.length > 0) {
+            block += `\n상위 샘플 데이터(JSON): ${JSON.stringify(firstSheet.rows.slice(0, 5))}`;
+          }
+        }
+        block += `\n\n${a.parsedContent}\n[/ATTACHED_DOCUMENT_DATA]`;
+        return block;
+      })
       .join('\n\n');
 
     const promptGuidance = attachedDataBlocks
@@ -1326,7 +1342,12 @@ export const OmniChatBar: React.FC = () => {
                 )}
                 <span className="max-w-[140px] truncate">{file.name}</span>
                 {file.sizeFormatted && <span className="text-[9px] opacity-70">({file.sizeFormatted})</span>}
-                {file.parsedContent && <span className="text-[9px] px-1 py-0.2 rounded bg-emerald-200/60 dark:bg-emerald-800/60 text-emerald-800 dark:text-emerald-200">분석완료</span>}
+                {file.parsedContent && (
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-200 border border-emerald-300 dark:border-emerald-700 font-semibold flex items-center space-x-1">
+                    <CheckCircle2 className="w-3 h-3 text-emerald-600 dark:text-emerald-400 inline mr-1" />
+                    <span>{file.summaryBadge || '파싱 완료'}</span>
+                  </span>
+                )}
                 <button
                   type="button"
                   onClick={() => removeAttachment(idx)}
