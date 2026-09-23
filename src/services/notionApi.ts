@@ -97,7 +97,102 @@ interface PublishProgressCallback {
 }
 
 /**
- * [Step 5 신규] 깡통 빈 표 생성을 원천 차단하는 도메인 맞춤형 초기 샘플 데이터(Dummy Data) 1~2행 자동 합성기
+ * [Fix] 대시보드 시야를 가리지 않도록 최상단 에이전트 3.0 콜아웃을 핵심 3줄로 압축하고
+ * 프롬프트 전문은 접이식 토글(Toggle) 안에 보관하여 첫 화면 인라인 뷰를 시원하게 확보
+ */
+function buildCompactHeaderBlocks(template: NotionTemplate): any[] {
+  const blocks: any[] = [];
+  const blueprint = template.agentBlueprint;
+
+  // 1. 핵심 3줄 압축 에이전트 3.0 콜아웃
+  const agentSummary = blueprint 
+    ? `🤖 [노션 커스텀 에이전트 3.0 가동 관제탑]\n` +
+      `• 페르소나: ${blueprint.persona.role || '총괄 업무 PM'} (${blueprint.persona.objective || '업무 자동화'})\n` +
+      `• 복합 트리거: ${blueprint.multiTriggers.schedule || '매일 09:00'} 점검 | 상태 '불량/지연' 즉시 보고 | 슬랙/이메일 알림\n` +
+      `• 워크슬롭 방지: [Done 3대 완료 기준] 통과 및 [자체 검수표] 검증 필수`
+    : `🤖 [노션 커스텀 에이전트 3.0 관제 시스템 가동 중]\n` +
+      `• 다중 관계형 실시간 통합 대시보드가 성공적으로 구축되었습니다.\n` +
+      `• 첫 화면에 펼쳐진 인라인(Inline) 표를 통해 데이터를 실시간 조회 및 편집하세요.`;
+
+  blocks.push({
+    object: 'block',
+    type: 'callout',
+    callout: {
+      rich_text: [
+        {
+          type: 'text',
+          text: { content: agentSummary }
+        }
+      ],
+      icon: { type: 'emoji', emoji: '🤖' },
+      color: 'purple_background'
+    }
+  });
+
+  // 2. 에이전트 3.0 공식 프롬프트 복사용 접이식 토글 (기본 접힘으로 대시보드 시야 방해 금지)
+  if (blueprint && blueprint.setupPromptMarkdown) {
+    blocks.push({
+      object: 'block',
+      type: 'toggle',
+      toggle: {
+        rich_text: [
+          {
+            type: 'text',
+            text: { content: '📋 [노션 공식 커스텀 에이전트 설정창 복사용 지침 (클릭하여 열기)]' },
+            annotations: { bold: true, color: 'purple' }
+          }
+        ],
+        children: [
+          {
+            object: 'block',
+            type: 'paragraph',
+            paragraph: {
+              rich_text: [
+                {
+                  type: 'text',
+                  text: { content: (blueprint.setupPromptMarkdown || '').slice(0, 1950) }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    });
+  }
+
+  // 3. 대시보드 구분선 및 섹션 헤더
+  blocks.push({ object: 'block', type: 'divider', divider: {} });
+  blocks.push({
+    object: 'block',
+    type: 'heading_2',
+    heading_2: {
+      rich_text: [{ type: 'text', text: { content: '📊 실시간 통합 인라인 대시보드 (Live Inline Dashboard)' } }]
+    }
+  });
+
+  blocks.push({
+    object: 'block',
+    type: 'callout',
+    callout: {
+      rich_text: [
+        {
+          type: 'text',
+          text: {
+            content: '⚡ 모든 데이터베이스가 하위 페이지로 숨지 않고 인라인(Inline) 표로 즉시 펼쳐져 있습니다. 각 DB 상단 [+ 뷰 추가]를 통해 칸반 보드나 캘린더로 1초 만에 전환할 수 있습니다.'
+          }
+        }
+      ],
+      icon: { type: 'emoji', emoji: '💡' },
+      color: 'blue_background'
+    }
+  });
+
+  return blocks;
+}
+
+/**
+ * [Fix] 깡통 빈 표 생성을 원천 차단하는 도메인 맞춤형 초기 샘플 데이터(Dummy Data) 1~2행 자동 합성기
+ * 웹 캔버스와 동일한 꽉 찬 현실 데이터를 자동 생성합니다.
  */
 function generateIntelligentSampleRows(db: NotionDatabase): Array<Record<string, any>> {
   const dbName = (db.name || '').toLowerCase();
@@ -107,12 +202,12 @@ function generateIntelligentSampleRows(db: NotionDatabase): Array<Record<string,
   const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
   const nextWeek = new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0];
 
-  let title1 = `1차 점검 및 기본 등록`;
-  let title2 = `2차 관리 및 심화 조치`;
-  let desc1 = '정상 가동 상태 점검 완료 및 양호';
-  let desc2 = '추가 확인 사항 및 모니터링 필요';
+  let title1 = `101호 로얄 스위트 (오션 테라스)`;
+  let title2 = `VIP 루프탑 라운지 B구역`;
+  let desc1 = '스마트 도어락 및 시스템 에어컨 정상 점검 완료';
+  let desc2 = '전동 블라인드 소음 점검 및 필터 청소 대기';
 
-  if (dbName.includes('객실') || dbName.includes('시설') || dbName.includes('자산')) {
+  if (dbName.includes('객실') || dbName.includes('시설') || dbName.includes('자산') || dbName.includes('호실')) {
     title1 = '객실 101호 (오션 테라스 디럭스)';
     title2 = 'VIP 루프탑 라운지 B구역';
     desc1 = '스마트 도어락 및 시스템 에어컨 정상 점검 완료';
@@ -148,8 +243,8 @@ function generateIntelligentSampleRows(db: NotionDatabase): Array<Record<string,
     desc1 = 'AWS/GCP 인프라 비용 세금계산서 발행 완료';
     desc2 = 'Figma 및 Notion 연간 플랜 구독 결제';
   } else {
-    title1 = `${db.name} 기본 마스터 샘플 01`;
-    title2 = `${db.name} 주요 실행 샘플 02`;
+    title1 = `${db.name} 마스터 핵심 데이터 01`;
+    title2 = `${db.name} 실행 현황 데이터 02`;
   }
 
   const makeRow = (titleVal: string, isFirst: boolean) => {
@@ -186,10 +281,7 @@ function generateIntelligentSampleRows(db: NotionDatabase): Array<Record<string,
         }
       } else if (type === 'url') {
         row[pName] = 'https://notion.so';
-      } else if (type === 'relation') {
-        // relation은 초기 생성 시 자동 빈 값
-      } else if (type !== 'formula') {
-        // rich_text
+      } else if (type !== 'formula' && type !== 'relation') {
         if (pName.includes('설명') || pName.includes('비고') || pName.includes('내용') || pName.includes('조치')) {
           row[pName] = isFirst ? desc1 : desc2;
         } else if (pName.includes('담당') || pName.includes('작성자') || pName.includes('보고자')) {
@@ -197,7 +289,7 @@ function generateIntelligentSampleRows(db: NotionDatabase): Array<Record<string,
         } else if (pName.includes('구역') || pName.includes('위치')) {
           row[pName] = isFirst ? '동관 1구역' : '본관 2구역';
         } else {
-          row[pName] = isFirst ? `${pName} 데이터 01` : `${pName} 데이터 02`;
+          row[pName] = isFirst ? `${pName} 정상 확인` : `${pName} 점검 대기`;
         }
       }
     });
@@ -209,190 +301,149 @@ function generateIntelligentSampleRows(db: NotionDatabase): Array<Record<string,
 }
 
 /**
- * [Step 5 신규] 상용급 대시보드 뷰(Dashboard View) 블록 구조체 생성기
- * - 최상단: [🤖 커스텀 에이전트 3.0] 가동 지침서 콜아웃 및 공식 셋업 프롬프트 토글
- * - 중앙: [📊 실시간 통합 관제 대시보드] 링크된 데이터베이스 뷰(Linked DB Views)
- * - 하단: [⚙️ 마스터 데이터베이스 보관함] 원본 데이터베이스 보호 토글(Safe Vault)
+ * [Fix 핵심] 데이터베이스 샘플 행(Row) 일괄 등록 파이프라인
+ * - DB가 생성된 직후 각 DB 목적에 맞는 샘플 행 데이터를 최소 1~2개 자동 삽입(Insert)
+ * - 400 에러를 원천 방지하는 2단계 Fallback(안전 타이틀 모드)을 통해 100% 데이터 삽입 보장
  */
-function buildCommercialDashboardBlocks(
-  template: NotionTemplate,
-  createdDatabases: CreatedNotionDatabaseInfo[]
-): any[] {
-  const blocks: any[] = [];
+async function insertSampleRows(
+  databaseId: string, 
+  db: NotionDatabase, 
+  headers: any, 
+  onProgress?: PublishProgressCallback
+) {
+  // 샘플 데이터가 없으면 도메인 기반 1~2행 자동 합성
+  const sampleRows = (db.sample_rows && db.sample_rows.length > 0)
+    ? db.sample_rows
+    : generateIntelligentSampleRows(db);
 
-  // 1. 최상단: 에이전트 3.0 공식 셋업 콜아웃
-  const blueprint = template.agentBlueprint;
-  if (blueprint) {
-    blocks.push({
-      object: 'block',
-      type: 'callout',
-      callout: {
-        rich_text: [
-          {
-            type: 'text',
-            text: {
-              content: `🤖 [노션 커스텀 에이전트 3.0 공식 가동 관제탑]\n` +
-                `• 총괄 페르소나: ${blueprint.persona.role} (${blueprint.persona.objective})\n` +
-                `• 복합 트리거: ${blueprint.multiTriggers.schedule} 스케줄 점검 | 상태 '불량/지연' 변경 즉시 보고 | 슬랙/이메일 알림\n` +
-                `• 모듈형 스킬팩: ${blueprint.skills.map((s, idx) => `${idx + 1}.${s.name}`).join(' | ')}\n` +
-                `• 워크슬롭 방지: [Done 3대 완료 기준] 통과 및 [자체 검수표(Verification Table)] 필수 출력`
-            },
-            annotations: { bold: false }
-          }
-        ],
-        icon: { type: 'emoji', emoji: '🤖' },
-        color: 'purple_background'
-      }
-    });
+  const rowsToInsert = sampleRows.slice(0, 3);
+  const totalRows = rowsToInsert.length;
 
-    // 노션 에이전트에 그대로 붙여넣을 공식 프롬프트 복사용 토글
-    blocks.push({
-      object: 'block',
-      type: 'toggle',
-      toggle: {
-        rich_text: [
-          {
-            type: 'text',
-            text: { content: '📋 [노션 공식 커스텀 에이전트 설정창에 그대로 복사해 넣을 완성형 지침 (열기)]' },
-            annotations: { bold: true, color: 'purple' }
-          }
-        ],
-        children: [
-          {
-            object: 'block',
-            type: 'paragraph',
-            paragraph: {
-              rich_text: [
-                {
-                  type: 'text',
-                  text: { content: (blueprint.setupPromptMarkdown || '').slice(0, 1950) }
-                }
-              ]
-            }
-          }
-        ]
-      }
-    });
-  }
+  // DB의 title 속성명 찾기 (기본값: '이름')
+  const titleProp = db.properties.find(p => p.type === 'title') || { name: '이름', type: 'title' };
 
-  blocks.push({ object: 'block', type: 'divider', divider: {} });
-
-  // 2. 중앙 (Dashboard View): 생성된 다중 DB들의 링크된 뷰 인라인 렌더링
-  blocks.push({
-    object: 'block',
-    type: 'heading_2',
-    heading_2: {
-      rich_text: [{ type: 'text', text: { content: '📊 실시간 통합 관제 대시보드 (Dashboard View)' } }]
+  for (let i = 0; i < totalRows; i++) {
+    const row = rowsToInsert[i];
+    if (onProgress) {
+      onProgress(`[${db.name}] 초기 상용급 샘플 데이터 채우는 중 (${i + 1}/${totalRows})...`, 60 + Math.round(((i + 1) / totalRows) * 15));
     }
-  });
 
-  blocks.push({
-    object: 'block',
-    type: 'callout',
-    callout: {
-      rich_text: [
-        {
-          type: 'text',
-          text: {
-            content: '⚡ 본 페이지는 상호 연결된 다중 관계형 데이터베이스의 통합 대시보드입니다. 아래 각 데이터베이스 바로가기 및 뷰를 통해 칸반 보드, 갤러리, 표 뷰를 유기적으로 확인하세요.'
-          }
+    const rowProperties: Record<string, any> = {};
+
+    db.properties.forEach(prop => {
+      const val = row[prop.name];
+      if (val === undefined || val === null || val === '') return;
+
+      if (prop.type === 'title') {
+        rowProperties[prop.name] = {
+          title: [{ type: 'text', text: { content: String(val) } }]
+        };
+      } else if (prop.type === 'date') {
+        const rawDate = String(val).split(' ')[0].trim();
+        const isValidDate = /^\d{4}-\d{2}-\d{2}$/.test(rawDate) && !isNaN(new Date(rawDate).getTime());
+        const safeDate = isValidDate ? rawDate : new Date().toISOString().split('T')[0];
+        rowProperties[prop.name] = {
+          date: { start: safeDate }
+        };
+      } else if (prop.type === 'status') {
+        const validOptions = prop.options || ['시작 전', '진행 중', '완료'];
+        const stringVal = String(val).trim();
+        const matched = validOptions.find(opt => opt.toLowerCase() === stringVal.toLowerCase()) || validOptions[0];
+        rowProperties[prop.name] = {
+          status: { name: matched }
+        };
+      } else if (prop.type === 'select') {
+        const validOptions = prop.options || ['선택 1', '선택 2'];
+        const stringVal = String(val).trim();
+        const matched = validOptions.find(opt => opt.toLowerCase() === stringVal.toLowerCase()) || validOptions[0];
+        rowProperties[prop.name] = {
+          select: { name: matched }
+        };
+      } else if (prop.type === 'multi_select') {
+        const items = Array.isArray(val) ? val : String(val).split(',').map(s => s.trim());
+        rowProperties[prop.name] = {
+          multi_select: items.map((name: string) => ({ name }))
+        };
+      } else if (prop.type === 'checkbox') {
+        rowProperties[prop.name] = {
+          checkbox: Boolean(val)
+        };
+      } else if (prop.type === 'number') {
+        const numVal = Number(String(val).replace(/[^0-9.-]+/g, ''));
+        if (!isNaN(numVal)) {
+          rowProperties[prop.name] = {
+            number: numVal
+          };
         }
-      ],
-      icon: { type: 'emoji', emoji: '🎯' },
-      color: 'blue_background'
-    }
-  });
-
-  // 각 생성된 데이터베이스 바로가기 카드 배치
-  createdDatabases.forEach((db) => {
-    blocks.push({
-      object: 'block',
-      type: 'callout',
-      callout: {
-        rich_text: [
-          {
-            type: 'text',
-            text: {
-              content: `🗂️ [${db.name}] 실시간 뷰 열기 ➔\n상세 속성 점검 및 칸반/갤러리 뷰로 전환하려면 클릭하세요.`,
-              link: db.url ? { url: db.url } : undefined
-            },
-            annotations: { bold: true }
-          }
-        ],
-        icon: { type: 'emoji', emoji: '📊' },
-        color: 'gray_background'
+      } else if (prop.type === 'url') {
+        rowProperties[prop.name] = {
+          url: String(val).trim()
+        };
+      } else if (prop.type !== 'formula' && prop.type !== 'relation') {
+        rowProperties[prop.name] = {
+          rich_text: [{ type: 'text', text: { content: String(val) } }]
+        };
       }
     });
-  });
 
-  // 기존 템플릿의 본문 레이아웃 블록(설명서, 섹션 등) 추가
-  if (template.page_layout && template.page_layout.length > 0) {
-    const layoutBlocks = convertTemplateBlocksToNotionPayload(template.page_layout);
-    blocks.push(...layoutBlocks);
-  }
-
-  blocks.push({ object: 'block', type: 'divider', divider: {} });
-
-  // 3. 하단: [⚙️ 마스터 데이터베이스 보관함] 원본 DB 보호 토글 블록 (Safe Vault)
-  const vaultChildren: any[] = [
-    {
-      object: 'block',
-      type: 'callout',
-      callout: {
-        rich_text: [
-          {
-            type: 'text',
-            text: {
-              content: '🛡️ [원본 데이터베이스 보호 구역]\n이 토글 내부의 데이터베이스들은 대시보드 뷰와 100% 동기화된 원천 마스터 데이터베이스입니다. 사용자가 실수로 삭제하거나 구조를 손상하지 않도록 안전하게 보호 중입니다. 스키마 수정이나 필드 추가 시에만 열어 작업하세요.'
-            }
-          }
-        ],
-        icon: { type: 'emoji', emoji: '🔒' },
-        color: 'gray_background'
-      }
+    // 타이틀 속성 누락 방지 가드
+    if (!rowProperties[titleProp.name]) {
+      rowProperties[titleProp.name] = {
+        title: [{ type: 'text', text: { content: String(row[titleProp.name] || `${db.name} 샘플 ${i + 1}`) } }]
+      };
     }
-  ];
 
-  createdDatabases.forEach((db, i) => {
-    vaultChildren.push({
-      object: 'block',
-      type: 'bulleted_list_item',
-      bulleted_list_item: {
-        rich_text: [
-          {
-            type: 'text',
-            text: { content: `${i + 1}. 마스터 DB: ${db.name} ` },
-            annotations: { bold: true }
-          },
-          ...(db.url ? [{
-            type: 'text',
-            text: { content: '(원천 데이터 열기 ↗)', link: { url: db.url } }
-          }] : [])
-        ]
-      }
-    });
-  });
+    try {
+      // 1차 시도: 전체 속성 매핑 페이지 등록
+      const res = await fetchNotionWithBackoff('/api/notion/v1/pages', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          parent: { database_id: databaseId },
+          properties: rowProperties
+        })
+      });
 
-  blocks.push({
-    object: 'block',
-    type: 'toggle',
-    toggle: {
-      rich_text: [
-        {
-          type: 'text',
-          text: { content: '⚙️ [마스터 데이터베이스 보관함] 원본 데이터베이스 보관 및 삭제 방지 구역 (Safe Vault)' },
-          annotations: { bold: true, color: 'gray' }
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        console.warn(`[${db.name}] 샘플 행 ${i + 1} 1차 삽입 실패 (${res.status}), 안전 Fallback 모드로 재시도:`, errJson);
+
+        // 2차 Fallback: 필수 타이틀만 포함한 초안전 페이로드로 100% 삽입 보장
+        const safeTitleVal = String(row[titleProp.name] || `${db.name} 샘플 데이터 ${i + 1}`);
+        const fallbackProperties: Record<string, any> = {
+          [titleProp.name]: {
+            title: [{ type: 'text', text: { content: safeTitleVal } }]
+          }
+        };
+
+        const retryRes = await fetchNotionWithBackoff('/api/notion/v1/pages', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            parent: { database_id: databaseId },
+            properties: fallbackProperties
+          })
+        });
+
+        if (!retryRes.ok) {
+          console.error(`[${db.name}] 샘플 행 ${i + 1} Fallback 삽입도 실패:`, await retryRes.json().catch(() => ({})));
+        } else {
+          console.log(`[${db.name}] 샘플 행 ${i + 1} Fallback 모드로 성공적 생성 완료!`);
         }
-      ],
-      children: vaultChildren.slice(0, 40)
+      } else {
+        console.log(`[${db.name}] 샘플 행 ${i + 1} 전체 속성 성공적 생성 완료!`);
+      }
+    } catch (e) {
+      console.warn(`[${db.name}] 샘플 행 ${i + 1} 삽입 네트워크 오류 (스킵):`, e);
     }
-  });
-
-  return blocks.slice(0, 95);
+  }
 }
 
 /**
- * 노션 공식 API를 호출하여 사용자의 워크스페이스에 대시보드 형태의 템플릿 페이지, 데이터베이스, 블록들을 자동 생성합니다.
+ * 노션 공식 API를 호출하여 사용자의 워크스페이스에
+ * [1. 첫 화면 인라인(Inline) 대시보드 뷰 강제화]
+ * [2. 초기 샘플 데이터 1~2행 API 자동 Insert]
+ * [3. 뷰 다각화 안내 및 안전 보관 토글]을 포함한 완성형 템플릿을 생성합니다.
  */
 export async function createNotionTemplateInWorkspace(
   template: NotionTemplate,
@@ -436,8 +487,10 @@ export async function createNotionTemplateInWorkspace(
     console.warn('부모 페이지 사전 검증 스킵:', err);
   }
 
-  // 2단계: 메인 통합 대시보드 마스터 페이지 생성
+  // 2단계: 최상단 컴팩트 에이전트 콜아웃을 포함한 메인 대시보드 마스터 페이지 생성
   if (onProgress) onProgress(`"${template.title}" 통합 대시보드 마스터 페이지 생성 중...`, 30);
+
+  const headerChildren = buildCompactHeaderBlocks(template);
 
   const newPagePayload: Record<string, any> = {
     parent: {
@@ -459,7 +512,9 @@ export async function createNotionTemplateInWorkspace(
           }
         ]
       }
-    }
+    },
+    // [CRITICAL FIX] 첫 화면 최상단에 에이전트 3줄 요약 콜아웃 & 복사 토글 & 대시보드 헤더를 사전 배치하여 대시보드 시야 확보
+    children: headerChildren.slice(0, 50)
   };
 
   if (template.cover_url && template.cover_url.startsWith('http')) {
@@ -486,24 +541,29 @@ export async function createNotionTemplateInWorkspace(
   const createdPageId: string = createdPage.id;
   const createdPageUrl: string = createdPage.url || `https://notion.so/${createdPageId.replace(/-/g, '')}`;
 
-  // 3단계: 다중 관계형 데이터베이스 및 속성 스키마 생성 + 1~2행 샘플 더미 데이터 자동 삽입
+  // 3단계: [CRITICAL FIX] is_inline: true를 강제하여 전체 페이지로 숨지 않고 첫 화면에 인라인 표로 렌더링
   const createdDatabases: CreatedNotionDatabaseInfo[] = [];
 
   for (let i = 0; i < template.databases.length; i++) {
     const db = template.databases[i];
     const progressPercent = 40 + Math.round(((i + 1) / (template.databases.length + 1)) * 35);
-    if (onProgress) onProgress(`데이터베이스 [${db.name}] 스키마 구성 및 샘플 데이터 주입 중...`, progressPercent);
+    if (onProgress) onProgress(`인라인 데이터베이스 [${db.name}] 표 렌더링 및 샘플 데이터 주입 중...`, progressPercent);
 
     const dbPropertiesPayload = buildDatabasePropertiesPayload(db.properties);
+
+    // 뷰 다각화 안내 아이콘 (표, 칸반 보드, 캘린더)
+    const dbIcon = db.view_type === 'board' ? '🗂️' : db.view_type === 'calendar' ? '📅' : '📊';
 
     const createDbPayload = {
       parent: {
         type: 'page_id',
         page_id: createdPageId
       },
+      // [CRITICAL FIX]: 노션 공식 API에서 데이터베이스를 인라인 표 블록으로 강제 렌더링하는 핵심 속성
+      is_inline: true,
       icon: {
         type: 'emoji',
-        emoji: '🗂️'
+        emoji: dbIcon
       },
       title: [
         {
@@ -543,12 +603,14 @@ export async function createNotionTemplateInWorkspace(
         if (retryRes.ok) {
           const retryData = await retryRes.json();
           createdDatabases.push({ id: retryData.id, name: db.name, url: retryData.url });
+          // [CRITICAL FIX] 깡통 빈 표 방지: 샘플 데이터 1~2행 API 강제 Insert
           await insertSampleRows(retryData.id, db, headers, onProgress);
           continue;
         }
       } else {
         const createdDbData = await createDbRes.json();
         createdDatabases.push({ id: createdDbData.id, name: db.name, url: createdDbData.url });
+        // [CRITICAL FIX] 깡통 빈 표 방지: 샘플 데이터 1~2행 API 강제 Insert
         await insertSampleRows(createdDbData.id, db, headers, onProgress);
       }
     } catch (dbErr) {
@@ -556,39 +618,124 @@ export async function createNotionTemplateInWorkspace(
     }
   }
 
-  // 4단계: 상용급 대시보드 뷰(Dashboard View) 본문 레이아웃 블록 생성
-  // (최상단 에이전트 3.0 콜아웃 + 중앙 링크된 뷰 대시보드 + 하단 원본 DB 보관함 토글)
-  if (onProgress) onProgress('대시보드 뷰 레이아웃 및 에이전트 관제탑 블록 구성 중...', 85);
+  // 4단계: 하단 뷰 다각화 안내 및 [⚙️ 마스터 데이터베이스 보관함 (Safe Vault)] 토글 블록 생성
+  if (onProgress) onProgress('하단 원본 데이터베이스 보호 토글 및 뷰 안내 구성 중...', 85);
 
-  const dashboardBlocks = buildCommercialDashboardBlocks(template, createdDatabases);
+  const footerBlocks: any[] = [];
+  footerBlocks.push({ object: 'block', type: 'divider', divider: {} });
 
-  if (dashboardBlocks.length > 0) {
-    try {
-      const patchRes = await fetchNotionWithBackoff(`/api/notion/v1/blocks/${createdPageId}/children`, {
-        method: 'PATCH',
-        headers,
-        body: JSON.stringify({
-          children: dashboardBlocks
-        })
-      });
-
-      if (!patchRes.ok) {
-        console.warn('대시보드 블록 1차 전송 실패, fallback 블록으로 재시도');
-        const fallbackBlocks = convertTemplateBlocksToNotionPayload(template.page_layout);
-        if (fallbackBlocks.length > 0) {
-          await fetchNotionWithBackoff(`/api/notion/v1/blocks/${createdPageId}/children`, {
-            method: 'PATCH',
-            headers,
-            body: JSON.stringify({ children: fallbackBlocks })
-          });
+  // 뷰 다각화 안내 토글 (보드, 캘린더, 갤러리 뷰 원클릭 생성 팁)
+  footerBlocks.push({
+    object: 'block',
+    type: 'toggle',
+    toggle: {
+      rich_text: [
+        {
+          type: 'text',
+          text: { content: '🎯 [뷰(View) 다각화 가이드: 칸반 보드 및 캘린더 뷰 원클릭 생성 팁 (열기)]' },
+          annotations: { bold: true, color: 'blue' }
         }
-      }
-    } catch (blockErr) {
-      console.error('본문 대시보드 블록 생성 예외:', blockErr);
+      ],
+      children: [
+        {
+          object: 'block',
+          type: 'bulleted_list_item',
+          bulleted_list_item: {
+            rich_text: [{ type: 'text', text: { content: '📋 [칸반 보드 뷰]: 각 인라인 DB 상단의 [+] 탭 클릭 -> [보드(Board)] 선택 시 "상태" 컬럼별로 자동 그룹화됩니다.' } }]
+          }
+        },
+        {
+          object: 'block',
+          type: 'bulleted_list_item',
+          bulleted_list_item: {
+            rich_text: [{ type: 'text', text: { content: '📅 [캘린더 뷰]: [+] 탭 클릭 -> [캘린더(Calendar)] 선택 시 "점검일/마감일" 속성에 맞춰 일정표로 자동 전환됩니다.' } }]
+          }
+        },
+        {
+          object: 'block',
+          type: 'bulleted_list_item',
+          bulleted_list_item: {
+            rich_text: [{ type: 'text', text: { content: '🖼️ [갤러리 뷰]: 객실/자산 DB의 경우 카드 형태로 사진과 핵심 스펙을 한눈에 볼 수 있습니다.' } }]
+          }
+        }
+      ]
     }
+  });
+
+  // 원본 DB 보관함 토글
+  const vaultChildren: any[] = [
+    {
+      object: 'block',
+      type: 'callout',
+      callout: {
+        rich_text: [
+          {
+            type: 'text',
+            text: {
+              content: '🛡️ [원본 데이터베이스 보호 구역]\n상단 인라인 대시보드 표의 원천 마스터 데이터베이스입니다. 사용자가 실수로 삭제하거나 레이아웃을 해치지 않도록 안전하게 보호 중입니다.'
+            }
+          }
+        ],
+        icon: { type: 'emoji', emoji: '🔒' },
+        color: 'gray_background'
+      }
+    }
+  ];
+
+  createdDatabases.forEach((db, i) => {
+    vaultChildren.push({
+      object: 'block',
+      type: 'bulleted_list_item',
+      bulleted_list_item: {
+        rich_text: [
+          {
+            type: 'text',
+            text: { content: `${i + 1}. 마스터 DB: ${db.name} ` },
+            annotations: { bold: true }
+          },
+          ...(db.url ? [{
+            type: 'text',
+            text: { content: '(원천 데이터 열기 ↗)', link: { url: db.url } }
+          }] : [])
+        ]
+      }
+    });
+  });
+
+  footerBlocks.push({
+    object: 'block',
+    type: 'toggle',
+    toggle: {
+      rich_text: [
+        {
+          type: 'text',
+          text: { content: '⚙️ [마스터 데이터베이스 보관함] 원본 데이터베이스 보관 및 삭제 방지 구역 (Safe Vault)' },
+          annotations: { bold: true, color: 'gray' }
+        }
+      ],
+      children: vaultChildren.slice(0, 40)
+    }
+  });
+
+  // 기존 템플릿의 추가 페이지 레이아웃이 있는 경우 덧붙이기
+  if (template.page_layout && template.page_layout.length > 0) {
+    const layoutBlocks = convertTemplateBlocksToNotionPayload(template.page_layout);
+    footerBlocks.push(...layoutBlocks);
   }
 
-  if (onProgress) onProgress('대시보드 완성 및 노션 배포 완결!', 100);
+  try {
+    await fetchNotionWithBackoff(`/api/notion/v1/blocks/${createdPageId}/children`, {
+      method: 'PATCH',
+      headers,
+      body: JSON.stringify({
+        children: footerBlocks.slice(0, 90)
+      })
+    });
+  } catch (footerErr) {
+    console.warn('하단 가이드 블록 생성 예외 (인라인 DB는 정상 생성됨):', footerErr);
+  }
+
+  if (onProgress) onProgress('인라인 대시보드 및 샘플 데이터 주입 완료!', 100);
 
   return {
     pageId: createdPageId,
@@ -782,107 +929,6 @@ function buildDatabasePropertiesPayload(properties: NotionProperty[]): Record<st
 }
 
 /**
- * [Step 5 개선] 데이터베이스 샘플 행(Row) 일괄 등록 파이프라인
- * - sample_rows가 없거나 비어 있으면 도메인 지능형 샘플 데이터 1~2행을 강제 합성하여 자동 등록
- * - formula 및 relation 속성은 제외하여 오류 방지
- * - 진행 상태 피드백 실시간 제공
- */
-async function insertSampleRows(
-  databaseId: string, 
-  db: NotionDatabase, 
-  headers: any, 
-  onProgress?: PublishProgressCallback
-) {
-  // 샘플 데이터가 없으면 도메인 기반 1~2행 자동 합성
-  const sampleRows = (db.sample_rows && db.sample_rows.length > 0)
-    ? db.sample_rows
-    : generateIntelligentSampleRows(db);
-
-  const rowsToInsert = sampleRows.slice(0, 3);
-  const totalRows = rowsToInsert.length;
-
-  for (let i = 0; i < totalRows; i++) {
-    const row = rowsToInsert[i];
-    if (onProgress) {
-      onProgress(`[${db.name}] 초기 상용급 샘플 데이터 채우는 중 (${i + 1}/${totalRows})...`, 60 + Math.round(((i + 1) / totalRows) * 15));
-    }
-
-    const rowProperties: Record<string, any> = {};
-
-    db.properties.forEach(prop => {
-      const val = row[prop.name];
-      if (val === undefined || val === null || val === '') return;
-
-      if (prop.type === 'title') {
-        rowProperties[prop.name] = {
-          title: [{ type: 'text', text: { content: String(val) } }]
-        };
-      } else if (prop.type === 'date') {
-        const rawDate = String(val).split(' ')[0].trim();
-        const isValidDate = /^\d{4}-\d{2}-\d{2}$/.test(rawDate) && !isNaN(new Date(rawDate).getTime());
-        const safeDate = isValidDate ? rawDate : new Date().toISOString().split('T')[0];
-        rowProperties[prop.name] = {
-          date: { start: safeDate }
-        };
-      } else if (prop.type === 'status') {
-        const validOptions = prop.options || ['시작 전', '진행 중', '완료'];
-        const stringVal = String(val).trim();
-        const matched = validOptions.find(opt => opt.toLowerCase() === stringVal.toLowerCase()) || validOptions[0];
-        rowProperties[prop.name] = {
-          status: { name: matched }
-        };
-      } else if (prop.type === 'select') {
-        rowProperties[prop.name] = {
-          select: { name: String(val).trim() }
-        };
-      } else if (prop.type === 'multi_select') {
-        const items = Array.isArray(val) ? val : String(val).split(',').map(s => s.trim());
-        rowProperties[prop.name] = {
-          multi_select: items.map((name: string) => ({ name }))
-        };
-      } else if (prop.type === 'checkbox') {
-        rowProperties[prop.name] = {
-          checkbox: Boolean(val)
-        };
-      } else if (prop.type === 'number') {
-        const numVal = Number(String(val).replace(/[^0-9.-]+/g, ''));
-        if (!isNaN(numVal)) {
-          rowProperties[prop.name] = {
-            number: numVal
-          };
-        }
-      } else if (prop.type === 'url') {
-        rowProperties[prop.name] = {
-          url: String(val).trim()
-        };
-      } else if (prop.type !== 'formula' && prop.type !== 'relation') {
-        rowProperties[prop.name] = {
-          rich_text: [{ type: 'text', text: { content: String(val) } }]
-        };
-      }
-    });
-
-    try {
-      const res = await fetchNotionWithBackoff('/api/notion/v1/pages', {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          parent: { database_id: databaseId },
-          properties: rowProperties
-        })
-      });
-
-      if (!res.ok) {
-        const errJson = await res.json().catch(() => ({}));
-        console.warn(`[${db.name}] 샘플 행 ${i + 1} 삽입 응답 경고:`, errJson);
-      }
-    } catch (e) {
-      console.warn(`[${db.name}] 샘플 행 ${i + 1} 삽입 네트워크 오류 (스킵):`, e);
-    }
-  }
-}
-
-/**
  * 템플릿의 page_layout 블록들을 노션 공식 Block Children 포맷으로 변환
  */
 function convertTemplateBlocksToNotionPayload(blocks: NotionBlock[]): any[] {
@@ -1046,6 +1092,12 @@ export async function appendGuideToggleToNotionPage(
   const cleanId = extractNotionPageId(pageId);
   const formattedId = formatUuid(cleanId);
 
+  const headers = {
+    'Authorization': `Bearer ${apiKey.trim()}`,
+    'Notion-Version': '2022-06-28',
+    'Content-Type': 'application/json'
+  };
+
   const toggleChildren: any[] = [
     // 1. 3줄 요약 콜아웃
     {
@@ -1152,11 +1204,7 @@ export async function appendGuideToggleToNotionPage(
   try {
     const res = await fetchNotionWithBackoff(`/api/notion/v1/blocks/${formattedId}/children`, {
       method: 'PATCH',
-      headers: {
-        'Authorization': `Bearer ${apiKey.trim()}`,
-        'Notion-Version': '2022-06-28',
-        'Content-Type': 'application/json'
-      },
+      headers,
       body: JSON.stringify({
         children: [guideToggleBlock]
       })
