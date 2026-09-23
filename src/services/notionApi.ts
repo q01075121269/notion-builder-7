@@ -103,9 +103,13 @@ interface PublishProgressCallback {
 function buildCompactHeaderBlocks(template: NotionTemplate): any[] {
   const blocks: any[] = [];
   const blueprint = template.agentBlueprint;
+  const dbs = template.databases || [];
+  const totalDbs = dbs.length;
+  const totalProps = dbs.reduce((sum, db) => sum + (db.properties?.length || 0), 0);
+  const totalRows = dbs.reduce((sum, db) => sum + (db.sample_rows?.length || 0), 0);
+  const cleanTitle = template.title || '통합 관제 대시보드';
 
-  // 1. [Hub & Spoke 최상단 KPI 3종 통계 콜아웃 컬럼 리스트]
-  // ⚡ 조치 진행 중 / 🗓️ 조치 예정·계획 / 🚨 지연·긴급
+  // 1. [100% 동적 KPI 3종 통계 콜아웃 컬럼 리스트] - 하드코딩 텍스트 완전 박멸
   blocks.push({
     object: 'block',
     type: 'column_list',
@@ -123,12 +127,40 @@ function buildCompactHeaderBlocks(template: NotionTemplate): any[] {
                   rich_text: [
                     {
                       type: 'text',
-                      text: { content: '⚡ 조치 진행 중: 5건\n' },
+                      text: { content: `📊 마스터 DB: ${totalDbs}개소\n` },
                       annotations: { bold: true }
                     },
                     {
                       type: 'text',
-                      text: { content: '현장 방문 실사 및 중재 상담 진행' },
+                      text: { content: `${cleanTitle} 하위 연계 데이터베이스` },
+                      annotations: { italic: true }
+                    }
+                  ],
+                  icon: { type: 'emoji', emoji: '📊' },
+                  color: 'blue_background'
+                }
+              }
+            ]
+          }
+        },
+        {
+          object: 'block',
+          type: 'column',
+          column: {
+            children: [
+              {
+                object: 'block',
+                type: 'callout',
+                callout: {
+                  rich_text: [
+                    {
+                      type: 'text',
+                      text: { content: `⚡ 총 관리 속성: ${totalProps}개\n` },
+                      annotations: { bold: true }
+                    },
+                    {
+                      type: 'text',
+                      text: { content: '실시간 상태·수식(Formula) 연동 추적' },
                       annotations: { italic: true }
                     }
                   ],
@@ -151,45 +183,17 @@ function buildCompactHeaderBlocks(template: NotionTemplate): any[] {
                   rich_text: [
                     {
                       type: 'text',
-                      text: { content: '🗓️ 조치 예정/계획: 8건\n' },
+                      text: { content: `🎯 등록 데이터: ${totalRows}건\n` },
                       annotations: { bold: true }
                     },
                     {
                       type: 'text',
-                      text: { content: '일정 협의 및 보수 부품 수급 대기' },
+                      text: { content: '무손실 100% 동기화 및 실시간 업데이트' },
                       annotations: { italic: true }
                     }
                   ],
-                  icon: { type: 'emoji', emoji: '🗓️' },
-                  color: 'blue_background'
-                }
-              }
-            ]
-          }
-        },
-        {
-          object: 'block',
-          type: 'column',
-          column: {
-            children: [
-              {
-                object: 'block',
-                type: 'callout',
-                callout: {
-                  rich_text: [
-                    {
-                      type: 'text',
-                      text: { content: '🚨 지연/긴급: 2건\n' },
-                      annotations: { bold: true }
-                    },
-                    {
-                      type: 'text',
-                      text: { content: '심야 소음 다발 및 천장 누수 긴급 출동' },
-                      annotations: { italic: true }
-                    }
-                  ],
-                  icon: { type: 'emoji', emoji: '🚨' },
-                  color: 'red_background'
+                  icon: { type: 'emoji', emoji: '🎯' },
+                  color: 'purple_background'
                 }
               }
             ]
@@ -199,15 +203,16 @@ function buildCompactHeaderBlocks(template: NotionTemplate): any[] {
     }
   });
 
-  // 2. [캘린더 안내 및 3대 분야별 하위 DB 통합 네비게이션 콜아웃]
-  const guideContent = 
+  // 2. [100% 동적 하위 DB 네비게이션 콜아웃] - 실제 생성된 DB 목록으로 동적 구성
+  let guideContent = 
     `💡 [1초 뷰 전환 뷰어 가이드]\n` +
     `현재 데이터베이스는 노션 API 규격상 '기본 표(Table)'로 인라인 생성되었습니다.\n` +
-    `표 우측 상단의 [+ 뷰 추가] 버튼을 클릭하고 [캘린더(Calendar)]를 선택하시면 조치 일정이 한눈에 펼쳐지는 인라인 캘린더가 켜집니다!\n\n` +
-    `🔗 3대 하위 마스터 DB 1:1 직결 바로가기:\n` +
-    `① [DB 1] 📋 일반 민원 접수·조치 일지 (민원조치일지.xlsx 기반)\n` +
-    `② [DB 2] 🔇 세대간 층간소음 중재 관리 DB (세대간 소음민원.xlsx 기반)\n` +
-    `③ [DB 3] 💧 세대 누수 및 하자보수 관리 DB (세대 누수관련.xlsx 기반)`;
+    `표 우측 상단의 [+ 뷰 추가] 버튼을 클릭하고 [보드(Board)] 또는 [캘린더(Calendar)]를 선택하시면 맞춤형 대시보드 뷰로 즉시 전환됩니다!\n\n` +
+    `🔗 연계 마스터 데이터베이스 (${totalDbs}종) 바로가기:\n`;
+
+  dbs.forEach((db, idx) => {
+    guideContent += `${idx + 1}️⃣ [DB ${idx + 1}] ${db.name}${db.description ? ` (${db.description})` : ''}\n`;
+  });
 
   blocks.push({
     object: 'block',
@@ -216,7 +221,7 @@ function buildCompactHeaderBlocks(template: NotionTemplate): any[] {
       rich_text: [
         {
           type: 'text',
-          text: { content: guideContent }
+          text: { content: guideContent.trim() }
         }
       ],
       icon: { type: 'emoji', emoji: '🏢' },

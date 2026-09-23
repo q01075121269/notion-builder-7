@@ -445,13 +445,20 @@ export const OmniChatBar: React.FC = () => {
       localStorage.removeItem('notion_template_vault_draft');
     } catch {}
 
-    // [빈 껍데기 파일 파싱 실패 전송 방어]
-    // 텍스트도 없고 유효하게 파싱된 첨부 데이터도 없는 경우 전송 차단
-    const hasValidContent = attachedFiles.some((a) => a.parsedContent && !a.error);
+    // [빈 껍데기 파일 파싱 실패 전송 방어 및 명확한 에러 경고]
+    const invalidFile = attachedFiles.find((a) => a.error || (!a.parsedContent && (!a.sheets || a.sheets.length === 0)));
+    if (invalidFile && !text) {
+      isLoadingRef.current = false;
+      setIsGenerating(false);
+      showToast(invalidFile.error || '⚠️ 파일 본문을 추출할 수 없습니다. 텍스트가 포함된 정상적인 문서인지 확인해 주세요.', 'error');
+      return;
+    }
+
+    const hasValidContent = attachedFiles.some((a) => (a.parsedContent || (a.sheets && a.sheets.length > 0)) && !a.error);
     if (!text && !hasValidContent) {
       isLoadingRef.current = false;
       setIsGenerating(false);
-      showToast('⚠️ 유효한 텍스트나 파일 내용이 없습니다. 요구사항을 직접 입력하시거나 텍스트가 포함된 문서를 첨부해 주세요.', 'info');
+      showToast('⚠️ 파일 본문을 추출할 수 없습니다. 텍스트가 포함된 정상적인 문서인지 확인해 주세요.', 'error');
       return;
     }
 

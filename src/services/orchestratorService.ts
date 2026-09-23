@@ -203,12 +203,38 @@ async function fallbackClientOrchestration(
     const isCertification = lower.includes('자격증') || lower.includes('수험생') || lower.includes('시험') || lower.includes('공부') || lower.includes('오답노트');
     const cleanTopicTitle = sanitizeTemplateTitle(queryText, userText);
 
+    // 첨부 파일 포맷에 따른 동적 설명 레이블 생성 (엑셀 고정 텍스트 제거)
+    const allFileNames = attachedBlocks.map(b => {
+      const m = b[1].match(/파일명:\s*([^\n\r]+)/);
+      return m ? m[1].trim() : '';
+    }).join(' ');
+
+    let attachmentTypeLabel = '파일';
+    if (hasAttachment) {
+      if (/xlsx|xls|csv/i.test(allFileNames)) {
+        attachmentTypeLabel = '스프레드시트 표';
+      } else if (/docx|doc|pdf|hwpx|txt/i.test(allFileNames)) {
+        attachmentTypeLabel = '문서 본문';
+      }
+    }
+
+    // 파일이 첨부되었으나 추출된 스키마/데이터가 전혀 없고 사용자 입력 텍스트도 없는 경우 -> 가짜 Mock 템플릿 생성 차단!
+    if (hasAttachment && !attachedDbSchemas && !pureUserText) {
+      return {
+        intent: 'CHAT',
+        reply_message: '⚠️ 파일 본문을 추출할 수 없습니다. 텍스트가 포함된 정상적인 문서인지 확인해 주세요.',
+        needs_clarification: true,
+        redirect_url: '/chat',
+        payload: {}
+      };
+    }
+
     return {
       intent: 'BUILDER',
       reply_message: isCertification
         ? `🎯 [자격증/수험생 올인원 합격 스케줄러] 템플릿 제작을 시작했습니다! 템플릿 빌더 라이브 캔버스에 결과물이 즉시 투영되었습니다.`
         : hasAttachment
-        ? `✨ [${cleanTopicTitle}] 템플릿 제작 완결! 첨부하신 엑셀 데이터를 정밀 분석하여 노션 마스터 DB 스키마와 샘플 데이터 1~2행을 캔버스에 즉각 렌더링했습니다.`
+        ? `✨ [${cleanTopicTitle}] 템플릿 제작 완결! 첨부하신 ${attachmentTypeLabel} 데이터를 정밀 분석하여 노션 마스터 DB 스키마와 샘플 데이터를 캔버스에 즉각 렌더링했습니다.`
         : `"${cleanTopicTitle}" 템플릿 제작을 시작할게요! 템플릿 빌더 작업실로 안내해 드립니다.`,
       needs_clarification: false,
       redirect_url: '/builder',

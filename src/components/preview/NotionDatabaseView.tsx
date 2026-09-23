@@ -734,45 +734,41 @@ const DashboardView: React.FC<{
   rows: Array<Record<string, any>>;
   titleProp?: NotionProperty;
 }> = ({ database, rows, titleProp }) => {
-  // 상태별 건수 통계 계산
+  // 100% 동적 실제 데이터 기반 통계 계산
   const statusProp = database.properties.find(p => p.type === 'status');
   let inProgressCount = 0;
   let plannedCount = 0;
-  let urgentCount = 0;
   let completedCount = 0;
+  let urgentCount = 0;
 
   rows.forEach(r => {
-    const sVal = String(statusProp ? r[statusProp.name] || '' : Object.values(r).join(' '));
-    if (/진행|조사|확인|중재|수리|출동/i.test(sVal)) inProgressCount++;
-    else if (/예정|접수|계획|대기/i.test(sVal)) plannedCount++;
-    else if (/완료|해결|합의/i.test(sVal)) completedCount++;
-    else plannedCount++;
+    const sVal = String(statusProp ? r[statusProp.name] || "" : Object.values(r).join(" ")).toLowerCase();
+    if (/진행|작업|조사|확인|중재|수리|출동|처리중/i.test(sVal)) inProgressCount++;
+    else if (/완료|해결|합의|승인|종결/i.test(sVal)) completedCount++;
+    else if (/예정|접수|계획|대기|시작전/i.test(sVal)) plannedCount++;
+    else inProgressCount++;
 
     const rowStr = JSON.stringify(r);
-    if (/긴급|당일|지연|초과|누수|크랙/i.test(rowStr)) urgentCount++;
+    if (/긴급|당일|지연|초과|오류|불량|리스크|주의/i.test(rowStr)) urgentCount++;
   });
-
-  if (inProgressCount === 0 && rows.length > 0) inProgressCount = Math.max(1, Math.floor(rows.length * 0.4));
-  if (plannedCount === 0 && rows.length > 0) plannedCount = Math.max(1, Math.floor(rows.length * 0.5));
-  if (urgentCount === 0) urgentCount = 1;
 
   const total = rows.length || 1;
   const progressPercent = Math.min(100, Math.round(((completedCount + inProgressCount * 0.5) / total) * 100));
 
   return (
     <div className="p-4 sm:p-6 space-y-6 bg-slate-50/50 dark:bg-neutral-900/50 rounded-2xl border border-slate-200/80 dark:border-neutral-800">
-      {/* 1. 상단 KPI 통계 요약 카드 3종 가로 그리드 */}
+      {/* 1. 상단 KPI 통계 요약 카드 3종 가로 그리드 - 100% 동적 매핑 */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div className="p-4 rounded-xl bg-gradient-to-br from-amber-50 to-orange-50/60 dark:from-amber-950/40 dark:to-orange-950/20 border border-amber-200 dark:border-amber-800 shadow-2xs">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold text-amber-800 dark:text-amber-300 flex items-center space-x-1">
               <Zap className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
-              <span>⚡ 조치 진행 중</span>
+              <span>⚡ 진행 중 항목</span>
             </span>
             <span className="text-xl sm:text-2xl font-black text-amber-900 dark:text-amber-100">{inProgressCount}건</span>
           </div>
           <p className="text-[11px] text-amber-700/80 dark:text-amber-400/80 mt-1.5">
-            현장 방문 실사 및 세대간 중재 상담 진행 중
+            {database.name} 실시간 작업 및 조치 진행 현황
           </p>
         </div>
 
@@ -780,12 +776,12 @@ const DashboardView: React.FC<{
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold text-blue-800 dark:text-blue-300 flex items-center space-x-1">
               <Clock className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-              <span>🗓️ 조치 예정/계획</span>
+              <span>🗓️ 계획/대기 항목</span>
             </span>
             <span className="text-xl sm:text-2xl font-black text-blue-900 dark:text-blue-100">{plannedCount}건</span>
           </div>
           <p className="text-[11px] text-blue-700/80 dark:text-blue-400/80 mt-1.5">
-            일정 조율 및 하자보수 자재 수급 대기
+            일정 조율 및 후속 처리 대기 항목
           </p>
         </div>
 
@@ -793,12 +789,12 @@ const DashboardView: React.FC<{
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold text-rose-800 dark:text-rose-300 flex items-center space-x-1">
               <AlertTriangle className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" />
-              <span>🚨 지연/긴급</span>
+              <span>🚨 중점 관리 항목</span>
             </span>
             <span className="text-xl sm:text-2xl font-black text-rose-900 dark:text-rose-100">{urgentCount}건</span>
           </div>
           <p className="text-[11px] text-rose-700/80 dark:text-rose-400/80 mt-1.5">
-            심야 소음 다발 및 배관 누수 집중 관리 필요
+            기한 임박 및 긴급 대응 중점 관리 항목
           </p>
         </div>
       </div>

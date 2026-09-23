@@ -26,83 +26,20 @@ export interface DynamicBuildParams {
  * 도메인에 걸맞은 격조 높은 공식 프로젝트 명칭을 추출합니다.
  */
 export function sanitizeTemplateTitle(rawInput: string, topic?: string): string {
-  const combinedRaw = `${rawInput || ''} ${topic || ''}`.trim();
-  const lowerCombined = combinedRaw.toLowerCase();
-
-  // [Hotfix 0: 주민 민원 및 입주자 지원 도메인 (민원, 누수, 소음, 세대간 분쟁 등)]
-  if (
-    lowerCombined.includes('민원') ||
-    lowerCombined.includes('소음') ||
-    (lowerCombined.includes('누수') && !lowerCombined.includes('계량기누수')) ||
-    lowerCombined.includes('세대간') ||
-    lowerCombined.includes('입주자') ||
-    (lowerCombined.includes('주민') && (lowerCombined.includes('관리') || lowerCombined.includes('접수') || lowerCombined.includes('분쟁') || lowerCombined.includes('지원')))
-  ) {
-    return '🏢 [총괄 관제] 주민 민원 및 세대 하자 통합 관리 대시보드';
-  }
-
-  // [Hotfix 1: 특정 도메인 및 파일명 키워드 우선 고정 매핑 (Fail-Safe)]
-  if (
-    (lowerCombined.includes('검침') || lowerCombined.includes('계량기') || lowerCombined.includes('원격검침')) &&
-    !lowerCombined.includes('민원') && !lowerCombined.includes('소음') && !lowerCombined.includes('주민')
-  ) {
-    return '[원격검침 & 시설 관제] 실시간 검침 모니터링 관리 OS';
-  }
-  // 첨부 파일명이 ardenhill_room_maintenance_checklist 이거나 아덴힐 관련인 경우 무조건 강제 치환
-  if (
-    lowerCombined.includes('ardenhill') || 
-    lowerCombined.includes('아덴힐') || 
-    lowerCombined.includes('room_maintenance') ||
-    (lowerCombined.includes('리조트') && (lowerCombined.includes('시설') || lowerCombined.includes('객실') || lowerCombined.includes('점검') || lowerCombined.includes('체크리스트')))
-  ) {
-    return '[아덴힐 리조트] 객실 시설관리 및 정기 점검 OS';
-  }
-
-  // [Hotfix 2: 프롬프트 지시어 오염 감지 시 전면 폐기(Bypass)]
-  const promptContaminants = [
-    '지침', '사용자가', '반영하여', '반영하', '설계하십시오', '1 1로', '1:1로', 
-    'properties', 'db_schema', 'attached', '첨부한', '표/문서', '반영해', '노션 db 속성',
-    '샘플 행', '초기 행', '프롬프트', '지시어'
-  ];
-  const isContaminated = promptContaminants.some(word => lowerCombined.includes(word));
-
+  // 1. 첨부 블록 및 태그 데이터 선제거
   let text = (rawInput || topic || '').trim();
-
-  // 오염되었거나 텍스트가 30자 이상으로 길면 즉시 폐기 후 도메인 추론 fallback 가동
-  if (isContaminated || text.length > 30) {
-    if (lowerCombined.includes('민원') || lowerCombined.includes('소음') || lowerCombined.includes('누수') || lowerCombined.includes('주민')) {
-      return '🏢 [총괄 관제] 주민 민원 및 세대 하자 통합 관리 대시보드';
-    }
-    if (lowerCombined.includes('검침') || lowerCombined.includes('계량기') || lowerCombined.includes('에너지')) {
-      return '[원격검침 & 시설 관제] 실시간 검침 모니터링 관리 OS';
-    }
-    if (lowerCombined.includes('시설') || lowerCombined.includes('객실') || lowerCombined.includes('하자') || lowerCombined.includes('호텔') || lowerCombined.includes('건물')) {
-      return '[시설 & 자산 관리] 객실 점검 및 하자보수 관제 OS';
-    }
-    if (lowerCombined.includes('프로젝트') || lowerCombined.includes('개발') || lowerCombined.includes('스프린트') || lowerCombined.includes('스타트업') || lowerCombined.includes('기획') || lowerCombined.includes('okr')) {
-      return '[프로젝트 OS] 애자일 로드맵 & 스프린트 마스터 OS';
-    }
-    if (lowerCombined.includes('자격증') || lowerCombined.includes('수험') || lowerCombined.includes('시험') || lowerCombined.includes('공부') || lowerCombined.includes('오답') || lowerCombined.includes('합격')) {
-      return '[합격 패스] 수험 로드맵 & 기출 오답노트 올인원 OS';
-    }
-    if (lowerCombined.includes('가계부') || lowerCombined.includes('지출') || lowerCombined.includes('소비') || lowerCombined.includes('재무') || lowerCombined.includes('돈')) {
-      return '[스마트 파이낸스] 월간 소비 분석 & 고정비 가드 OS';
-    }
-    return '[통합 관리] 비즈니스 & 라이프 통합 관제 OS';
-  }
-
-  // 1. 첨부 블록 및 파일명 선제거
   text = text.replace(/\[ATTACHED_DOCUMENT_DATA\][\s\S]*?\[\/ATTACHED_DOCUMENT_DATA\]/gi, ' ');
   text = text.replace(/\[첨부:[^\]]*\]/gi, ' ');
+
+  // 2. 파일 확장자가 포함된 경우 파일명 추출
+  const fileMatch = text.match(/([\w\-가-힣]+)\.(xlsx|xls|csv|docx|doc|pdf|txt|md|json|hwp|hwpx)/i);
+  let baseFileName = '';
+  if (fileMatch && fileMatch[1]) {
+    baseFileName = fileMatch[1].replace(/[_\-]+/g, ' ').trim();
+  }
   text = text.replace(/[\w\-가-힣]+\.(xlsx|xls|csv|docx|doc|pdf|txt|md|json|hwp|hwpx)/gi, ' ');
 
-  // 2. 대괄호 태그 선제거
-  text = text.replace(/^\[.*?\]\s*/g, ' ');
-
-  // 3. 특수문자 및 기호 먼저 제거 (마침표, 쉼표, 느낌표, 괄호 등)
-  text = text.replace(/[!?,.~^@#$%&*_+={}\[\]:;<>/\\|`'"()]/g, ' ');
-
-  // 4. 서술어 및 요청어 전역 제거 (공백 유연 매칭)
+  // 3. 서술어, 프롬프트 명령어, 불필요한 조사 전역 제거
   const phrasesToRemove = [
     /만들어\s*(줘(요)?|주세요|줄래|주라|봐|보자)/gi,
     /제작해\s*(줘(요)?|주세요|줄래|주라|봐)/gi,
@@ -112,8 +49,6 @@ export function sanitizeTemplateTitle(rawInput: string, topic?: string): string 
     /반영해\s*(주고|줘(요)?|주세요|줄래|주라|봐|서|하여)/gi,
     /추가해\s*(줘(요)?|주세요|줄래|주라|봐)/gi,
     /보완해\s*(줘(요)?|주세요|줄래|주라|봐)/gi,
-    /짜\s*(줘(요)?|주세요|줄래|주라|봐)/gi,
-    /뽑아\s*(줘(요)?|주세요|줄래|주라|봐)/gi,
     /해\s*(줘(요)?|주세요|봐|보자)/gi,
     /(해주세요|해줘|해봐|부탁해요|부탁해)/gi,
     /(참고해서|참고하여|참고|기반으로|기반한|기반|첨부|파일)/gi,
@@ -125,39 +60,19 @@ export function sanitizeTemplateTitle(rawInput: string, topic?: string): string 
     text = text.replace(p, ' ');
   });
 
+  // 특수문자 정리
+  text = text.replace(/[!?,.~^@#$%&*_+={}\[\]:;<>/\\|`'"()]/g, ' ');
   text = text.replace(/\s+/g, ' ').trim();
-  const lower = text.toLowerCase();
 
-  // 도메인별 고품격 공식 타이틀 포맷팅
-  if (lower.includes('민원') || lower.includes('소음') || lower.includes('누수') || lower.includes('주민')) {
-    return '🏢 [총괄 관제] 주민 민원 및 세대 하자 통합 관리 대시보드';
+  // 추출된 텍스트가 있으면 그것을 핵심 주제로 채택, 없으면 파일명, 둘 다 없으면 topic 활용
+  const coreSubject = text || baseFileName || topic || '업무 관리';
+  const cleanSubject = coreSubject.replace(/\s+/g, ' ').trim();
+
+  // 순수 동적 명사구 대시보드 타이틀 조합 (하드코딩 강제 매핑 없음)
+  if (cleanSubject.length >= 2) {
+    return `[${cleanSubject}] 맞춤형 통합 관리 대시보드`;
   }
-  if (lower.includes('검침') || lower.includes('계량기') || lower.includes('에너지')) {
-    return '[원격검침 & 시설 관제] 실시간 검침 모니터링 관리 OS';
-  }
-  if (lower.includes('아덴힐') || (lower.includes('리조트') && (lower.includes('시설') || lower.includes('객실')))) {
-    return '[아덴힐 리조트] 객실 시설관리 및 정기 점검 OS';
-  }
-  if (lower.includes('시설') || lower.includes('객실') || lower.includes('하자') || lower.includes('리조트') || lower.includes('호텔') || lower.includes('건물')) {
-    const sub = text.replace(/(시설|객실|하자|리조트|호텔|건물|관리|점검)/g, '').trim();
-    return sub ? ('[시설 & 자산 관리] ' + sub + ' 시설점검 관제 OS') : '[시설 & 자산 관리] 객실 점검 및 하자보수 관제 OS';
-  }
-  if (lower.includes('프로젝트') || lower.includes('개발') || lower.includes('스프린트') || lower.includes('스타트업') || lower.includes('기획') || lower.includes('okr')) {
-    return '[프로젝트 OS] ' + (text || '애자일 로드맵 & 스프린트 마스터') + ' OS';
-  }
-  if (lower.includes('합격') || lower.includes('시험') || lower.includes('자격증') || lower.includes('공부') || lower.includes('수험') || lower.includes('고시')) {
-    return '[합격 패스] ' + (text || '수험 로드맵 & 기출 오답노트') + ' 올인원 OS';
-  }
-  if (lower.includes('결산') || lower.includes('회계') || lower.includes('가계부') || lower.includes('지출') || lower.includes('소비') || lower.includes('돈') || lower.includes('재무') || lower.includes('자산')) {
-    return '[스마트 파이낸스] ' + (text || '월간 소비 분석 & 고정비 가드') + ' OS';
-  }
-  if (lower.includes('루틴') || lower.includes('해빗') || lower.includes('습관') || lower.includes('건강') || lower.includes('헬스') || lower.includes('피트니스')) {
-    return '[라이프 & 웰니스] ' + (text || '24H 데일리 루틴 & 해빗 트래커') + ' OS';
-  }
-  if (lower.includes('독서') || lower.includes('책') || lower.includes('서재') || lower.includes('인용구') || lower.includes('도서')) {
-    return '[지식 아카이브] ' + (text || '디지털 서재 & 독서 인사이트') + ' OS';
-  }
-  return text.length >= 2 ? ('[통합 관리] ' + text + ' 관제 OS') : '[통합 관리] 비즈니스 & 라이프 통합 관제 OS';
+  return '맞춤형 통합 관리 대시보드';
 }
 
 /**

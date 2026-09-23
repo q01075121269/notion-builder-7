@@ -776,16 +776,14 @@ export async function parseUploadedFile(file: File): Promise<AttachedFile> {
         } else {
           // .hwp 바이너리 안전 파서
           const result = await parseHwpDocument(file);
-          attached.parsedContent = result.text;
-          if (result.warning) {
-            attached.warning = result.warning;
-          }
-          if (result.hasExtractedText) {
-            attached.summaryBadge = 'HWP 텍스트 추출';
+          if (result.hasExtractedText && result.text) {
+            attached.parsedContent = result.text;
+            attached.summaryBadge = 'HWP 텍스트 추출 완료';
           } else {
             attached.isUnsupportedHwp = true;
-            attached.summaryBadge = 'HWP 안내문 탑재';
-            // 빨간색 error 대신 warning을 활용하여 크래시 방지
+            attached.error = "구형 HWP 파일은 웹에서 직접 텍스트 추출이 어렵습니다. 한글 프로그램에서 [다른 이름으로 저장 -> PDF 또는 Word(DOCX)]로 변환 후 올려주세요.";
+            attached.parsedContent = undefined;
+            attached.summaryBadge = 'HWP 변환 필요';
           }
         }
         break;
