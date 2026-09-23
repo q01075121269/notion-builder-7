@@ -1,7 +1,6 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext';
 import { TemplatePreviewCanvas } from '../TemplatePreviewCanvas';
-import { PRESET_TEMPLATES } from '../../services/presetTemplates';
 
 /**
  * [제1챕터 템플릿 마스터 빌더 작업실]
@@ -13,7 +12,7 @@ export const SplitLayout: React.FC = () => {
 
   return (
     <div className="flex-1 flex flex-col h-full w-full min-h-0 overflow-hidden relative">
-      <TemplatePreviewCanvas template={currentTemplate || PRESET_TEMPLATES.college_student} />
+      <TemplatePreviewCanvas template={currentTemplate} />
     </div>
   );
 };

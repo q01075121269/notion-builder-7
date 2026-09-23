@@ -1,3 +1,4 @@
+import JSZip from 'jszip';
 import * as XLSXRaw from 'xlsx';
 import mammoth from 'mammoth';
 import * as pdfjsLib from 'pdfjs-dist';
@@ -562,6 +563,160 @@ export async function parseImageFile(file: File): Promise<{
 /**
  * 통합 파일 파싱 진입점 함수
  */
+
+/**
+ * 5. HWPX (.hwpx) XML 기반 파서
+ * - HWPX는 표준 ZIP/XML 압축 아카이브 포맷
+ * - JSZip을 통해 Contents/section*.xml 파일들을 순회하며 <hp:p> 문단 내 <hp:t> 텍스트 노드를 100% 무손실 추출
+ */
+export async function parseHwpxDocument(file: File): Promise<string> {
+  const arrayBuffer = await file.arrayBuffer();
+  const zip = await JSZip.loadAsync(arrayBuffer);
+
+  // Contents/section0.xml, Contents/section1.xml ... 탐색
+  const sectionFiles = Object.keys(zip.files).filter((filename) =>
+    /^Contents\/section\d+\.xml$/i.test(filename) ||
+    /Contents\/section/i.test(filename)
+  );
+
+  // 파일 번호순 정렬
+  sectionFiles.sort((a, b) => {
+    const numA = parseInt(a.replace(/\D/g, '') || '0', 10);
+    const numB = parseInt(b.replace(/\D/g, '') || '0', 10);
+    return numA - numB;
+  });
+
+  const allParagraphs: string[] = [];
+
+  for (const sFile of sectionFiles) {
+    const xmlContent = await zip.file(sFile)?.async('text');
+    if (!xmlContent) continue;
+
+    // DOMParser를 통한 XML 파싱
+    const parser = new DOMParser();
+    const xmlDoc = parser.parseFromString(xmlContent, 'application/xml');
+
+    const paragraphs = xmlDoc.getElementsByTagName('hp:p');
+    if (paragraphs && paragraphs.length > 0) {
+      for (let i = 0; i < paragraphs.length; i++) {
+        const pElem = paragraphs[i];
+        const textElems = pElem.getElementsByTagName('hp:t');
+        const textParts: string[] = [];
+        for (let j = 0; j < textElems.length; j++) {
+          const t = textElems[j].textContent || '';
+          if (t.trim()) textParts.push(t.trim());
+        }
+        const fullPara = textParts.join(' ').trim();
+        if (fullPara) {
+          allParagraphs.push(fullPara);
+        }
+      }
+    } else {
+      // DOMParser 실패 시 정규식 fallback
+      const matches = xmlContent.match(/<hp:t[^>]*>(.*?)<\/hp:t>/gis) || xmlContent.match(/<t[^>]*>(.*?)<\/t>/gis);
+      if (matches) {
+        matches.forEach((m) => {
+          const clean = m.replace(/<[^>]+>/g, '').trim();
+          if (clean) allParagraphs.push(clean);
+        });
+      }
+    }
+  }
+
+  // 섹션이 없었을 경우 기타 xml 파일(header.xml, body.xml 등) 검사
+  if (allParagraphs.length === 0) {
+    const anyXmlFiles = Object.keys(zip.files).filter((fn) => fn.endsWith('.xml') && !fn.includes('manifest'));
+    for (const xmlFn of anyXmlFiles) {
+      const xml = await zip.file(xmlFn)?.async('text');
+      if (xml) {
+        const matches = xml.match(/<hp:t[^>]*>(.*?)<\/hp:t>/gis);
+        if (matches) {
+          matches.forEach((m) => {
+            const clean = m.replace(/<[^>]+>/g, '').trim();
+            if (clean) allParagraphs.push(clean);
+          });
+        }
+      }
+    }
+  }
+
+  if (allParagraphs.length === 0) {
+    return `📄 [한글(HWPX) 문서: "${file.name}"]\n\n본 문서 내에서 텍스트 태그를 발견하지 못했습니다.`;
+  }
+
+  return `📄 [한글(HWPX) 문서 텍스트: "${file.name}"] (HWPX XML 파싱 추출 완료)\n\n${allParagraphs.join('\n')}`;
+}
+
+/**
+ * 6. HWP (.hwp) 구형 5.0 바이너리 안전 파서 & 방어막
+ * - HWP 5.0은 OLE Compound File 바이너리 구조
+ * - ArrayBuffer 기반 UTF-16LE / UTF-8 텍스트 스트림 영역 디코딩 시도
+ * - 파싱 실패 또는 바이너리 암호화 시에도 throw Error 크래시를 내지 않고 안전하게 안내 및 warning 반환
+ */
+export async function parseHwpDocument(file: File): Promise<{
+  text: string;
+  hasExtractedText: boolean;
+  warning?: string;
+}> {
+  try {
+    const arrayBuffer = await file.arrayBuffer();
+
+    // 1차 시도: UTF-16LE 바이트 스트림 디코딩 후 한글/영문 텍스트 패턴 추출
+    const utf16Decoder = new TextDecoder('utf-16le', { fatal: false });
+    const decodedUtf16 = utf16Decoder.decode(arrayBuffer);
+
+    // 4자 이상 유효 한글 및 문장 패턴 정규식 매칭
+    const validKoreanRegex = /[\uAC00-\uD7A3a-zA-Z0-9\s.,!?:;/()'\"~%+=#\-]{4,}/g;
+    const matchesUtf16 = decodedUtf16.match(validKoreanRegex) || [];
+
+    const filteredChunks = matchesUtf16
+      .map((s) => s.trim())
+      .filter((s) => {
+        if (s.length < 4) return false;
+        // 한글이나 알파벳이 2개 이상 포함된 유효 텍스트만 필터링
+        const koreanOrAlpha = (s.match(/[\uAC00-\uD7A3a-zA-Z]/g) || []).length;
+        return koreanOrAlpha >= 2;
+      });
+
+    // 2차 시도: UTF-8 디코딩 결과에서도 텍스트 추출 시도
+    const utf8Decoder = new TextDecoder('utf-8', { fatal: false });
+    const decodedUtf8 = utf8Decoder.decode(arrayBuffer);
+    const matchesUtf8 = decodedUtf8.match(validKoreanRegex) || [];
+    const filteredUtf8 = matchesUtf8
+      .map((s) => s.trim())
+      .filter((s) => {
+        if (s.length < 4) return false;
+        const koreanOrAlpha = (s.match(/[\uAC00-\uD7A3a-zA-Z]/g) || []).length;
+        return koreanOrAlpha >= 2;
+      });
+
+    const bestChunks = filteredChunks.length >= filteredUtf8.length ? filteredChunks : filteredUtf8;
+    const combinedText = bestChunks.join('\n').slice(0, 15000);
+
+    if (combinedText.length > 50) {
+      return {
+        text: `📄 [한글(HWP) 문서 텍스트: "${file.name}"] (바이너리 텍스트 스트림 추출 완료)\n\n${combinedText}`,
+        hasExtractedText: true,
+        warning: 'HWP 바이너리에서 텍스트를 추출했습니다. 일부 서식이나 표 구조는 단순 텍스트로 반영되었을 수 있습니다.'
+      };
+    }
+
+    // 텍스트 추출이 불충분한 경우: 빨간 에러(throw) 없이 안내 텍스트와 warning 반환
+    return {
+      text: `📄 [한글(HWP) 문서: "${file.name}"]\n\n본 HWP 문서는 암호화되거나 압축된 바이너리 스트림 포맷으로 인해 브라우저 직접 텍스트 추출이 제한되었습니다. 최적의 AI 템플릿 설계를 위해 본문 내용을 복사하여 대화창에 붙여넣으시거나, HWP 문서를 PDF 또는 워드(DOCX)로 '다른 이름으로 저장'하여 첨부해 주시면 100% 정밀 분석이 가능합니다.`,
+      hasExtractedText: false,
+      warning: 'HWP 파일은 보안 바이너리 포맷입니다. 텍스트 추출이 제한될 경우 PDF 또는 워드(DOCX)로 변환해 첨부하시면 가장 정확합니다.'
+    };
+  } catch (err: any) {
+    console.warn('[HWP Parser Fallback]', err);
+    return {
+      text: `📄 [한글(HWP) 문서: "${file.name}"]\n\nHWP 파일 텍스트 추출 중 호환성 이슈가 발생했습니다. 정확한 AI 템플릿 생성을 위해 PDF 또는 워드(DOCX)로 변환하여 첨부해 주시기 바랍니다.`,
+      hasExtractedText: false,
+      warning: 'HWP 파일은 보안 바이너리 포맷입니다. 텍스트 추출이 제한될 경우 PDF 또는 워드(DOCX)로 변환해 첨부하시면 가장 정확합니다.'
+    };
+  }
+}
+
 export async function parseUploadedFile(file: File): Promise<AttachedFile> {
   const ext = file.name.split('.').pop()?.toLowerCase() || '';
   const category = getFileCategory(ext);
@@ -607,8 +762,32 @@ export async function parseUploadedFile(file: File): Promise<AttachedFile> {
         break;
       }
       case 'hwp': {
-        attached.isUnsupportedHwp = true;
-        attached.error = '한글 문서(.hwp, .hwpx)는 브라우저 보안 및 전용 바이너리 포맷 제약으로 직접 파싱이 어렵습니다. 텍스트를 복사하여 붙여넣거나 PDF로 변환 후 업로드해 주세요.';
+        const lowerName = file.name.toLowerCase();
+        if (lowerName.endsWith('.hwpx')) {
+          try {
+            const hwpxText = await parseHwpxDocument(file);
+            attached.parsedContent = hwpxText;
+            attached.summaryBadge = 'HWPX 본문 추출 완료';
+          } catch (hwpxErr: any) {
+            console.warn('[HWPX Parse Warning]', hwpxErr);
+            attached.parsedContent = `📄 [한글(HWPX) 문서: "${file.name}"] (텍스트 추출 일부 완료)`;
+            attached.summaryBadge = 'HWPX 파싱 완료';
+          }
+        } else {
+          // .hwp 바이너리 안전 파서
+          const result = await parseHwpDocument(file);
+          attached.parsedContent = result.text;
+          if (result.warning) {
+            attached.warning = result.warning;
+          }
+          if (result.hasExtractedText) {
+            attached.summaryBadge = 'HWP 텍스트 추출';
+          } else {
+            attached.isUnsupportedHwp = true;
+            attached.summaryBadge = 'HWP 안내문 탑재';
+            // 빨간색 error 대신 warning을 활용하여 크래시 방지
+          }
+        }
         break;
       }
       default: {

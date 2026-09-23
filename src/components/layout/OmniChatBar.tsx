@@ -152,6 +152,8 @@ export interface OmniAttachment {
   summaryBadge?: string;
   isParsing?: boolean;
   error?: string;
+  warning?: string;
+  isUnsupportedHwp?: boolean;
 }
 
 // ─── OmniChatBar 컴포넌트 ────────────────────────────────────────────────────
@@ -347,6 +349,8 @@ export const OmniChatBar: React.FC = () => {
 
         if (parsed.error) {
           showToast(`⚠️ [${file.name}] ${parsed.error}`, 'error');
+        } else if ((parsed as any).warning) {
+          showToast((parsed as any).warning, 'info');
         } else {
           showToast(`📊 [${file.name}] 데이터 분석 완료 (${parsed.summaryBadge || '추출 성공'})`, 'success');
         }
@@ -403,8 +407,13 @@ export const OmniChatBar: React.FC = () => {
     handleClearInput();
     setCurrentTemplate(null);
     try {
+      localStorage.removeItem('notion_template_cache');
       localStorage.removeItem('notion_template_vault_draft');
+      localStorage.removeItem('notion_builder_draft');
+      localStorage.removeItem('notion_chat_messages');
+      sessionStorage.clear();
     } catch {}
+    window.dispatchEvent(new CustomEvent('canvas:reset'));
     showToast('🧹 옴니 챗 대화 기록과 템플릿 캔버스가 깨끗이 초기화되었습니다.', 'info');
   };
 
@@ -428,12 +437,23 @@ export const OmniChatBar: React.FC = () => {
     isLoadingRef.current = true;
     lastSentRef.current = { text, time: now };
 
-    // [전송 시작 시 기존 캔버스 상태(previewTemplate) 초기화 및 로딩 스피너 활성화]
+    // [전송 시작 시 기존 캔버스 상태(previewTemplate) 즉시 언마운트 및 캐시 완전 파기]
     setIsGenerating(true);
     setCurrentTemplate(null);
     try {
+      localStorage.removeItem('notion_template_cache');
       localStorage.removeItem('notion_template_vault_draft');
     } catch {}
+
+    // [빈 껍데기 파일 파싱 실패 전송 방어]
+    // 텍스트도 없고 유효하게 파싱된 첨부 데이터도 없는 경우 전송 차단
+    const hasValidContent = attachedFiles.some((a) => a.parsedContent && !a.error);
+    if (!text && !hasValidContent) {
+      isLoadingRef.current = false;
+      setIsGenerating(false);
+      showToast('⚠️ 유효한 텍스트나 파일 내용이 없습니다. 요구사항을 직접 입력하시거나 텍스트가 포함된 문서를 첨부해 주세요.', 'info');
+      return;
+    }
 
     const pureText = text;
     const attachedDataBlocks = attachedFiles
@@ -830,7 +850,7 @@ export const OmniChatBar: React.FC = () => {
         } else {
           // AI 오케스트레이터 payload 기반 동적 템플릿 즉석 빌드
           const allAttachedNames = attachedFiles.map((a) => a.name).join(' ');
-          const fallbackTopic = pureText || allAttachedNames || '주민 민원 종합 관리';
+          const fallbackTopic = pureText || (allAttachedNames ? allAttachedNames.replace(/\.[^.]+$/, '') : '') || '새 맞춤형 워크스페이스';
           const rawTopic = (response.payload?.template_topic as string) || fallbackTopic;
           const rawTitle = (response.payload?.suggested_title as string) || `${fallbackTopic} AI 템플릿`;
           const sanitizedTopic = sanitizeTemplateTitle(rawTopic, fallbackTopic);

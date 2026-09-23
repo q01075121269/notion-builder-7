@@ -32,4 +32,5 @@ export interface AttachedFile {
   isParsing: boolean;
   error?: string;
   isUnsupportedHwp?: boolean;
+  warning?: string;
 }

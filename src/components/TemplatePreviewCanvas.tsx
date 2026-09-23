@@ -39,7 +39,7 @@ import {
 } from 'lucide-react';
 
 export interface TemplatePreviewCanvasProps {
-  template: NotionTemplate;
+  template: NotionTemplate | null;
 }
 
 const VAULT_STORAGE_KEY = 'notion_template_vault_draft';
@@ -61,7 +61,8 @@ export const TemplatePreviewCanvas: React.FC<TemplatePreviewCanvasProps> = ({ te
   const [selectedDbId, setSelectedDbId] = useState<string | null>(null);
 
   // [Step 4] Memory Vault & 캔버스 인라인 편집기 상태 관리
-  const [editableTemplate, setEditableTemplate] = useState<NotionTemplate>(() => {
+  const [editableTemplate, setEditableTemplate] = useState<NotionTemplate | null>(() => {
+    if (!template) return null;
     try {
       const saved = localStorage.getItem(VAULT_STORAGE_KEY);
       if (saved) {
@@ -76,16 +77,38 @@ export const TemplatePreviewCanvas: React.FC<TemplatePreviewCanvasProps> = ({ te
     return ensureTemplateAgentBlueprint(template);
   });
 
+  // [Clean Wipe & Canvas Reset Listener]
+  useEffect(() => {
+    const handleReset = () => {
+      setEditableTemplate(null);
+      try {
+        localStorage.removeItem(VAULT_STORAGE_KEY);
+        localStorage.removeItem('notion_template_cache');
+      } catch {}
+    };
+    window.addEventListener('canvas:reset', handleReset);
+    return () => window.removeEventListener('canvas:reset', handleReset);
+  }, []);
+
   // template prop이 외부에서 완전히 변경되었을 때 (예: 다른 프리셋 선택)
   useEffect(() => {
-    const updated = ensureTemplateAgentBlueprint(template);
-    setEditableTemplate(updated);
+    if (!template) {
+      setEditableTemplate(null);
+    } else {
+      const updated = ensureTemplateAgentBlueprint(template);
+      setEditableTemplate(updated);
+    }
   }, [template]);
 
   // 변경 시 Memory Vault (localStorage) 자동 지속 보존
   useEffect(() => {
     try {
-      localStorage.setItem(VAULT_STORAGE_KEY, JSON.stringify(editableTemplate));
+      if (editableTemplate) {
+        localStorage.setItem(VAULT_STORAGE_KEY, JSON.stringify(editableTemplate));
+      } else {
+        localStorage.removeItem(VAULT_STORAGE_KEY);
+        localStorage.removeItem('notion_template_cache');
+      }
     } catch (e) {
       console.warn('Failed to save to localStorage', e);
     }
@@ -97,7 +120,7 @@ export const TemplatePreviewCanvas: React.FC<TemplatePreviewCanvasProps> = ({ te
   const handleSaveToArchive = () => {
     if (!editableTemplate) return;
 
-    const targetId = editableTemplate.id || template.id || `arch-${Date.now()}`;
+    const targetId = editableTemplate.id || template?.id || `arch-${Date.now()}`;
     const targetTitle = editableTemplate.title.trim();
 
     const updatedTemplate: NotionTemplate = {
@@ -125,15 +148,22 @@ export const TemplatePreviewCanvas: React.FC<TemplatePreviewCanvasProps> = ({ te
   const handleResetToOriginal = () => {
     try {
       localStorage.removeItem(VAULT_STORAGE_KEY);
+      localStorage.removeItem('notion_template_cache');
     } catch {}
-    const original = ensureTemplateAgentBlueprint(template);
-    setEditableTemplate(original);
+    if (!template) {
+      setEditableTemplate(null);
+    } else {
+      const original = ensureTemplateAgentBlueprint(template);
+      setEditableTemplate(original);
+    }
     showToast('💡 템플릿 스키마가 초기 상태로 복원되었습니다.', 'info');
   };
 
   // 1. DB 명칭 인라인 변경
   const handleUpdateDatabaseName = (dbIndex: number, newName: string) => {
-    setEditableTemplate(prev => {
+    if (!editableTemplate) return;
+    setEditableTemplate((prev): NotionTemplate | null => {
+      if (!prev) return null;
       const oldName = prev.databases[dbIndex]?.name;
       const updatedDbs = prev.databases.map((db, i) => {
         if (i === dbIndex) {
@@ -153,6 +183,7 @@ export const TemplatePreviewCanvas: React.FC<TemplatePreviewCanvasProps> = ({ te
 
       return {
         ...prev,
+        title: prev.title || '',
         databases: updatedDbs
       };
     });
@@ -161,156 +192,117 @@ export const TemplatePreviewCanvas: React.FC<TemplatePreviewCanvasProps> = ({ te
 
   // 2. 속성(컬럼)명 인라인 변경
   const handleUpdatePropertyName = (dbIndex: number, propIndex: number, newName: string) => {
-    setEditableTemplate(prev => {
+    if (!editableTemplate) return;
+    setEditableTemplate((prev): NotionTemplate | null => {
+      if (!prev) return null;
       const updatedDbs = [...prev.databases];
       if (!updatedDbs[dbIndex]) return prev;
-
       const updatedProps = [...updatedDbs[dbIndex].properties];
       if (!updatedProps[propIndex]) return prev;
-
-      updatedProps[propIndex] = {
-        ...updatedProps[propIndex],
-        name: newName
-      };
-
-      updatedDbs[dbIndex] = {
-        ...updatedDbs[dbIndex],
-        properties: updatedProps
-      };
-
-      return {
-        ...prev,
-        databases: updatedDbs
-      };
+      updatedProps[propIndex] = { ...updatedProps[propIndex], name: newName };
+      updatedDbs[dbIndex] = { ...updatedDbs[dbIndex], properties: updatedProps };
+      const res: NotionTemplate = { ...prev, title: prev.title || "", databases: updatedDbs };
+      return res;
     });
-    showToast(`속성명이 '${newName}'(으)로 변경되었습니다.`, 'info');
+    showToast(`속성명이 '${newName}'(으)로 변경되었습니다.`, "info");
   };
 
   // 3. 속성 타입 드롭다운 변경
   const handleUpdatePropertyType = (dbIndex: number, propIndex: number, newType: NotionPropertyType) => {
-    setEditableTemplate(prev => {
+    if (!editableTemplate) return;
+    setEditableTemplate((prev): NotionTemplate | null => {
+      if (!prev) return null;
       const updatedDbs = [...prev.databases];
       if (!updatedDbs[dbIndex]) return prev;
-
       const updatedProps = [...updatedDbs[dbIndex].properties];
       const targetProp = updatedProps[propIndex];
       if (!targetProp) return prev;
-
-      const newProp: NotionProperty = {
-        ...targetProp,
-        type: newType,
-      };
-
-      if (newType === 'formula') {
+      const newProp: NotionProperty = { ...targetProp, type: newType };
+      if (newType === "formula") {
         newProp.expression = 'ifs(prop("상태") == "완료", "■■■■■ 100% 🟢", "■■■□□ 60% 🟡")';
-      } else if (newType === 'select' || newType === 'multi_select' || newType === 'status') {
-        newProp.options = ['대기 중', '진행 중', '완료'];
-      } else if (newType === 'relation') {
+      } else if (newType === "select" || newType === "multi_select" || newType === "status") {
+        newProp.options = ["대기 중", "진행 중", "완료"];
+      } else if (newType === "relation") {
         const otherDb = prev.databases.find((_, i) => i !== dbIndex);
-        newProp.target = otherDb?.name || '관련 데이터베이스';
+        newProp.target = otherDb?.name || "관련 데이터베이스";
       }
-
       updatedProps[propIndex] = newProp;
-      updatedDbs[dbIndex] = {
-        ...updatedDbs[dbIndex],
-        properties: updatedProps
-      };
-
-      return {
-        ...prev,
-        databases: updatedDbs
-      };
+      updatedDbs[dbIndex] = { ...updatedDbs[dbIndex], properties: updatedProps };
+      const res: NotionTemplate = { ...prev, title: prev.title || "", databases: updatedDbs };
+      return res;
     });
-    showToast(`속성 타입이 '${newType}'(으)로 변경되었습니다.`, 'info');
+    showToast(`속성 타입이 '${newType}'(으)로 변경되었습니다.`, "info");
   };
 
   // 4. 속성 삭제
   const handleDeleteProperty = (dbIndex: number, propIndex: number) => {
+    if (!editableTemplate) return;
     const targetProp = editableTemplate.databases[dbIndex]?.properties[propIndex];
-    if (targetProp?.type === 'title') {
-      showToast('기본 제목(Title) 속성은 삭제할 수 없습니다.', 'info');
+    if (targetProp?.type === "title") {
+      showToast("기본 제목(Title) 속성은 삭제할 수 없습니다.", "info");
       return;
     }
-
-    setEditableTemplate(prev => {
+    setEditableTemplate((prev): NotionTemplate | null => {
+      if (!prev) return null;
       const updatedDbs = [...prev.databases];
       if (!updatedDbs[dbIndex]) return prev;
-
       const updatedProps = updatedDbs[dbIndex].properties.filter((_, i) => i !== propIndex);
-      updatedDbs[dbIndex] = {
-        ...updatedDbs[dbIndex],
-        properties: updatedProps
-      };
-
-      return {
-        ...prev,
-        databases: updatedDbs
-      };
+      updatedDbs[dbIndex] = { ...updatedDbs[dbIndex], properties: updatedProps };
+      const res: NotionTemplate = { ...prev, title: prev.title || "", databases: updatedDbs };
+      return res;
     });
-    showToast('속성이 삭제되었습니다.', 'info');
+    showToast("속성이 삭제되었습니다.", "info");
   };
 
   // 5. 새 속성 추가
   const handleAddProperty = (dbIndex: number) => {
-    setEditableTemplate(prev => {
+    if (!editableTemplate) return;
+    setEditableTemplate((prev): NotionTemplate | null => {
+      if (!prev) return null;
       const updatedDbs = [...prev.databases];
       if (!updatedDbs[dbIndex]) return prev;
-
       const newIndex = updatedDbs[dbIndex].properties.length + 1;
-      const newProp: NotionProperty = {
-        name: `새 속성 ${newIndex}`,
-        type: 'text'
-      };
-
-      updatedDbs[dbIndex] = {
-        ...updatedDbs[dbIndex],
-        properties: [...updatedDbs[dbIndex].properties, newProp]
-      };
-
-      return {
-        ...prev,
-        databases: updatedDbs
-      };
+      const newProp: NotionProperty = { name: `새 속성 ${newIndex}`, type: "text" };
+      updatedDbs[dbIndex] = { ...updatedDbs[dbIndex], properties: [...updatedDbs[dbIndex].properties, newProp] };
+      const res: NotionTemplate = { ...prev, title: prev.title || "", databases: updatedDbs };
+      return res;
     });
-    showToast('새 속성이 추가되었습니다. 캔버스에서 명칭과 타입을 설정하세요.', 'success');
+    showToast("새 속성이 추가되었습니다. 캔버스에서 명칭과 타입을 설정하세요.", "success");
   };
 
   // 6. 새 관계형 데이터베이스 추가
   const handleAddDatabase = () => {
-    setEditableTemplate(prev => {
+    if (!editableTemplate) return;
+    setEditableTemplate((prev): NotionTemplate | null => {
+      if (!prev) return null;
       const newIdx = prev.databases.length + 1;
       const newDb: NotionDatabase = {
         name: `📂 신규 업무 DB ${newIdx}`,
-        description: '사용자가 캔버스에서 직접 추가한 상용 관계형 데이터베이스',
-        view_type: 'table',
+        description: "사용자가 캔버스에서 직접 추가한 상용 관계형 데이터베이스",
+        view_type: "table",
         properties: [
-          { name: '제목', type: 'title' },
-          { name: '마감일', type: 'date' },
-          { name: '진행 상태', type: 'status', options: ['대기 중', '진행 중', '완료'] },
-          { name: 'Quality_Status', type: 'select', options: ['초안', '검수 중', '승인', '반려'] },
-          { name: 'Verified', type: 'checkbox' },
-          { name: '진행률 수식', type: 'formula', expression: 'ifs(prop("진행 상태") == "완료", "100% 🟢", "50% 🟡")' }
+          { name: "제목", type: "title" },
+          { name: "마감일", type: "date" },
+          { name: "진행 상태", type: "status", options: ["대기 중", "진행 중", "완료"] },
+          { name: "Quality_Status", type: "select", options: ["초안", "검수 중", "승인", "반려"] },
+          { name: "Verified", type: "checkbox" },
+          { name: "진행률 수식", type: "formula", expression: 'ifs(prop("진행 상태") == "완료", "100% 🟢", "50% 🟡")' }
         ],
-        sample_rows: [
-          { '제목': '신규 업무 항목 1', '진행 상태': '진행 중', 'Quality_Status': '초안', 'Verified': false }
-        ]
+        sample_rows: [{ "제목": "신규 업무 항목 1", "진행 상태": "진행 중", "Quality_Status": "초안", "Verified": false }]
       };
-
-      return {
-        ...prev,
-        databases: [...prev.databases, newDb]
-      };
+      const res: NotionTemplate = { ...prev, title: prev.title || "", databases: [...prev.databases, newDb] };
+      return res;
     });
-    showToast('신규 데이터베이스가 추가되었습니다.', 'success');
+    showToast("신규 데이터베이스가 추가되었습니다.", "success");
   };
 
   // 통계 계산: DB 수, 총 속성 수, Formulas 2.0 수식 수
-  const totalDatabases = editableTemplate.databases.length;
-  const totalProperties = editableTemplate.databases.reduce((sum, db) => sum + db.properties.length, 0);
-  const totalFormulas = editableTemplate.databases.reduce(
+  const totalDatabases = editableTemplate ? editableTemplate.databases.length : 0;
+  const totalProperties = editableTemplate ? editableTemplate.databases.reduce((sum, db) => sum + db.properties.length, 0) : 0;
+  const totalFormulas = editableTemplate ? editableTemplate.databases.reduce(
     (sum, db) => sum + db.properties.filter((p) => p.type === 'formula').length,
     0
-  );
+  ) : 0;
 
   // 특정 DB 스크롤 이동
   const scrollToDb = (dbName: string) => {
@@ -323,6 +315,7 @@ export const TemplatePreviewCanvas: React.FC<TemplatePreviewCanvasProps> = ({ te
 
   // 대화창 수정 유도
   const handleModifyWithChat = () => {
+    if (!editableTemplate) return;
     const promptText = `"${editableTemplate.title}" 템플릿의 데이터베이스 속성을 고도화하고 맞춤형 수식을 추가해줘.`;
     setPendingChatPrompt(promptText);
     setActiveMobileTab('chat');
@@ -331,6 +324,7 @@ export const TemplatePreviewCanvas: React.FC<TemplatePreviewCanvasProps> = ({ te
 
   // 에이전트 스킬 프리셋 주입 핸들러
   const handleApplySkill = (skillPrompt: string, skillName: string) => {
+    if (!editableTemplate) return;
     setPendingChatPrompt(`현재 "${editableTemplate.title}" 템플릿에 [${skillName}]을 무손실 업그레이드로 적용해줘: ${skillPrompt}`);
     setActiveMobileTab('chat');
     showToast(`💬 "${skillName}" 요청이 대화창에 준비되었습니다.`, 'info');
@@ -418,7 +412,7 @@ export const TemplatePreviewCanvas: React.FC<TemplatePreviewCanvasProps> = ({ te
                 </div>
 
                 <div className="space-y-1 max-h-48 overflow-y-auto pr-0.5">
-                  {editableTemplate.databases.map((db, idx) => (
+                  {(editableTemplate?.databases || []).map((db, idx) => (
                     <button
                       key={idx}
                       onClick={() => scrollToDb(db.name)}
@@ -595,7 +589,7 @@ export const TemplatePreviewCanvas: React.FC<TemplatePreviewCanvasProps> = ({ te
 
                 <button
                   onClick={publishToNotion}
-                  disabled={isPublishing}
+                  disabled={isPublishing || !editableTemplate}
                   className="flex items-center space-x-1.5 px-3 py-1 rounded-lg text-xs font-bold text-white bg-slate-900 hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 shadow-xs transition disabled:opacity-50 cursor-pointer whitespace-nowrap"
                 >
                   {isPublishing ? (
@@ -699,6 +693,42 @@ export const TemplatePreviewCanvas: React.FC<TemplatePreviewCanvasProps> = ({ te
                   <p className="text-sm text-neutral-500 dark:text-neutral-400 max-w-md leading-relaxed">
                     첨부된 엑셀 데이터의 시트 구조, 스마트 헤더 행, 관계형 DB 스키마 및 Formula 2.0 수식을 정밀 분석하여 맞춤형 대시보드 뷰를 생성합니다.
                   </p>
+                </div>
+              ) : !editableTemplate ? (
+                <div className="flex flex-col items-center justify-center min-h-[500px] p-8 text-center animate-fade-in">
+                  <div className="w-16 h-16 rounded-2xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200/60 dark:border-indigo-800/60 flex items-center justify-center mb-5 text-2xl shadow-xs">
+                    ✨
+                  </div>
+                  <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-slate-100 dark:bg-neutral-800 text-slate-700 dark:text-neutral-300 border border-slate-200 dark:border-neutral-700 text-xs font-bold mb-3">
+                    <Sparkles className="w-3.5 h-3.5 text-indigo-500" />
+                    <span>새로운 템플릿 제작 대기 중</span>
+                  </div>
+                  <h3 className="text-xl sm:text-2xl font-black text-neutral-800 dark:text-neutral-100 mb-2 tracking-tight">
+                    어떤 노션 시스템을 구축할까요?
+                  </h3>
+                  <p className="text-sm text-neutral-500 dark:text-neutral-400 max-w-md leading-relaxed mb-6">
+                    하단 옴니 챗에 원하시는 템플릿 주제를 입력하시거나, 엑셀/HWP/PDF 문서를 첨부하시면 AI 아키텍트가 1장 완결형 노션 대시보드로 즉시 자동 빌드합니다.
+                  </p>
+                  <div className="flex flex-wrap gap-2 justify-center max-w-lg">
+                    <button 
+                      onClick={() => setPendingChatPrompt('원격검침 실시간 모니터링 관리 OS 만들어줘')}
+                      className="text-xs px-3 py-1.5 rounded-lg bg-white dark:bg-neutral-800 border border-slate-200 dark:border-neutral-700 hover:border-indigo-500 text-slate-700 dark:text-neutral-300 transition cursor-pointer"
+                    >
+                      ⚡ 원격검침 실시간 모니터링
+                    </button>
+                    <button 
+                      onClick={() => setPendingChatPrompt('주민 민원 및 세대 하자 통합 관리 대시보드 만들어줘')}
+                      className="text-xs px-3 py-1.5 rounded-lg bg-white dark:bg-neutral-800 border border-slate-200 dark:border-neutral-700 hover:border-indigo-500 text-slate-700 dark:text-neutral-300 transition cursor-pointer"
+                    >
+                      🏢 주민 민원 및 세대 하자 대시보드
+                    </button>
+                    <button 
+                      onClick={() => setPendingChatPrompt('자격증/수험생 올인원 합격 스케줄러 만들어줘')}
+                      className="text-xs px-3 py-1.5 rounded-lg bg-white dark:bg-neutral-800 border border-slate-200 dark:border-neutral-700 hover:border-indigo-500 text-slate-700 dark:text-neutral-300 transition cursor-pointer"
+                    >
+                      🎯 자격증/수험생 합격 스케줄러
+                    </button>
+                  </div>
                 </div>
               ) : previewMode === 'tree' ? (
                 <div className="p-4 sm:p-8 pb-32">
