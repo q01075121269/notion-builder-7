@@ -100,58 +100,82 @@ async function fallbackClientOrchestration(
     .replace(/\[첨부:[^\]]*\]/gi, '')
     .trim();
 
-  // 첨부 데이터가 있으면 마크다운 표 컬럼 및 샘플 데이터 파싱
+  // 다중 첨부 문서 데이터 블록 전역 추출 (다중 엑셀 파일 병합 파싱 지원)
   let attachedDbSchemas: any[] | null = null;
-  const attachedMatch = userText.match(/\[ATTACHED_DOCUMENT_DATA\]([\s\S]*?)\[\/ATTACHED_DOCUMENT_DATA\]/i);
-  if (attachedMatch) {
-    const rawAttached = attachedMatch[1];
-    const tableHeaderMatch = rawAttached.match(/\|\s*([^\n\r]+)\s*\|\s*\n\s*\|\s*[-|\s]+\|/);
-    if (tableHeaderMatch) {
-      const headerLine = tableHeaderMatch[1];
-      const rawCols = headerLine
-        .split('|')
-        .map(c => c.trim())
-        .filter(c => c && !c.startsWith('__EMPTY') && !/^열_\d+$/i.test(c));
-      if (rawCols.length > 0) {
-        const properties = rawCols.map((colName, idx) => {
-          let type = 'text';
-          if (idx === 0) type = 'title';
-          else if (/일자|날짜|일시|시간|시각|기한|마감/i.test(colName)) type = 'date';
-          else if (/상태|진행|결과|통신/i.test(colName)) type = 'status';
-          else if (/전기|수도|가스|온수|난방|지침|사용량|금액|비용|가격|단가|수량|점수|율/i.test(colName)) type = 'number';
-          else if (/담당|책임|관리자/i.test(colName)) type = 'person';
-          else if (/동|호|구분|분류|타입|종류|유형|위치/i.test(colName)) type = 'select';
-          return { name: colName, type };
-        });
+  const attachedBlocks = Array.from(
+    userText.matchAll(/\[ATTACHED_DOCUMENT_DATA\]([\s\S]*?)\[\/ATTACHED_DOCUMENT_DATA\]/gi)
+  );
 
-        // 1~2개 행 데이터 추출
-        const sampleRows: Record<string, any>[] = [];
-        const linesAfterDivider = rawAttached.split(/\|\s*[-|\s]+\|/)[1] || '';
-        const rowLines = linesAfterDivider.split('\n').map(l => l.trim()).filter(l => l.startsWith('|') && !l.includes('생략'));
-        rowLines.slice(0, 3).forEach(rl => {
-          const cells = rl.split('|').map(c => c.trim()).filter((_, i, arr) => i > 0 && i < arr.length - 1);
-          if (cells.length > 0) {
-            const rowObj: Record<string, any> = {};
-            rawCols.forEach((col, cIdx) => {
-              rowObj[col] = cells[cIdx] || '';
-            });
-            sampleRows.push(rowObj);
+  if (attachedBlocks.length > 0) {
+    attachedDbSchemas = [];
+
+    for (let bIdx = 0; bIdx < attachedBlocks.length; bIdx++) {
+      const rawAttached = attachedBlocks[bIdx][1];
+      const fileNameMatch = rawAttached.match(/파일명:\s*([^\n\r]+)/);
+      const fileName = fileNameMatch ? fileNameMatch[1].trim() : `첨부데이터_${bIdx + 1}`;
+
+      const tableHeaderMatch = rawAttached.match(/\|\s*([^\n\r]+)\s*\|\s*\n\s*\|\s*[-|\s]+\|/);
+      if (tableHeaderMatch) {
+        const headerLine = tableHeaderMatch[1];
+        const rawCols = headerLine
+          .split('|')
+          .map(c => c.trim())
+          .filter(c => c && !c.startsWith('__EMPTY') && !/^열_\d+$/i.test(c));
+
+        if (rawCols.length > 0) {
+          const properties = rawCols.map((colName, idx) => {
+            let type = 'text';
+            if (idx === 0) type = 'title';
+            else if (/일자|날짜|일시|시간|시각|기한|마감/i.test(colName)) type = 'date';
+            else if (/상태|진행|결과|통신|현황/i.test(colName)) type = 'status';
+            else if (/전기|수도|가스|온수|난방|지침|사용량|금액|비용|가격|단가|수량|점수|율/i.test(colName)) type = 'number';
+            else if (/담당|책임|관리자|작성자|조치자|민원인/i.test(colName)) type = 'person';
+            else if (/동|호|구분|분류|타입|종류|유형|위치|차수|원인/i.test(colName)) type = 'select';
+            return { name: colName, type };
+          });
+
+          // 각 파일당 10~20행 샘플 데이터 온전 추출
+          const sampleRows: Record<string, any>[] = [];
+          const linesAfterDivider = rawAttached.split(/\|\s*[-|\s]+\|/)[1] || '';
+          const rowLines = linesAfterDivider
+            .split('\n')
+            .map(l => l.trim())
+            .filter(l => l.startsWith('|') && !l.includes('생략'));
+
+          rowLines.slice(0, 15).forEach(rl => {
+            const cells = rl.split('|').map(c => c.trim()).filter((_, i, arr) => i > 0 && i < arr.length - 1);
+            if (cells.length > 0) {
+              const rowObj: Record<string, any> = {};
+              rawCols.forEach((col, cIdx) => {
+                rowObj[col] = cells[cIdx] || '';
+              });
+              sampleRows.push(rowObj);
+            }
+          });
+
+          // 파일명과 컨텍스트에 부합하는 고유한 DB명 매핑
+          let dbName = `📋 ${fileName.replace(/\.[^.]+$/, '')} 마스터 DB`;
+          const lowerFileName = (fileName + ' ' + rawCols.join(' ')).toLowerCase();
+
+          if (lowerFileName.includes('민원')) {
+            dbName = '📋 주민 민원 접수 및 처리 마스터 DB';
+          } else if (lowerFileName.includes('누수')) {
+            dbName = '💧 세대 누수 및 하자 정밀 점검 DB';
+          } else if (lowerFileName.includes('소음')) {
+            dbName = '🔇 층간소음 분쟁 중재 및 관리 DB';
+          } else if (lowerFileName.includes('검침')) {
+            dbName = '⚡ 원격검침 실시간 모니터링 관리 DB';
+          } else if (lowerFileName.includes('ardenhill') || lowerFileName.includes('아덴힐')) {
+            dbName = '🏢 [아덴힐] 객실 및 시설 점검 마스터 DB';
           }
-        });
 
-        const isArdenhill = userText.includes('ardenhill') || userText.includes('아덴힐');
-        const isMetering = userText.includes('검침') || userText.includes('계량기') || userText.includes('에너지') || userText.includes('전력') || userText.includes('수도');
-        let attachedDbName = '📋 첨부 데이터 점검 및 운영 마스터 DB';
-        if (isMetering) {
-          attachedDbName = '⚡ [시설 & 에너지] 원격검침 실시간 모니터링 관리 DB';
-        } else if (isArdenhill) {
-          attachedDbName = '🏢 [아덴힐] 객실 및 시설 점검 마스터 DB';
+          attachedDbSchemas.push({
+            name: dbName,
+            db_name: dbName,
+            properties,
+            sample_rows: sampleRows.length > 0 ? sampleRows : undefined
+          });
         }
-        attachedDbSchemas = [{
-          db_name: attachedDbName,
-          properties,
-          sample_rows: sampleRows.length > 0 ? sampleRows : undefined
-        }];
       }
     }
   }
@@ -170,7 +194,9 @@ async function fallbackClientOrchestration(
     lower.includes('수험생') || lower.includes('공부') || lower.includes('시험') || 
     lower.includes('오답') || lower.includes('합격') || 
     lower.includes('검침') || lower.includes('계량기') || lower.includes('에너지') || 
-    lower.includes('수도') || lower.includes('전기');
+    lower.includes('수도') || lower.includes('전기') ||
+    lower.includes('민원') || lower.includes('누수') || lower.includes('소음') || 
+    lower.includes('세대간') || lower.includes('입주자') || lower.includes('주민');
 
   if (isBuilderMode || hasAttachment || hasBuilderKeywords) {
     const isCertification = lower.includes('자격증') || lower.includes('수험생') || lower.includes('시험') || lower.includes('공부') || lower.includes('오답노트');

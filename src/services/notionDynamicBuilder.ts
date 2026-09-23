@@ -29,12 +29,22 @@ export function sanitizeTemplateTitle(rawInput: string, topic?: string): string 
   const combinedRaw = `${rawInput || ''} ${topic || ''}`.trim();
   const lowerCombined = combinedRaw.toLowerCase();
 
+  // [Hotfix 0: 주민 민원 및 입주자 지원 도메인 (민원, 누수, 소음, 세대간 분쟁 등)]
+  if (
+    lowerCombined.includes('민원') ||
+    lowerCombined.includes('소음') ||
+    (lowerCombined.includes('누수') && !lowerCombined.includes('계량기누수')) ||
+    lowerCombined.includes('세대간') ||
+    lowerCombined.includes('입주자') ||
+    (lowerCombined.includes('주민') && (lowerCombined.includes('관리') || lowerCombined.includes('접수') || lowerCombined.includes('분쟁') || lowerCombined.includes('지원')))
+  ) {
+    return '[주민 민원 & 입주자 지원] 주민 민원 종합 관리 OS';
+  }
+
   // [Hotfix 1: 특정 도메인 및 파일명 키워드 우선 고정 매핑 (Fail-Safe)]
   if (
-    lowerCombined.includes('검침') ||
-    lowerCombined.includes('계량기') ||
-    lowerCombined.includes('에너지') ||
-    (lowerCombined.includes('시설') && (lowerCombined.includes('수도') || lowerCombined.includes('전기') || lowerCombined.includes('가스')))
+    (lowerCombined.includes('검침') || lowerCombined.includes('계량기') || lowerCombined.includes('원격검침')) &&
+    !lowerCombined.includes('민원') && !lowerCombined.includes('소음') && !lowerCombined.includes('주민')
   ) {
     return '[원격검침 & 시설 관제] 실시간 검침 모니터링 관리 OS';
   }
@@ -60,6 +70,9 @@ export function sanitizeTemplateTitle(rawInput: string, topic?: string): string 
 
   // 오염되었거나 텍스트가 30자 이상으로 길면 즉시 폐기 후 도메인 추론 fallback 가동
   if (isContaminated || text.length > 30) {
+    if (lowerCombined.includes('민원') || lowerCombined.includes('소음') || lowerCombined.includes('누수') || lowerCombined.includes('주민')) {
+      return '[주민 민원 & 입주자 지원] 주민 민원 종합 관리 OS';
+    }
     if (lowerCombined.includes('검침') || lowerCombined.includes('계량기') || lowerCombined.includes('에너지')) {
       return '[원격검침 & 시설 관제] 실시간 검침 모니터링 관리 OS';
     }
@@ -116,6 +129,9 @@ export function sanitizeTemplateTitle(rawInput: string, topic?: string): string 
   const lower = text.toLowerCase();
 
   // 도메인별 고품격 공식 타이틀 포맷팅
+  if (lower.includes('민원') || lower.includes('소음') || lower.includes('누수') || lower.includes('주민')) {
+    return '[주민 민원 & 입주자 지원] 주민 민원 종합 관리 OS';
+  }
   if (lower.includes('검침') || lower.includes('계량기') || lower.includes('에너지')) {
     return '[원격검침 & 시설 관제] 실시간 검침 모니터링 관리 OS';
   }
@@ -150,6 +166,83 @@ export function sanitizeTemplateTitle(rawInput: string, topic?: string): string 
  */
 export function getDomainEcoDatabases(domainOrTopic: string, title: string): NotionDatabase[] {
   const t = (domainOrTopic + ' ' + title).toLowerCase();
+
+  // [0순위: 주민 민원 종합 관리 도메인 (민원접수 DB, 세대누수 점검 DB, 층간소음 중재 DB)]
+  if (t.includes('민원') || t.includes('소음') || t.includes('누수') || t.includes('세대간') || t.includes('입주자') || t.includes('주민')) {
+    return [
+      {
+        name: '📋 주민 민원 접수 및 처리 마스터 DB',
+        description: '입주민 민원 접수부터 현장 점검, 중재 및 최종 처리 결과를 원스톱으로 관리하는 마스터 DB',
+        view_type: 'table',
+        properties: [
+          { name: '접수번호/민원명', type: 'title' },
+          { name: '접수일시', type: 'date' },
+          { name: '민원 유형', type: 'select', options: ['층간소음 분쟁', '세대 누수/하자', '시설/엘리베이터 보수', '주차 갈등', '공동생활 규약 위반'] },
+          { name: '발생 동/호수', type: 'text' },
+          { name: '처리 상태', type: 'status', options: ['접수 완료', '현장 확인 중', '중재/조치 중', '처리 완료 ✅'] },
+          { name: '담당 관리자', type: 'person' },
+          { name: '누수 점검 연계', type: 'relation', target: '💧 세대 누수 및 하자 정밀 점검 DB' },
+          { name: '소음 중재 연계', type: 'relation', target: '🔇 층간소음 분쟁 중재 및 관리 DB' },
+          { 
+            name: '조치 소요기간(수식)', 
+            type: 'formula', 
+            expression: 'ifs(prop("처리 상태") == "처리 완료 ✅", "처리 완료 🎉", "진행 중 ⚠️")' 
+          },
+          { name: 'Quality_Status', type: 'select', options: ['초안', '검수 중', '승인', '반려'] },
+          { name: 'Verified', type: 'checkbox' }
+        ],
+        sample_rows: [
+          { '접수번호/민원명': '[민원-2024-012] 102동 1104호 거실 천장 누수 피해 접수', '접수일시': '2026-09-23', '민원 유형': '세대 누수/하자', '발생 동/호수': '102동 1104호', '처리 상태': '현장 확인 중', '조치 소요기간(수식)': '진행 중 ⚠️', 'Quality_Status': '검수 중', 'Verified': false },
+          { '접수번호/민원명': '[민원-2024-015] 105동 801호 심야 층간소음(발망치) 상담 요청', '접수일시': '2026-09-23', '민원 유형': '층간소음 분쟁', '발생 동/호수': '105동 801호', '처리 상태': '중재/조치 중', '조치 소요기간(수식)': '진행 중 ⚠️', 'Quality_Status': '승인', 'Verified': true },
+          { '접수번호/민원명': '[민원-2024-008] 지하 1층 주차장 진입로 조명 점멸 수리', '접수일시': '2026-09-22', '민원 유형': '시설/엘리베이터 보수', '발생 동/호수': '관리동 공용부', '처리 상태': '처리 완료 ✅', '조치 소요기간(수식)': '처리 완료 🎉', 'Quality_Status': '승인', 'Verified': true }
+        ]
+      },
+      {
+        name: '💧 세대 누수 및 하자 정밀 점검 DB',
+        description: '세대 내 배관 파손, 방수층 균열 등 누수 피해 원인 규명 및 하자보수 합의 이력을 추적하는 정밀 점검 DB',
+        view_type: 'table',
+        properties: [
+          { name: '점검 건명', type: 'title' },
+          { name: '피해 세대', type: 'text' },
+          { name: '원인 추정 세대', type: 'text' },
+          { name: '점검 일시', type: 'date' },
+          { name: '누수 원인', type: 'select', options: ['배관 부식/파손', '방수층 균열', '욕실 배수 트랩 이탈', '외벽 크랙/우천 누수', '윗세대 온수배관 결함'] },
+          { name: '보수 상태', type: 'status', options: ['원인 조사 중', '견적/합의 중', '보수 공사 중', '하자보수 완료 ✅'] },
+          { name: '예상/발생 비용(원)', type: 'number' },
+          { name: '점검 책임자', type: 'person' },
+          { name: '연관 민원 기록', type: 'relation', target: '📋 주민 민원 접수 및 처리 마스터 DB' },
+          { name: 'Quality_Status', type: 'select', options: ['초안', '검수 중', '승인', '반려'] },
+          { name: 'Verified', type: 'checkbox' }
+        ],
+        sample_rows: [
+          { '점검 건명': '102동 1104호 거실 천장 열화상 누수 탐지', '피해 세대': '102동 1104호', '원인 추정 세대': '102동 1204호', '점검 일시': '2026-09-23', '누수 원인': '욕실 배수 트랩 이탈', '보수 상태': '견적/합의 중', '예상/발생 비용(원)': 450000, 'Quality_Status': '검수 중', 'Verified': false },
+          { '점검 건명': '201동 302호 베란다 우수관 주변 누수 보수', '피해 세대': '201동 302호', '원인 추정 세대': '공용 우수배관', '점검 일시': '2026-09-20', '누수 원인': '방수층 균열', '보수 상태': '하자보수 완료 ✅', '예상/발생 비용(원)': 180000, 'Quality_Status': '승인', 'Verified': true }
+        ]
+      },
+      {
+        name: '🔇 층간소음 분쟁 중재 및 관리 DB',
+        description: '세대 간 소음 갈등 완화를 위한 차수별 방문 상담, 소음방지매트 지원 및 중재 합의를 관리하는 분쟁 케어 DB',
+        view_type: 'table',
+        properties: [
+          { name: '분쟁 관리번호', type: 'title' },
+          { name: '피해 접수 세대', type: 'text' },
+          { name: '소음 유발 세대', type: 'text' },
+          { name: '소음 유형', type: 'select', options: ['발걸음/아이 뜀', '가전제품/세탁기 야간가동', '가구 끄는 소리', '반려동물 짖음', '늦은 시간 악기/TV'] },
+          { name: '발생 시간대', type: 'select', options: ['주간 (09-18시)', '야간 (18-22시)', '심야 (22-07시)'] },
+          { name: '중재 진행 차수', type: 'select', options: ['1차 유선 안내/주의 권고', '2차 방문 면담/완충재 지원', '3차 층간소음위원회 중재', '분쟁조정위원회 이첩'] },
+          { name: '중재 상태', type: 'status', options: ['접수/상담 중', '양측 면담 완료', '소음방지매트 설치합의', '중재 합의 완료 ✅'] },
+          { name: '중재 담당자', type: 'person' },
+          { name: '연관 민원 기록', type: 'relation', target: '📋 주민 민원 접수 및 처리 마스터 DB' },
+          { name: 'Quality_Status', type: 'select', options: ['초안', '검수 중', '승인', '반려'] },
+          { name: 'Verified', type: 'checkbox' }
+        ],
+        sample_rows: [
+          { '분쟁 관리번호': '[소음-105-01] 105동 801호 ↔ 901호 아이 뜀박질 소음 중재', '피해 접수 세대': '105동 801호', '소음 유발 세대': '105동 901호', '소음 유형': '발걸음/아이 뜀', '발생 시간대': '야간 (18-22시)', '중재 진행 차수': '2차 방문 면담/완충재 지원', '중재 상태': '소음방지매트 설치합의', 'Quality_Status': '승인', 'Verified': true },
+          { '분쟁 관리번호': '[소음-203-04] 203동 402호 심야 세탁기 진동 소음 안내', '피해 접수 세대': '203동 302호', '소음 유발 세대': '203동 402호', '소음 유형': '가전제품/세탁기 야간가동', '발생 시간대': '심야 (22-07시)', '중재 진행 차수': '1차 유선 안내/주의 권고', '중재 상태': '중재 합의 완료 ✅', 'Quality_Status': '승인', 'Verified': true }
+        ]
+      }
+    ];
+  }
 
   // A-0. 실시간 검침/계량기/에너지 및 시설 관리 도메인
   if (t.includes('검침') || t.includes('계량기') || t.includes('에너지') || (t.includes('시설') && (t.includes('수도') || t.includes('전기') || t.includes('가스')))) {
@@ -851,7 +944,7 @@ export function buildDynamicTemplateFromPayload(params: DynamicBuildParams): Not
           ];
 
       databases.push({
-        name: schema.db_name || (idx === 0 ? `🏢 ${cleanTitle.replace(/^\[.*?\]\s*/, '')} 마스터 DB` : idx === 1 ? `📋 세부 점검 & 실행 트래커 DB` : `🛠️ 조치 및 리스크 관리 DB`),
+        name: schema.name || schema.db_name || (idx === 0 ? `🏢 ${cleanTitle.replace(/^\[.*?\]\s*/, '')} 마스터 DB` : idx === 1 ? `📋 세부 점검 & 실행 트래커 DB` : `🛠️ 조치 및 리스크 관리 DB`),
         description: `AI가 동적으로 맞춤 구성한 ${schema.db_name || '마스터 DB'}입니다.`,
         view_type: 'table',
         properties: finalProps,

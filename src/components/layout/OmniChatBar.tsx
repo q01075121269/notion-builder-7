@@ -388,6 +388,26 @@ export const OmniChatBar: React.FC = () => {
     setAttachedFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
+  // ── 입력창 및 첨부파일 명시적 Clear 핸들러 ────────────────────────────────
+  const handleClearInput = () => {
+    setInputValue('');
+    setAttachedFiles([]);
+    if (inputRef.current) inputRef.current.value = '';
+    baseTextRef.current = '';
+    fullTranscriptRef.current = '';
+  };
+
+  // ── 대화 기록 및 템플릿 캔버스 완전 초기화 (Clean Wipe) ──────────────────────
+  const handleResetSessionAndCanvas = () => {
+    setMessages([]);
+    handleClearInput();
+    setCurrentTemplate(null);
+    try {
+      localStorage.removeItem('notion_template_vault_draft');
+    } catch {}
+    showToast('🧹 옴니 챗 대화 기록과 템플릿 캔버스가 깨끗이 초기화되었습니다.', 'info');
+  };
+
   // ── 메시지 전송 ─────────────────────────────────────────────────────────────
   const handleSendMessage = useCallback(async (overrideText?: string) => {
     const raw = (overrideText ?? inputValue).trim();
@@ -726,7 +746,7 @@ export const OmniChatBar: React.FC = () => {
         receipts = buildReceipts('BUILDER');
         setIsViewingCurationHub(false);
 
-        // [첨부 엑셀 데이터 100% 직행 추출] 파일 내 시트명, 컬럼, 샘플 행 파싱
+        // [다중 첨부 엑셀 데이터 100% 직행 추출] 각 파일별 시트명, 컬럼, 샘플 행 파싱
         const extractedAttachedSchemas: any[] = [];
         attachedFiles.forEach((file) => {
           if (file.parsedContent) {
@@ -741,18 +761,18 @@ export const OmniChatBar: React.FC = () => {
                 const properties = rawCols.map((colName, idx) => {
                   let type: any = 'text';
                   if (idx === 0) type = 'title';
-                  else if (/일자|날짜|일시|기한|마감/i.test(colName)) type = 'date';
-                  else if (/상태|진행|결과/i.test(colName)) type = 'status';
-                  else if (/금액|비용|가격|단가|수량|점수|율/i.test(colName)) type = 'number';
-                  else if (/담당|책임|관리자/i.test(colName)) type = 'person';
-                  else if (/구분|분류|타입|종류|유형/i.test(colName)) type = 'select';
+                  else if (/일자|날짜|일시|시간|시각|기한|마감/i.test(colName)) type = 'date';
+                  else if (/상태|진행|결과|통신|현황/i.test(colName)) type = 'status';
+                  else if (/전기|수도|가스|온수|난방|지침|사용량|금액|비용|가격|단가|수량|점수|율/i.test(colName)) type = 'number';
+                  else if (/담당|책임|관리자|작성자|조치자|민원인/i.test(colName)) type = 'person';
+                  else if (/동|호|구분|분류|타입|종류|유형|위치|차수|원인/i.test(colName)) type = 'select';
                   return { name: colName, type };
                 });
 
                 const sampleRows: Record<string, any>[] = [];
                 const linesAfter = file.parsedContent.split(/\|\s*[-|\s]+\|/)[1] || '';
                 const rowLines = linesAfter.split('\n').map((l) => l.trim()).filter((l) => l.startsWith('|') && !l.includes('생략'));
-                rowLines.slice(0, 3).forEach((rl) => {
+                rowLines.slice(0, 15).forEach((rl) => {
                   const cells = rl.split('|').map((c) => c.trim()).filter((_, i, arr) => i > 0 && i < arr.length - 1);
                   if (cells.length > 0) {
                     const rowObj: Record<string, any> = {};
@@ -763,11 +783,22 @@ export const OmniChatBar: React.FC = () => {
                   }
                 });
 
-                const cleanDbName = file.name.includes('ardenhill') || file.name.includes('아덴힐')
-                  ? '🏢 [아덴힐] 객실 및 시설 점검 마스터 DB'
-                  : `📋 ${file.name.replace(/\.[^.]+$/, '')} 마스터 DB`;
+                let cleanDbName = `📋 ${file.name.replace(/\.[^.]+$/, '')} 마스터 DB`;
+                const lowerFileName = (file.name + ' ' + rawCols.join(' ')).toLowerCase();
+                if (lowerFileName.includes('민원')) {
+                  cleanDbName = '📋 주민 민원 접수 및 처리 마스터 DB';
+                } else if (lowerFileName.includes('누수')) {
+                  cleanDbName = '💧 세대 누수 및 하자 정밀 점검 DB';
+                } else if (lowerFileName.includes('소음')) {
+                  cleanDbName = '🔇 층간소음 분쟁 중재 및 관리 DB';
+                } else if (lowerFileName.includes('검침')) {
+                  cleanDbName = '⚡ 원격검침 실시간 모니터링 관리 DB';
+                } else if (lowerFileName.includes('ardenhill') || lowerFileName.includes('아덴힐')) {
+                  cleanDbName = '🏢 [아덴힐] 객실 및 시설 점검 마스터 DB';
+                }
 
                 extractedAttachedSchemas.push({
+                  name: cleanDbName,
                   db_name: cleanDbName,
                   properties,
                   sample_rows: sampleRows.length > 0 ? sampleRows : undefined,
@@ -777,10 +808,16 @@ export const OmniChatBar: React.FC = () => {
           }
         });
 
-        const mergedDbSchemas = [
-          ...extractedAttachedSchemas,
-          ...((response.payload?.db_schema as any[]) || []),
-        ];
+        // 중복 방지 병합
+        const mergedDbSchemas: any[] = [...extractedAttachedSchemas];
+        const apiSchemas = (response.payload?.db_schema as any[]) || [];
+        apiSchemas.forEach((apiS) => {
+          const sName = apiS.name || apiS.db_name;
+          if (!mergedDbSchemas.some((m) => (m.name || m.db_name) === sName)) {
+            mergedDbSchemas.push(apiS);
+          }
+        });
+
         receipts = buildReceipts('BUILDER');
         setIsViewingCurationHub(false);
 
@@ -791,8 +828,8 @@ export const OmniChatBar: React.FC = () => {
           targetTemplate = PRESET_TEMPLATES.certification_exam;
         } else {
           // AI 오케스트레이터 payload 기반 동적 템플릿 즉석 빌드
-          const attachedFileName = attachedFiles[0]?.name || '';
-          const fallbackTopic = pureText || attachedFileName.replace(/\.[^.]+$/, '') || '시설관리 및 점검';
+          const allAttachedNames = attachedFiles.map((a) => a.name).join(' ');
+          const fallbackTopic = pureText || allAttachedNames || '주민 민원 종합 관리';
           const rawTopic = (response.payload?.template_topic as string) || fallbackTopic;
           const rawTitle = (response.payload?.suggested_title as string) || `${fallbackTopic} AI 템플릿`;
           const sanitizedTopic = sanitizeTemplateTitle(rawTopic, fallbackTopic);
@@ -1013,8 +1050,10 @@ export const OmniChatBar: React.FC = () => {
             <div className="flex items-center space-x-1">
               {messages.length > 0 && (
                 <button
-                  onClick={() => setMessages([])}
-                  className="text-[10px] text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 px-2 py-0.5 rounded-md hover:bg-neutral-100 dark:hover:bg-neutral-800 transition"
+                  type="button"
+                  onClick={handleResetSessionAndCanvas}
+                  className="text-[10px] text-neutral-400 hover:text-rose-600 dark:hover:text-rose-400 px-2 py-0.5 rounded-md hover:bg-rose-50 dark:hover:bg-rose-950/40 transition font-medium cursor-pointer"
+                  title="대화 기록 및 템플릿 캔버스 완전 초기화 (Clean Wipe)"
                 >
                   초기화
                 </button>
@@ -1458,6 +1497,27 @@ export const OmniChatBar: React.FC = () => {
             )}
           </button>
 
+          {/* 입력창 및 첨부파일 완전 초기화 'X' 버튼 */}
+          {(inputValue.trim() || attachedFiles.length > 0) && (
+            <button
+              type="button"
+              onClick={handleClearInput}
+              className="
+                w-10 h-10 min-w-[40px] shrink-0
+                flex items-center justify-center
+                rounded-xl transition
+                bg-slate-100 dark:bg-neutral-800
+                text-neutral-400 hover:text-rose-600 dark:hover:text-rose-400
+                hover:bg-rose-50 dark:hover:bg-rose-950/40
+                cursor-pointer
+              "
+              title="입력 내용 및 첨부파일 지우기"
+              aria-label="입력 초기화"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
+
           {/* 전송 버튼 */}
           <button
             type="button"
@@ -1504,11 +1564,13 @@ export const OmniChatBar: React.FC = () => {
           {/* 닫기 버튼 (확장 상태) */}
           {isExpanded && (
             <button
+              type="button"
               onClick={() => setIsExpanded(false)}
               className="shrink-0 p-1.5 rounded-xl text-neutral-400 hover:text-neutral-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-neutral-800 transition"
               aria-label="피드 접기"
+              title="피드 접기"
             >
-              <X className="w-4 h-4" />
+              <ChevronDown className="w-4 h-4" />
             </button>
           )}
         </div>
