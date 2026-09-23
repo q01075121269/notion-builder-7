@@ -583,7 +583,18 @@ export const OmniChatBar: React.FC = () => {
         return;
       }
 
-      const response: OrchestratorResponse = await sendToOrchestrator(fullMessageText, [...messages, userMsg], apiKey, authUser?.email, selectedModel);
+      const response: OrchestratorResponse = await sendToOrchestrator(fullMessageText, [...messages, userMsg], apiKey, authUser?.email, selectedModel, activeMode);
+
+      // [🚨 핵심 방어: 템플릿 마스터 우선주의 및 오피스 스튜디오 오라우팅 원천 차단]
+      const isBuilderChipActive = activeMode === 'builder';
+      const hasFileAttachment = attachedFiles.length > 0;
+      const isTemplateRelated = /템플릿|노션|db|데이터베이스|대시보드|시설|객실|하자|아덴힐|체크리스트|자격증|수험|합격/i.test(pureText);
+
+      let effectiveIntent = response.intent;
+      if ((isBuilderChipActive || hasFileAttachment || isTemplateRelated) && response.intent === 'DEVLAB') {
+        console.warn('[OmniChatBar] Overriding DEVLAB intent to BUILDER because template mode/file attachment is active.');
+        effectiveIntent = 'BUILDER';
+      }
 
       let finalReply = response.reply_message;
       let receipts: ActionReceipt[] = [];
@@ -684,7 +695,58 @@ export const OmniChatBar: React.FC = () => {
 
           receipts = buildReceipts('LIFE');
         }
-      } else if (response.intent === 'BUILDER' || response.payload?.db_schema) {
+      } else if (effectiveIntent === 'BUILDER' || response.payload?.db_schema || isBuilderChipActive || hasFileAttachment) {
+        receipts = buildReceipts('BUILDER');
+        setIsViewingCurationHub(false);
+
+        // [첨부 엑셀 데이터 100% 직행 추출] 파일 내 시트명, 컬럼, 샘플 행 파싱
+        const extractedAttachedSchemas: any[] = [];
+        attachedFiles.forEach((file) => {
+          if (file.parsedContent) {
+            const tableHeaderMatch = file.parsedContent.match(/\|\s*([^\n\r]+)\s*\|\s*\n\s*\|\s*[-|\s]+\|/);
+            if (tableHeaderMatch) {
+              const headerLine = tableHeaderMatch[1];
+              const rawCols = headerLine.split('|').map((c) => c.trim()).filter(Boolean);
+              if (rawCols.length > 0) {
+                const properties = rawCols.map((colName, idx) => {
+                  let type: any = 'text';
+                  if (idx === 0) type = 'title';
+                  else if (/일자|날짜|일시|기한|마감/i.test(colName)) type = 'date';
+                  else if (/상태|진행|결과/i.test(colName)) type = 'status';
+                  else if (/금액|비용|가격|단가|수량|점수|율/i.test(colName)) type = 'number';
+                  else if (/담당|책임|관리자/i.test(colName)) type = 'person';
+                  else if (/구분|분류|타입|종류|유형/i.test(colName)) type = 'select';
+                  return { name: colName, type };
+                });
+
+                const sampleRows: Record<string, any>[] = [];
+                const linesAfter = file.parsedContent.split(/\|\s*[-|\s]+\|/)[1] || '';
+                const rowLines = linesAfter.split('\n').map((l) => l.trim()).filter((l) => l.startsWith('|') && !l.includes('생략'));
+                rowLines.slice(0, 3).forEach((rl) => {
+                  const cells = rl.split('|').map((c) => c.trim()).filter((_, i, arr) => i > 0 && i < arr.length - 1);
+                  if (cells.length > 0) {
+                    const rowObj: Record<string, any> = {};
+                    rawCols.forEach((col, cIdx) => {
+                      rowObj[col] = cells[cIdx] || '';
+                    });
+                    sampleRows.push(rowObj);
+                  }
+                });
+
+                extractedAttachedSchemas.push({
+                  db_name: `📋 ${file.name.replace(/\.[^.]+$/, '')} 원본 DB`,
+                  properties,
+                  sample_rows: sampleRows.length > 0 ? sampleRows : undefined,
+                });
+              }
+            }
+          }
+        });
+
+        const mergedDbSchemas = [
+          ...extractedAttachedSchemas,
+          ...((response.payload?.db_schema as any[]) || []),
+        ];
         receipts = buildReceipts('BUILDER');
         setIsViewingCurationHub(false);
 
@@ -704,7 +766,7 @@ export const OmniChatBar: React.FC = () => {
             topic: sanitizedTopic,
             title: sanitizedTitle,
             initialPrompt: text,
-            dbSchemas: response.payload?.db_schema as any[],
+            dbSchemas: mergedDbSchemas.length > 0 ? mergedDbSchemas : undefined,
             formulas: response.payload?.formulas as any[],
             valueAdd: response.payload?.value_add as string[],
             complexity: response.payload?.complexity as string
@@ -739,14 +801,14 @@ export const OmniChatBar: React.FC = () => {
         setTimeout(() => {
           setCurrentView('builder');
         }, 400);
-      } else if (response.intent === 'DEVLAB') {
+      } else if (effectiveIntent === 'DEVLAB') {
         receipts = buildReceipts('DEVLAB');
         if (response.payload?.sheetsData) {
           try {
             localStorage.setItem('office_sheets_data', JSON.stringify(response.payload.sheetsData));
           } catch {}
         }
-        if (response.redirect_url === '/devlab') {
+        if (response.redirect_url === '/devlab' && !isBuilderChipActive && !hasFileAttachment && !isTemplateRelated) {
           setTimeout(() => {
             setCurrentView('devlab');
             showToast('📊 스마트 시트 라이브 캔버스로 자동 전환되었습니다.', 'info');

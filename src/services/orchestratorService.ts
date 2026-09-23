@@ -31,7 +31,8 @@ export async function sendToOrchestrator(
   history: ChatMessage[] = [],
   apiKey?: string,
   userEmail?: string,
-  model?: GeminiModelType
+  model?: GeminiModelType,
+  currentMode?: string
 ): Promise<OrchestratorResponse> {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -46,10 +47,14 @@ export async function sendToOrchestrator(
   if (model) {
     headers['x-gemini-model'] = model;
   }
+  if (currentMode) {
+    headers['x-current-mode'] = currentMode;
+  }
 
   const payload = {
     text,
     model: model || 'auto',
+    current_mode: currentMode || 'builder',
     conversation_history: history.slice(-6).map((h) => ({
       role: h.role,
       content: h.content,
@@ -78,16 +83,18 @@ export async function sendToOrchestrator(
   }
 
   // 로컬 Vite dev server에서 API 라우트 프록시가 없는 경우 /api/gemini 프록시 활용 폴백
-  return fallbackClientOrchestration(text, apiKey, userEmail);
+  return fallbackClientOrchestration(text, apiKey, userEmail, currentMode);
 }
 
 // 클라이언트 사이드 보조 오케스트레이션 (네트워크/Vite 로컬 개발 안전망)
 async function fallbackClientOrchestration(
   userText: string,
   _apiKey?: string,
-  _userEmail?: string
+  _userEmail?: string,
+  currentMode?: string
 ): Promise<OrchestratorResponse> {
   // 첨부 문서 데이터 블록 분리 및 순수 사용자 텍스트 추출
+  const hasAttachment = userText.includes('[ATTACHED_DOCUMENT_DATA]');
   let pureUserText = userText
     .replace(/\[ATTACHED_DOCUMENT_DATA\][\s\S]*?\[\/ATTACHED_DOCUMENT_DATA\]/gi, '')
     .replace(/\[첨부:[^\]]*\]/gi, '')
@@ -130,7 +137,7 @@ async function fallbackClientOrchestration(
         });
 
         attachedDbSchemas = [{
-          db_name: '📊 첨부 파일 원본 데이터 마스터 DB',
+          db_name: '📋 첨부 데이터 점검 및 운영 마스터 DB',
           properties,
           sample_rows: sampleRows.length > 0 ? sampleRows : undefined
         }];
@@ -141,9 +148,43 @@ async function fallbackClientOrchestration(
   const queryText = pureUserText || userText;
   const lower = queryText.toLowerCase();
 
-  
+  // [🚨 절대 원칙: 템플릿 마스터 우선주의 및 오피스 오라우팅 원천 차단]
+  // 사용자가 템플릿 칩 활성 상태이거나, 파일 첨부 시, 또는 템플릿/노션/DB/시설 키워드 포함 시 무조건 BUILDER로 직행
+  const isBuilderMode = currentMode === 'builder';
+  const hasBuilderKeywords = 
+    lower.includes('템플릿') || lower.includes('노션') || lower.includes('db') || 
+    lower.includes('데이터베이스') || lower.includes('빌더') || lower.includes('대시보드') || 
+    lower.includes('시설') || lower.includes('객실') || lower.includes('하자') || 
+    lower.includes('아덴힐') || lower.includes('체크리스트') || lower.includes('자격증') || 
+    lower.includes('수험생') || lower.includes('공부') || lower.includes('시험') || 
+    lower.includes('오답') || lower.includes('합격');
 
-  // 0. 웹 크롤러 수급 파이프라인 감지 (긁어서, 크롤링, 리뷰, 스크래핑, 쿠팡, 데이터 수집)
+  if (isBuilderMode || hasAttachment || hasBuilderKeywords) {
+    const isCertification = lower.includes('자격증') || lower.includes('수험생') || lower.includes('시험') || lower.includes('공부') || lower.includes('오답노트');
+    const cleanTopicTitle = sanitizeTemplateTitle(queryText);
+
+    return {
+      intent: 'BUILDER',
+      reply_message: isCertification
+        ? `🎯 [자격증/수험생 올인원 합격 스케줄러] 템플릿 제작을 시작했습니다! 템플릿 빌더 라이브 캔버스에 결과물이 즉시 투영되었습니다.`
+        : hasAttachment
+        ? `✨ [${cleanTopicTitle}] 템플릿 제작 완결! 첨부하신 엑셀 데이터를 정밀 분석하여 노션 마스터 DB 스키마와 샘플 데이터 1~2행을 캔버스에 즉각 렌더링했습니다.`
+        : `"${cleanTopicTitle}" 템플릿 제작을 시작할게요! 템플릿 빌더 작업실로 안내해 드립니다.`,
+      needs_clarification: false,
+      redirect_url: '/builder',
+      payload: {
+        preset_key: isCertification ? 'certification_exam' : 'custom',
+        template_topic: cleanTopicTitle,
+        suggested_title: isCertification ? '자격증/수험생 올인원 합격 스케줄러 & 오답노트' : cleanTopicTitle,
+        title: cleanTopicTitle,
+        complexity: 'intermediate',
+        initial_prompt: cleanTopicTitle,
+        ...(attachedDbSchemas ? { db_schema: attachedDbSchemas } : {}),
+      },
+    };
+  }
+
+  // 0. 웹 크롤러 수급 파이프라인 감지
   if (
     lower.includes('긁어서') || lower.includes('크롤링') || lower.includes('리뷰') || 
     lower.includes('스크래핑') || lower.includes('쿠팡') || lower.includes('수집')
@@ -168,7 +209,8 @@ async function fallbackClientOrchestration(
       },
     };
   }
-  // 0.5. 노션 마스터 DB 내보내기/동기화 자연어 감지 (노션 db로 보내, 노션으로 전송, 노션 적재, 노션 동기화)
+
+  // 0.5. 노션 마스터 DB 내보내기/동기화 자연어 감지
   if (
     lower.includes('노션 db') || lower.includes('노션으로') || 
     lower.includes('노션 적재') || lower.includes('노션 동기화') || lower.includes('노션 전송')
@@ -196,11 +238,10 @@ async function fallbackClientOrchestration(
     };
   }
 
-  // 1. AI 오피스 스튜디오 듀얼 엔진 키워드 감지 (기안서, 품의서, 지출결의서, 주간보고, 제안서, 문서, 슬라이드, 시트)
+  // 1. AI 오피스 스튜디오 듀얼 엔진 키워드 감지 (명시적 문서 양식 요청 시에만 한정)
   if (
-    lower.includes('기안') || lower.includes('품의') || lower.includes('지출결의') || 
-    lower.includes('주간보고') || lower.includes('제안서') || lower.includes('보고서') || 
-    lower.includes('독스') || lower.includes('시트') || lower.includes('슬라이드') || lower.includes('양식')
+    lower.includes('기안서') || lower.includes('품의서') || lower.includes('지출결의서') || 
+    lower.includes('주간보고') || lower.includes('슬라이드') || lower.includes('발표자료') || lower.includes('장표')
   ) {
     const officePayload = processOfficeOrchestration(userText);
     return {
@@ -212,33 +253,6 @@ async function fallbackClientOrchestration(
     };
   }
 
-  // 2. 템플릿 빌더 & 수험생/자격증 템플릿 감지 (Title Sanitizer 엄격 적용)
-  if (
-    lower.includes('템플릿') || lower.includes('빌더') || lower.includes('대시보드') || lower.includes('노션 페이지') ||
-    lower.includes('자격증') || lower.includes('수험생') || lower.includes('공부') || lower.includes('시험') || lower.includes('오답노트') || lower.includes('합격') ||
-    lower.includes('시설') || lower.includes('객실') || lower.includes('하자') || lower.includes('아덴힐')
-  ) {
-    const isCertification = lower.includes('자격증') || lower.includes('수험생') || lower.includes('시험') || lower.includes('공부') || lower.includes('오답노트');
-    const cleanTopicTitle = sanitizeTemplateTitle(queryText);
-
-    return {
-      intent: 'BUILDER',
-      reply_message: isCertification
-        ? `🎯 [자격증/수험생 올인원 합격 스케줄러] 템플릿 제작을 시작했습니다! 템플릿 빌더 라이브 캔버스에 결과물이 즉시 투영되었습니다.`
-        : `"${cleanTopicTitle}" 템플릿 제작을 시작할게요! 템플릿 빌더 작업실로 안내해 드립니다.`,
-      needs_clarification: false,
-      redirect_url: '/builder',
-      payload: {
-        preset_key: isCertification ? 'certification_exam' : 'custom',
-        template_topic: cleanTopicTitle,
-        suggested_title: isCertification ? '자격증/수험생 올인원 합격 스케줄러 & 오답노트' : cleanTopicTitle,
-        title: cleanTopicTitle,
-        complexity: 'intermediate',
-        initial_prompt: cleanTopicTitle,
-        ...(attachedDbSchemas ? { db_schema: attachedDbSchemas } : {}),
-      },
-    };
-  }
 
   if (lower.includes('독스') || lower.includes('시트') || lower.includes('슬라이드') || lower.includes('보고서') || lower.includes('결재') || lower.includes('품의서') || lower.includes('오피스') || lower.includes('문서')) {
     const isSheets = lower.includes('시트') || lower.includes('계산') || lower.includes('지출');
