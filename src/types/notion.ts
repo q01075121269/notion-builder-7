@@ -148,6 +148,7 @@ export interface AgentBlueprint {
 
 export interface NotionTemplate {
   id?: string;
+  schema_version?: string; // [Step 5-A] 스키마 마이그레이션 호환 태그 (예: 1.0)
   title: string;
   icon: string;
   cover_query: string;
@@ -180,6 +181,7 @@ export interface CreatedNotionDatabaseInfo {
 }
 
 export interface CreatedNotionResource {
+  schema_version?: string; // [Step 5-A] 스키마 버전 태그
   pageId: string;
   pageUrl: string;
   pageTitle: string;
