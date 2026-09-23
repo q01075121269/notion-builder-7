@@ -104,7 +104,14 @@ function buildCompactHeaderBlocks(template: NotionTemplate): any[] {
   const blocks: any[] = [];
   const blueprint = template.agentBlueprint;
 
-  // 1. [Step 5-A 필수 요구사항] 최상단 [💡 1초 뷰 세팅 가이드] 및 schema_version 메타 태그
+  // 1. [Fix: 시각적 강조 및 직관적 2단계 뷰 전환 가이드] - 눈에 띄는 노란색 틴트(yellow_background)
+  const guideContent = 
+    `💡 [1초 뷰 전환 뷰어 가이드]\n` +
+    `현재 데이터베이스는 노션 API 규격상 '기본 표(Table)'로 생성되었습니다. 아래 2단계로 칸반 보드나 캘린더를 1초 만에 켜보세요!\n\n` +
+    `1️⃣ 생성된 표(Table)의 상단 제목 바로 우측에 있는 [ ▼ (기본 뷰 드롭다운)] 또는 [+ 뷰 추가] 버튼을 클릭하세요.\n` +
+    `2️⃣ 메뉴에서 [보드(Board)] 또는 [캘린더(Calendar)]를 선택하고, 그룹화 기준을 [운영 상태] 또는 [목표 일정]으로 지정하면 대시보드가 완성됩니다!\n\n` +
+    `🏷️ Schema Version: ${template.schema_version || '1.0'} (Commercial Dynamic Multi-DB Engine)`;
+
   blocks.push({
     object: 'block',
     type: 'callout',
@@ -112,82 +119,73 @@ function buildCompactHeaderBlocks(template: NotionTemplate): any[] {
       rich_text: [
         {
           type: 'text',
-          text: {
-            content: `💡 [1초 세팅 팁] 표 상단의 [+ 뷰 추가]를 누르고 '보드' 또는 '캘린더'를 선택하시면 데이터가 칸반 보드와 캘린더로 즉시 정렬됩니다.\n🏷️ Schema Version: ${template.schema_version || '1.0'} (Commercial Dynamic Multi-DB Engine)`
-          },
-          annotations: { bold: false }
+          text: { content: guideContent }
         }
       ],
       icon: { type: 'emoji', emoji: '💡' },
-      color: 'blue_background'
+      color: 'yellow_background'
     }
   });
 
-  // 2. 핵심 3줄 압축 에이전트 3.0 콜아웃
+  // 2. [Fix: 시야 확보를 위한 에이전트 3.0 상세 지침 토글화] - 대시보드 표가 한눈에 들어오도록 완벽히 접어둠
   const agentSummary = blueprint 
     ? `🤖 [노션 커스텀 에이전트 3.0 가동 관제탑]\n` +
-      `• 총괄 페르소나: ${blueprint.persona.role || '총괄 업무 PM'} (${blueprint.persona.objective || '업무 자동화'})\n` +
+      `• 페르소나: ${blueprint.persona.role || '총괄 업무 PM'} (${blueprint.persona.objective || '업무 자동화'})\n` +
       `• 복합 트리거: ${blueprint.multiTriggers.schedule || '매일 09:00'} 점검 | 상태 '불량/지연' 즉시 보고 | 슬랙/이메일 알림\n` +
       `• 워크슬롭 방지: [Done 3대 완료 기준] 통과 및 [자체 검수표] 검증 필수`
     : `🤖 [노션 커스텀 에이전트 3.0 관제 시스템 가동 중]\n` +
       `• 다중 관계형 실시간 통합 대시보드가 성공적으로 구축되었습니다.\n` +
       `• 첫 화면에 펼쳐진 인라인(Inline) 표를 통해 데이터를 실시간 조회 및 편집하세요.`;
 
-  blocks.push({
-    object: 'block',
-    type: 'callout',
-    callout: {
-      rich_text: [
-        {
-          type: 'text',
-          text: { content: agentSummary }
-        }
-      ],
-      icon: { type: 'emoji', emoji: '🤖' },
-      color: 'purple_background'
-    }
-  });
-
-  // 3. 에이전트 3.0 공식 프롬프트 복사용 접이식 토글 (기본 접힘으로 대시보드 시야 방해 금지)
-  if (blueprint && blueprint.setupPromptMarkdown) {
-    blocks.push({
+  const agentToggleChildren: any[] = [
+    {
       object: 'block',
-      type: 'toggle',
-      toggle: {
+      type: 'callout',
+      callout: {
         rich_text: [
           {
             type: 'text',
-            text: { content: '📋 [노션 공식 커스텀 에이전트 설정창 복사용 지침 (클릭하여 열기)]' },
-            annotations: { bold: true, color: 'purple' }
+            text: { content: agentSummary }
           }
         ],
-        children: [
+        icon: { type: 'emoji', emoji: '🤖' },
+        color: 'purple_background'
+      }
+    }
+  ];
+
+  if (blueprint && blueprint.setupPromptMarkdown) {
+    agentToggleChildren.push({
+      object: 'block',
+      type: 'paragraph',
+      paragraph: {
+        rich_text: [
           {
-            object: 'block',
-            type: 'paragraph',
-            paragraph: {
-              rich_text: [
-                {
-                  type: 'text',
-                  text: { content: (blueprint.setupPromptMarkdown || '').slice(0, 1950) }
-                }
-              ]
-            }
+            type: 'text',
+            text: { content: (blueprint.setupPromptMarkdown || '').slice(0, 1950) }
           }
         ]
       }
     });
   }
 
-  // 4. 대시보드 구분선 및 인라인 헤딩
-  blocks.push({ object: 'block', type: 'divider', divider: {} });
   blocks.push({
     object: 'block',
-    type: 'heading_2',
-    heading_2: {
-      rich_text: [{ type: 'text', text: { content: '📊 실시간 통합 인라인 대시보드 (Live Inline Dashboard)' } }]
+    type: 'toggle',
+    toggle: {
+      rich_text: [
+        {
+          type: 'text',
+          text: { content: '🤖 [노션 커스텀 에이전트 3.0 가동 지침 및 공식 프롬프트 (클릭하여 열기)]' },
+          annotations: { bold: true, color: 'purple' }
+        }
+      ],
+      children: agentToggleChildren
     }
   });
+
+  // 3. 대시보드 구분선 (인라인 표로 바로 직결)
+  blocks.push({ object: 'block', type: 'divider', divider: {} });
 
   return blocks;
 }
