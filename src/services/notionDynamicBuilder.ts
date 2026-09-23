@@ -38,7 +38,7 @@ export function sanitizeTemplateTitle(rawInput: string, topic?: string): string 
     lowerCombined.includes('입주자') ||
     (lowerCombined.includes('주민') && (lowerCombined.includes('관리') || lowerCombined.includes('접수') || lowerCombined.includes('분쟁') || lowerCombined.includes('지원')))
   ) {
-    return '[주민 민원 & 입주자 지원] 주민 민원 종합 관리 OS';
+    return '🏢 [총괄 관제] 주민 민원 및 세대 하자 통합 관리 대시보드';
   }
 
   // [Hotfix 1: 특정 도메인 및 파일명 키워드 우선 고정 매핑 (Fail-Safe)]
@@ -71,7 +71,7 @@ export function sanitizeTemplateTitle(rawInput: string, topic?: string): string 
   // 오염되었거나 텍스트가 30자 이상으로 길면 즉시 폐기 후 도메인 추론 fallback 가동
   if (isContaminated || text.length > 30) {
     if (lowerCombined.includes('민원') || lowerCombined.includes('소음') || lowerCombined.includes('누수') || lowerCombined.includes('주민')) {
-      return '[주민 민원 & 입주자 지원] 주민 민원 종합 관리 OS';
+      return '🏢 [총괄 관제] 주민 민원 및 세대 하자 통합 관리 대시보드';
     }
     if (lowerCombined.includes('검침') || lowerCombined.includes('계량기') || lowerCombined.includes('에너지')) {
       return '[원격검침 & 시설 관제] 실시간 검침 모니터링 관리 OS';
@@ -130,7 +130,7 @@ export function sanitizeTemplateTitle(rawInput: string, topic?: string): string 
 
   // 도메인별 고품격 공식 타이틀 포맷팅
   if (lower.includes('민원') || lower.includes('소음') || lower.includes('누수') || lower.includes('주민')) {
-    return '[주민 민원 & 입주자 지원] 주민 민원 종합 관리 OS';
+    return '🏢 [총괄 관제] 주민 민원 및 세대 하자 통합 관리 대시보드';
   }
   if (lower.includes('검침') || lower.includes('계량기') || lower.includes('에너지')) {
     return '[원격검침 & 시설 관제] 실시간 검침 모니터링 관리 OS';
@@ -171,7 +171,7 @@ export function getDomainEcoDatabases(domainOrTopic: string, title: string): Not
   if (t.includes('민원') || t.includes('소음') || t.includes('누수') || t.includes('세대간') || t.includes('입주자') || t.includes('주민')) {
     return [
       {
-        name: '📋 주민 민원 접수 및 처리 마스터 DB',
+        name: '📋 [DB 1] 일반 민원 접수·조치 일지',
         description: '입주민 민원 접수부터 현장 점검, 중재 및 최종 처리 결과를 원스톱으로 관리하는 마스터 DB',
         view_type: 'table',
         properties: [
@@ -181,8 +181,8 @@ export function getDomainEcoDatabases(domainOrTopic: string, title: string): Not
           { name: '발생 동/호수', type: 'text' },
           { name: '처리 상태', type: 'status', options: ['접수 완료', '현장 확인 중', '중재/조치 중', '처리 완료 ✅'] },
           { name: '담당 관리자', type: 'person' },
-          { name: '누수 점검 연계', type: 'relation', target: '💧 세대 누수 및 하자 정밀 점검 DB' },
-          { name: '소음 중재 연계', type: 'relation', target: '🔇 층간소음 분쟁 중재 및 관리 DB' },
+          { name: '누수 점검 연계', type: 'relation', target: '💧 [DB 3] 세대 누수 및 하자보수 관리 DB' },
+          { name: '소음 중재 연계', type: 'relation', target: '🔇 [DB 2] 세대간 층간소음 중재 관리 DB' },
           { 
             name: '조치 소요기간(수식)', 
             type: 'formula', 
@@ -198,7 +198,7 @@ export function getDomainEcoDatabases(domainOrTopic: string, title: string): Not
         ]
       },
       {
-        name: '💧 세대 누수 및 하자 정밀 점검 DB',
+        name: '💧 [DB 3] 세대 누수 및 하자보수 관리 DB',
         description: '세대 내 배관 파손, 방수층 균열 등 누수 피해 원인 규명 및 하자보수 합의 이력을 추적하는 정밀 점검 DB',
         view_type: 'table',
         properties: [
@@ -210,7 +210,7 @@ export function getDomainEcoDatabases(domainOrTopic: string, title: string): Not
           { name: '보수 상태', type: 'status', options: ['원인 조사 중', '견적/합의 중', '보수 공사 중', '하자보수 완료 ✅'] },
           { name: '예상/발생 비용(원)', type: 'number' },
           { name: '점검 책임자', type: 'person' },
-          { name: '연관 민원 기록', type: 'relation', target: '📋 주민 민원 접수 및 처리 마스터 DB' },
+          { name: '연관 민원 기록', type: 'relation', target: '📋 [DB 1] 일반 민원 접수·조치 일지' },
           { name: 'Quality_Status', type: 'select', options: ['초안', '검수 중', '승인', '반려'] },
           { name: 'Verified', type: 'checkbox' }
         ],
@@ -220,7 +220,7 @@ export function getDomainEcoDatabases(domainOrTopic: string, title: string): Not
         ]
       },
       {
-        name: '🔇 층간소음 분쟁 중재 및 관리 DB',
+        name: '🔇 [DB 2] 세대간 층간소음 중재 관리 DB',
         description: '세대 간 소음 갈등 완화를 위한 차수별 방문 상담, 소음방지매트 지원 및 중재 합의를 관리하는 분쟁 케어 DB',
         view_type: 'table',
         properties: [
@@ -232,7 +232,7 @@ export function getDomainEcoDatabases(domainOrTopic: string, title: string): Not
           { name: '중재 진행 차수', type: 'select', options: ['1차 유선 안내/주의 권고', '2차 방문 면담/완충재 지원', '3차 층간소음위원회 중재', '분쟁조정위원회 이첩'] },
           { name: '중재 상태', type: 'status', options: ['접수/상담 중', '양측 면담 완료', '소음방지매트 설치합의', '중재 합의 완료 ✅'] },
           { name: '중재 담당자', type: 'person' },
-          { name: '연관 민원 기록', type: 'relation', target: '📋 주민 민원 접수 및 처리 마스터 DB' },
+          { name: '연관 민원 기록', type: 'relation', target: '📋 [DB 1] 일반 민원 접수·조치 일지' },
           { name: 'Quality_Status', type: 'select', options: ['초안', '검수 중', '승인', '반려'] },
           { name: 'Verified', type: 'checkbox' }
         ],

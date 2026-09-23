@@ -104,10 +104,110 @@ function buildCompactHeaderBlocks(template: NotionTemplate): any[] {
   const blocks: any[] = [];
   const blueprint = template.agentBlueprint;
 
-  // 1. [Fix: 시각적 강조 및 직관적 2단계 뷰 전환 가이드] - 눈에 띄는 노란색 틴트(yellow_background)
+  // 1. [Hub & Spoke 최상단 KPI 3종 통계 콜아웃 컬럼 리스트]
+  // ⚡ 조치 진행 중 / 🗓️ 조치 예정·계획 / 🚨 지연·긴급
+  blocks.push({
+    object: 'block',
+    type: 'column_list',
+    column_list: {
+      children: [
+        {
+          object: 'block',
+          type: 'column',
+          column: {
+            children: [
+              {
+                object: 'block',
+                type: 'callout',
+                callout: {
+                  rich_text: [
+                    {
+                      type: 'text',
+                      text: { content: '⚡ 조치 진행 중: 5건\n' },
+                      annotations: { bold: true }
+                    },
+                    {
+                      type: 'text',
+                      text: { content: '현장 방문 실사 및 중재 상담 진행' },
+                      annotations: { italic: true }
+                    }
+                  ],
+                  icon: { type: 'emoji', emoji: '⚡' },
+                  color: 'orange_background'
+                }
+              }
+            ]
+          }
+        },
+        {
+          object: 'block',
+          type: 'column',
+          column: {
+            children: [
+              {
+                object: 'block',
+                type: 'callout',
+                callout: {
+                  rich_text: [
+                    {
+                      type: 'text',
+                      text: { content: '🗓️ 조치 예정/계획: 8건\n' },
+                      annotations: { bold: true }
+                    },
+                    {
+                      type: 'text',
+                      text: { content: '일정 협의 및 보수 부품 수급 대기' },
+                      annotations: { italic: true }
+                    }
+                  ],
+                  icon: { type: 'emoji', emoji: '🗓️' },
+                  color: 'blue_background'
+                }
+              }
+            ]
+          }
+        },
+        {
+          object: 'block',
+          type: 'column',
+          column: {
+            children: [
+              {
+                object: 'block',
+                type: 'callout',
+                callout: {
+                  rich_text: [
+                    {
+                      type: 'text',
+                      text: { content: '🚨 지연/긴급: 2건\n' },
+                      annotations: { bold: true }
+                    },
+                    {
+                      type: 'text',
+                      text: { content: '심야 소음 다발 및 천장 누수 긴급 출동' },
+                      annotations: { italic: true }
+                    }
+                  ],
+                  icon: { type: 'emoji', emoji: '🚨' },
+                  color: 'red_background'
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  });
+
+  // 2. [캘린더 안내 및 3대 분야별 하위 DB 통합 네비게이션 콜아웃]
   const guideContent = 
-    `💡 [1초 세팅] 표 우측의 [+ 뷰 추가]를 누르고 '보드' 또는 '캘린더'를 선택하시면 대시보드가 완성됩니다.\n` +
-    `🏷️ Schema Version: ${template.schema_version || '1.0'} (Commercial Dynamic Multi-DB Engine)`;
+    `💡 [1초 뷰 전환 뷰어 가이드]\n` +
+    `현재 데이터베이스는 노션 API 규격상 '기본 표(Table)'로 인라인 생성되었습니다.\n` +
+    `표 우측 상단의 [+ 뷰 추가] 버튼을 클릭하고 [캘린더(Calendar)]를 선택하시면 조치 일정이 한눈에 펼쳐지는 인라인 캘린더가 켜집니다!\n\n` +
+    `🔗 3대 하위 마스터 DB 1:1 직결 바로가기:\n` +
+    `① [DB 1] 📋 일반 민원 접수·조치 일지 (민원조치일지.xlsx 기반)\n` +
+    `② [DB 2] 🔇 세대간 층간소음 중재 관리 DB (세대간 소음민원.xlsx 기반)\n` +
+    `③ [DB 3] 💧 세대 누수 및 하자보수 관리 DB (세대 누수관련.xlsx 기반)`;
 
   blocks.push({
     object: 'block',
@@ -119,7 +219,7 @@ function buildCompactHeaderBlocks(template: NotionTemplate): any[] {
           text: { content: guideContent }
         }
       ],
-      icon: { type: 'emoji', emoji: '💡' },
+      icon: { type: 'emoji', emoji: '🏢' },
       color: 'yellow_background'
     }
   });

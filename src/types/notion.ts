@@ -23,7 +23,7 @@ export interface NotionProperty {
 export interface NotionDatabase {
   name: string;
   description?: string;
-  view_type?: 'table' | 'board' | 'calendar' | 'gallery';
+  view_type?: 'table' | 'board' | 'calendar' | 'gallery' | 'list' | 'dashboard';
   properties: NotionProperty[];
   sample_rows?: Array<Record<string, any>>;
 }

@@ -785,12 +785,13 @@ export const OmniChatBar: React.FC = () => {
 
                 let cleanDbName = `📋 ${file.name.replace(/\.[^.]+$/, '')} 마스터 DB`;
                 const lowerFileName = (file.name + ' ' + rawCols.join(' ')).toLowerCase();
-                if (lowerFileName.includes('민원')) {
-                  cleanDbName = '📋 주민 민원 접수 및 처리 마스터 DB';
-                } else if (lowerFileName.includes('누수')) {
-                  cleanDbName = '💧 세대 누수 및 하자 정밀 점검 DB';
-                } else if (lowerFileName.includes('소음')) {
-                  cleanDbName = '🔇 층간소음 분쟁 중재 및 관리 DB';
+                // [중요: '소음|층간'을 최우선 판별하여 소음민원이 '민원'에 가로채이지 않도록 함]
+                if (/소음|층간/i.test(lowerFileName)) {
+                  cleanDbName = '🔇 [DB 2] 세대간 층간소음 중재 관리 DB';
+                } else if (/누수|하자|방수/i.test(lowerFileName)) {
+                  cleanDbName = '💧 [DB 3] 세대 누수 및 하자보수 관리 DB';
+                } else if (/민원|조치|일지|접수/i.test(lowerFileName)) {
+                  cleanDbName = '📋 [DB 1] 일반 민원 접수·조치 일지';
                 } else if (lowerFileName.includes('검침')) {
                   cleanDbName = '⚡ 원격검침 실시간 모니터링 관리 DB';
                 } else if (lowerFileName.includes('ardenhill') || lowerFileName.includes('아덴힐')) {
