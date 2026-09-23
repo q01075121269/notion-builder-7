@@ -20,14 +20,30 @@ import {
   User,
   Hash,
   Info,
-  Sparkles
+  Sparkles,
+  Edit2,
+  X
 } from 'lucide-react';
 
-interface NotionDatabaseViewProps {
+export interface NotionDatabaseViewProps {
   database: NotionDatabase;
+  dbIndex?: number;
+  onUpdateDatabaseName?: (dbIndex: number, newName: string) => void;
+  onUpdatePropertyName?: (dbIndex: number, propIndex: number, newName: string) => void;
+  onUpdatePropertyType?: (dbIndex: number, propIndex: number, newType: NotionPropertyType) => void;
+  onDeleteProperty?: (dbIndex: number, propIndex: number) => void;
+  onAddProperty?: (dbIndex: number) => void;
 }
 
-export const NotionDatabaseView: React.FC<NotionDatabaseViewProps> = ({ database }) => {
+export const NotionDatabaseView: React.FC<NotionDatabaseViewProps> = ({ 
+  database,
+  dbIndex,
+  onUpdateDatabaseName,
+  onUpdatePropertyName,
+  onUpdatePropertyType,
+  onDeleteProperty,
+  onAddProperty
+}) => {
   const { recentModifications } = useApp();
   const initialView = (database.view_type === 'board' || database.view_type === 'calendar') 
     ? database.view_type 
@@ -37,14 +53,26 @@ export const NotionDatabaseView: React.FC<NotionDatabaseViewProps> = ({ database
   const [isAddingRow, setIsAddingRow] = useState<boolean>(false);
   const [newTitle, setNewTitle] = useState<string>('');
 
+  // DB명 인라인 편집
+  const [isEditingDbName, setIsEditingDbName] = useState(false);
+  const [editingDbName, setEditingDbName] = useState(database.name);
+
   // 템플릿 변경이나 부분 수정으로 sample_rows가 업데이트되면 즉시 동기화
   useEffect(() => {
     if (database.sample_rows && database.sample_rows.length > 0) {
       setRows(database.sample_rows);
     }
+    setEditingDbName(database.name);
   }, [database]);
 
   const titleProp = database.properties.find(p => p.type === 'title') || database.properties[0];
+
+  const handleSaveDbName = () => {
+    if (editingDbName.trim() && onUpdateDatabaseName && dbIndex !== undefined) {
+      onUpdateDatabaseName(dbIndex, editingDbName.trim());
+    }
+    setIsEditingDbName(false);
+  };
 
   const handleAddRow = () => {
     if (!newTitle.trim()) return;
@@ -71,10 +99,35 @@ export const NotionDatabaseView: React.FC<NotionDatabaseViewProps> = ({ database
       <div className="px-4 pt-3 pb-2 border-b border-neutral-100 dark:border-neutral-800/80 bg-neutral-50/50 dark:bg-neutral-900/30">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
           <div>
-            <h3 className="font-bold text-base text-neutral-900 dark:text-neutral-100 flex items-center space-x-2">
-              <span>🗄️</span>
-              <span>{database.name}</span>
-            </h3>
+            {isEditingDbName ? (
+              <input
+                type="text"
+                value={editingDbName}
+                onChange={(e) => setEditingDbName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleSaveDbName();
+                  if (e.key === 'Escape') setIsEditingDbName(false);
+                }}
+                onBlur={handleSaveDbName}
+                autoFocus
+                className="font-bold text-base px-2 py-0.5 rounded bg-white dark:bg-slate-900 border border-purple-500 text-slate-900 dark:text-white ring-1 ring-purple-500"
+              />
+            ) : (
+              <h3 
+                onClick={() => {
+                  if (onUpdateDatabaseName && dbIndex !== undefined) {
+                    setIsEditingDbName(true);
+                    setEditingDbName(database.name);
+                  }
+                }}
+                className="font-bold text-base text-neutral-900 dark:text-neutral-100 flex items-center space-x-2 group cursor-pointer"
+                title="클릭하여 데이터베이스 명칭 변경"
+              >
+                <span>🗄️</span>
+                <span className="group-hover:text-purple-600 dark:group-hover:text-purple-400">{database.name}</span>
+                <Edit2 className="w-3 h-3 text-slate-400 opacity-0 group-hover:opacity-100 transition" />
+              </h3>
+            )}
             {database.description && (
               <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
                 {database.description}
@@ -102,7 +155,7 @@ export const NotionDatabaseView: React.FC<NotionDatabaseViewProps> = ({ database
         <div className="flex items-center space-x-1 -mb-2 border-b border-transparent">
           <button
             onClick={() => setActiveView('table')}
-            className={`flex items-center space-x-1.5 px-3 py-1.5 text-xs font-medium border-b-2 transition ${
+            className={`flex items-center space-x-1.5 px-3 py-1.5 text-xs font-medium border-b-2 transition cursor-pointer ${
               activeView === 'table'
                 ? 'border-neutral-900 text-neutral-900 dark:border-neutral-100 dark:text-neutral-100'
                 : 'border-transparent text-neutral-500 hover:text-neutral-700 dark:text-neutral-400'
@@ -113,7 +166,7 @@ export const NotionDatabaseView: React.FC<NotionDatabaseViewProps> = ({ database
           </button>
           <button
             onClick={() => setActiveView('board')}
-            className={`flex items-center space-x-1.5 px-3 py-1.5 text-xs font-medium border-b-2 transition ${
+            className={`flex items-center space-x-1.5 px-3 py-1.5 text-xs font-medium border-b-2 transition cursor-pointer ${
               activeView === 'board'
                 ? 'border-neutral-900 text-neutral-900 dark:border-neutral-100 dark:text-neutral-100'
                 : 'border-transparent text-neutral-500 hover:text-neutral-700 dark:text-neutral-400'
@@ -124,7 +177,7 @@ export const NotionDatabaseView: React.FC<NotionDatabaseViewProps> = ({ database
           </button>
           <button
             onClick={() => setActiveView('calendar')}
-            className={`flex items-center space-x-1.5 px-3 py-1.5 text-xs font-medium border-b-2 transition ${
+            className={`flex items-center space-x-1.5 px-3 py-1.5 text-xs font-medium border-b-2 transition cursor-pointer ${
               activeView === 'calendar'
                 ? 'border-neutral-900 text-neutral-900 dark:border-neutral-100 dark:text-neutral-100'
                 : 'border-transparent text-neutral-500 hover:text-neutral-700 dark:text-neutral-400'
@@ -149,6 +202,11 @@ export const NotionDatabaseView: React.FC<NotionDatabaseViewProps> = ({ database
             setNewTitle={setNewTitle}
             handleAddRow={handleAddRow}
             recentProps={recentModifications.propertyNames}
+            dbIndex={dbIndex}
+            onUpdatePropertyName={onUpdatePropertyName}
+            onUpdatePropertyType={onUpdatePropertyType}
+            onDeleteProperty={onDeleteProperty}
+            onAddProperty={onAddProperty}
           />
         )}
         {activeView === 'board' && (
@@ -163,7 +221,7 @@ export const NotionDatabaseView: React.FC<NotionDatabaseViewProps> = ({ database
       {activeView === 'table' && !isAddingRow && (
         <button
           onClick={() => setIsAddingRow(true)}
-          className="w-full flex items-center space-x-1.5 px-4 py-2.5 text-xs font-medium text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100 hover:bg-neutral-50 dark:hover:bg-neutral-800/50 border-t border-neutral-100 dark:border-neutral-800 transition"
+          className="w-full flex items-center space-x-1.5 px-4 py-2.5 text-xs font-medium text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100 hover:bg-neutral-50 dark:hover:bg-neutral-800/50 border-t border-neutral-100 dark:border-neutral-800 transition cursor-pointer"
         >
           <Plus className="w-3.5 h-3.5" />
           <span>새로 만들기</span>
@@ -173,7 +231,7 @@ export const NotionDatabaseView: React.FC<NotionDatabaseViewProps> = ({ database
   );
 };
 
-// 1. Table View Component with NEW/UPDATED Highlight
+// 1. Table View Component with Inline Column Edit
 const TableView: React.FC<{
   database: NotionDatabase;
   rows: Array<Record<string, any>>;
@@ -184,6 +242,11 @@ const TableView: React.FC<{
   setNewTitle: (v: string) => void;
   handleAddRow: () => void;
   recentProps: string[];
+  dbIndex?: number;
+  onUpdatePropertyName?: (dbIndex: number, propIndex: number, newName: string) => void;
+  onUpdatePropertyType?: (dbIndex: number, propIndex: number, newType: NotionPropertyType) => void;
+  onDeleteProperty?: (dbIndex: number, propIndex: number) => void;
+  onAddProperty?: (dbIndex: number) => void;
 }> = ({ 
   database, 
   rows, 
@@ -193,24 +256,70 @@ const TableView: React.FC<{
   newTitle, 
   setNewTitle, 
   handleAddRow,
-  recentProps 
+  recentProps,
+  dbIndex,
+  onUpdatePropertyName,
+  onDeleteProperty,
+  onAddProperty
 }) => {
+  const [editingPropIdx, setEditingPropIdx] = useState<number | null>(null);
+  const [editingPropName, setEditingPropName] = useState<string>('');
+
+  const startEditProp = (idx: number, name: string) => {
+    if (onUpdatePropertyName && dbIndex !== undefined) {
+      setEditingPropIdx(idx);
+      setEditingPropName(name);
+    }
+  };
+
+  const saveProp = (idx: number) => {
+    if (editingPropName.trim() && onUpdatePropertyName && dbIndex !== undefined) {
+      onUpdatePropertyName(dbIndex, idx, editingPropName.trim());
+    }
+    setEditingPropIdx(null);
+  };
+
   return (
     <table className="w-full text-left text-xs border-collapse">
       <thead>
         <tr className="border-b border-neutral-200 dark:border-neutral-800 bg-neutral-50/70 dark:bg-neutral-900/40 text-neutral-500 dark:text-neutral-400">
           {database.properties.map((prop, idx) => {
             const isModified = recentProps.includes(prop.name);
+            const isEditing = editingPropIdx === idx;
+
             return (
               <th 
                 key={idx} 
-                className={`py-2.5 px-3 font-medium whitespace-nowrap border-r border-neutral-100 dark:border-neutral-800/80 transition-colors ${
+                className={`py-2.5 px-3 font-medium whitespace-nowrap border-r border-neutral-100 dark:border-neutral-800/80 transition-colors group ${
                   isModified ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 font-bold' : ''
                 }`}
               >
                 <div className="flex items-center space-x-1.5">
                   <PropertyTypeIcon type={prop.type} />
-                  <span>{prop.name}</span>
+                  
+                  {isEditing ? (
+                    <input
+                      type="text"
+                      value={editingPropName}
+                      onChange={(e) => setEditingPropName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') saveProp(idx);
+                        if (e.key === 'Escape') setEditingPropIdx(null);
+                      }}
+                      onBlur={() => saveProp(idx)}
+                      autoFocus
+                      className="px-1 py-0.5 text-xs font-semibold rounded bg-white dark:bg-slate-900 border border-purple-500 text-slate-900 dark:text-white"
+                    />
+                  ) : (
+                    <span 
+                      onClick={() => startEditProp(idx, prop.name)}
+                      className="cursor-pointer hover:text-purple-600 dark:hover:text-purple-400 transition"
+                      title="클릭하여 속성명 변경"
+                    >
+                      {prop.name}
+                    </span>
+                  )}
+
                   {prop.type === 'formula' && (
                     <span 
                       title="무손실 업그레이드로 추가된 Formulas 2.0 수식입니다" 
@@ -233,12 +342,37 @@ const TableView: React.FC<{
                       <Info className="w-3 h-3" />
                     </span>
                   )}
+
+                  {/* 삭제 버튼 */}
+                  {prop.type !== 'title' && onDeleteProperty && dbIndex !== undefined && (
+                    <button
+                      type="button"
+                      onClick={() => onDeleteProperty(dbIndex, idx)}
+                      className="opacity-0 group-hover:opacity-100 p-0.5 text-slate-400 hover:text-red-500 rounded transition ml-1 cursor-pointer"
+                      title="속성 삭제"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  )}
                 </div>
               </th>
             );
           })}
+          
+          {/* 새 컬럼(속성) 추가 헤더 버튼 */}
           <th className="w-10 py-2.5 px-2 text-center text-neutral-400">
-            <Plus className="w-3.5 h-3.5 mx-auto" />
+            {onAddProperty && dbIndex !== undefined ? (
+              <button
+                type="button"
+                onClick={() => onAddProperty(dbIndex)}
+                className="p-1 rounded-md text-purple-600 dark:text-purple-400 hover:bg-purple-100 dark:hover:bg-purple-900/50 transition cursor-pointer"
+                title="새 속성 추가"
+              >
+                <Plus className="w-3.5 h-3.5 mx-auto" />
+              </button>
+            ) : (
+              <Plus className="w-3.5 h-3.5 mx-auto" />
+            )}
           </th>
         </tr>
       </thead>
@@ -287,7 +421,7 @@ const TableView: React.FC<{
               </td>
             ))}
             <td className="w-10 text-center">
-              <button onClick={handleAddRow} className="text-xs text-blue-600 font-bold hover:underline">
+              <button onClick={handleAddRow} className="text-xs text-blue-600 font-bold hover:underline cursor-pointer">
                 추가
               </button>
             </td>
@@ -328,20 +462,26 @@ const BoardView: React.FC<{
             </div>
 
             <div className="space-y-2">
-              {colRows.map((item, rIdx) => (
-                <div key={rIdx} className="p-3 bg-white dark:bg-notion-dark-card border border-neutral-200 dark:border-neutral-700/80 rounded-md shadow-xs space-y-2">
-                  <div className="font-semibold text-xs text-neutral-900 dark:text-neutral-100">
-                    {item[titleProp.name] || '제목 없음'}
+              {colRows.map((row, rIdx) => (
+                <div key={rIdx} className="p-3 bg-white dark:bg-neutral-800 rounded-md shadow-2xs border border-neutral-200/80 dark:border-neutral-700/80 text-xs">
+                  <div className="font-semibold text-neutral-900 dark:text-neutral-100 mb-1.5">
+                    {row[titleProp.name] || '제목 없음'}
                   </div>
-                  <div className="flex flex-wrap gap-1">
-                    {database.properties.filter(p => p.type === 'date' || p.type === 'formula').map((p, pIdx) => (
-                      <div key={pIdx}>
-                        <PropertyValueCell property={p} value={item[p.name]} row={item} />
+                  <div className="space-y-1">
+                    {database.properties.filter(p => p.name !== titleProp.name && p.name !== statusProp.name).slice(0, 3).map((p, pIdx) => (
+                      <div key={pIdx} className="flex items-center justify-between text-[11px] text-neutral-500 dark:text-neutral-400">
+                        <span className="truncate">{p.name}</span>
+                        <PropertyValueCell property={p} value={row[p.name]} row={row} />
                       </div>
                     ))}
                   </div>
                 </div>
               ))}
+              {colRows.length === 0 && (
+                <div className="text-[11px] text-neutral-400 py-4 text-center border border-dashed border-neutral-200 dark:border-neutral-800 rounded">
+                  항목 없음
+                </div>
+              )}
             </div>
           </div>
         );
@@ -350,51 +490,43 @@ const BoardView: React.FC<{
   );
 };
 
-// 3. Calendar View Component (달력 목업)
+// 3. Calendar View Component (월간 캘린더)
 const CalendarView: React.FC<{
   database: NotionDatabase;
   rows: Array<Record<string, any>>;
   titleProp: NotionProperty;
 }> = ({ database, rows, titleProp }) => {
-  const dateProp = database.properties.find(p => p.type === 'date') || { name: '일정', type: 'date' };
-  const formulaProps = database.properties.filter(p => p.type === 'formula');
+  const dateProp = database.properties.find(p => p.type === 'date') || { name: '날짜', type: 'date' as const };
+  const days = ['일', '월', '화', '수', '목', '금', '토'];
 
   return (
-    <div className="p-4 space-y-3">
-      <div className="flex items-center justify-between text-xs font-semibold text-neutral-600 dark:text-neutral-300">
-        <span className="flex items-center space-x-1.5">
-          <CalendarIcon className="w-4 h-4 text-blue-500" />
-          <span>캘린더 연동 타임라인 ({dateProp.name} 기준)</span>
-        </span>
-        <span className="text-[11px] text-neutral-400">일정 데이터 {rows.length}건 매핑됨</span>
+    <div className="p-4">
+      <div className="grid grid-cols-7 border-b border-neutral-200 dark:border-neutral-800 pb-2 mb-2 text-center text-xs font-semibold text-neutral-500">
+        {days.map((d, i) => (
+          <div key={i}>{d}</div>
+        ))}
       </div>
+      <div className="grid grid-cols-7 gap-1">
+        {Array.from({ length: 14 }).map((_, i) => {
+          const dayNum = i + 1;
+          const matchingRows = rows.filter(r => {
+            const val = r[dateProp.name];
+            return val && val.includes(`-${dayNum < 10 ? '0' + dayNum : dayNum}`);
+          });
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-        {rows.map((row, idx) => (
-          <div key={idx} className="p-3.5 rounded-lg border border-neutral-200 dark:border-neutral-700/80 bg-neutral-50/50 dark:bg-neutral-900/40 space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded text-[10px] font-medium bg-blue-100 dark:bg-blue-950 text-blue-800 dark:text-blue-300">
-                <Calendar className="w-3 h-3" />
-                <span>{row[dateProp.name] || '날짜 미지정'}</span>
-              </span>
-              {row['상태'] && (
-                <span className="text-[10px] px-1.5 py-0.5 rounded bg-neutral-200 dark:bg-neutral-700 text-neutral-700 dark:text-neutral-300">
-                  {row['상태']}
-                </span>
-              )}
-            </div>
-            <div className="font-semibold text-xs text-neutral-900 dark:text-white">
-              {row[titleProp.name]}
-            </div>
-            {formulaProps.length > 0 && (
-              <div className="flex flex-wrap gap-1 pt-1">
-                {formulaProps.map((fp, fIdx) => (
-                  <PropertyValueCell key={fIdx} property={fp} value={row[fp.name]} row={row} />
+          return (
+            <div key={i} className="min-h-[70px] p-1.5 border border-neutral-100 dark:border-neutral-800/80 rounded bg-white dark:bg-neutral-800/40">
+              <span className="text-[10px] font-mono text-neutral-400">{dayNum}</span>
+              <div className="mt-1 space-y-1">
+                {matchingRows.map((r, rIdx) => (
+                  <div key={rIdx} className="px-1.5 py-0.5 rounded bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 text-[10px] truncate border border-blue-200/50 dark:border-blue-900/50">
+                    {r[titleProp.name] || '일정'}
+                  </div>
                 ))}
               </div>
-            )}
-          </div>
-        ))}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -430,7 +562,6 @@ const PropertyValueCell: React.FC<{
   value: any; 
   row?: Record<string, any>;
 }> = ({ property, value, row }) => {
-  // Formula 속성인 경우 formulaEngine으로 자동 계산 및 시뮬레이션
   if (property.type === 'formula') {
     const computedVal = row 
       ? simulateFormulaValue(property.expression, row, property.name)
@@ -438,7 +569,6 @@ const PropertyValueCell: React.FC<{
 
     const strVal = String(computedVal);
 
-    // 1. 유니코드 진행률 게이지 스타일링
     if (strVal.includes('■') || strVal.includes('%')) {
       const isComplete = strVal.includes('100%') || strVal.includes('■■■■■');
       return (
@@ -456,7 +586,6 @@ const PropertyValueCell: React.FC<{
       );
     }
 
-    // 2. D-Day 계산 스타일링
     if (strVal.includes('D-') || strVal.includes('기한 초과') || strVal.includes('D-Day')) {
       const isOverdue = strVal.includes('기한 초과');
       const isToday = strVal.includes('D-Day');
@@ -477,7 +606,6 @@ const PropertyValueCell: React.FC<{
       );
     }
 
-    // 3. 기본 Formula 2.0 렌더링
     return (
       <span 
         title={property.expression ? `Formula 2.0 수식: ${property.expression}` : undefined}
@@ -508,36 +636,29 @@ const PropertyValueCell: React.FC<{
     case 'status':
       return (
         <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200/50 dark:border-emerald-900/50">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5" />
-          {String(value)}
+          <span>{String(value)}</span>
         </span>
       );
 
-    case 'relation':
+    case 'select':
       return (
-        <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded text-[11px] font-medium bg-amber-50 dark:bg-amber-950/50 text-amber-800 dark:text-amber-300 border border-amber-200/50 dark:border-amber-900/50">
-          <ArrowUpRight className="w-3 h-3" />
+        <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 border border-neutral-200/60 dark:border-neutral-700">
           <span>{String(value)}</span>
         </span>
       );
 
     case 'checkbox':
       return (
-        <input
-          type="checkbox"
-          checked={Boolean(value)}
-          readOnly
-          className="w-3.5 h-3.5 rounded border-neutral-300 text-blue-600 cursor-pointer"
+        <input 
+          type="checkbox" 
+          checked={Boolean(value)} 
+          readOnly 
+          className="rounded border-neutral-300 text-indigo-600 focus:ring-indigo-500 h-3.5 w-3.5" 
         />
       );
 
-    case 'select':
-    case 'multi_select':
-      return (
-        <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 border border-neutral-200/60 dark:border-neutral-700">
-          {String(value)}
-        </span>
-      );
+    case 'number':
+      return <span className="font-mono text-neutral-700 dark:text-neutral-300 font-medium">{Number(value).toLocaleString()}</span>;
 
     default:
       return <span>{String(value)}</span>;

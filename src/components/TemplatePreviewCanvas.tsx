@@ -1,5 +1,5 @@
-import React, { useState, useMemo } from 'react';
-import type { NotionTemplate, NotionDatabase } from '../types/notion';
+import React, { useState, useEffect } from 'react';
+import type { NotionTemplate, NotionDatabase, NotionProperty, NotionPropertyType } from '../types/notion';
 import { ResizableSplitLayout } from './ui/ResizableSplitLayout';
 import { NotionCover } from './preview/NotionCover';
 import { NotionHeader } from './preview/NotionHeader';
@@ -33,11 +33,14 @@ import {
   ChevronLeft,
   ChevronRight,
   SlidersHorizontal,
+  RotateCcw
 } from 'lucide-react';
 
 export interface TemplatePreviewCanvasProps {
   template: NotionTemplate;
 }
+
+const VAULT_STORAGE_KEY = 'notion_template_vault_draft';
 
 export const TemplatePreviewCanvas: React.FC<TemplatePreviewCanvasProps> = ({ template }) => {
   const { 
@@ -54,13 +57,224 @@ export const TemplatePreviewCanvas: React.FC<TemplatePreviewCanvasProps> = ({ te
 
   const [selectedDbId, setSelectedDbId] = useState<string | null>(null);
 
-  // [Step 3]: 에이전트 3.0 블루프린트, 품질 게이트 속성 및 Heartbeat 감사 DB 무손실 통합
-  const activeTemplate = useMemo(() => ensureTemplateAgentBlueprint(template), [template]);
+  // [Step 4] Memory Vault & 캔버스 인라인 편집기 상태 관리
+  const [editableTemplate, setEditableTemplate] = useState<NotionTemplate>(() => {
+    try {
+      const saved = localStorage.getItem(VAULT_STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && parsed.databases && parsed.databases.length > 0 && parsed.title === template.title) {
+          return ensureTemplateAgentBlueprint(parsed);
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to load draft from localStorage', e);
+    }
+    return ensureTemplateAgentBlueprint(template);
+  });
+
+  // template prop이 외부에서 완전히 변경되었을 때 (예: 다른 프리셋 선택)
+  useEffect(() => {
+    const updated = ensureTemplateAgentBlueprint(template);
+    setEditableTemplate(updated);
+  }, [template]);
+
+  // 변경 시 Memory Vault (localStorage) 자동 지속 보존
+  useEffect(() => {
+    try {
+      localStorage.setItem(VAULT_STORAGE_KEY, JSON.stringify(editableTemplate));
+    } catch (e) {
+      console.warn('Failed to save to localStorage', e);
+    }
+  }, [editableTemplate]);
+
+  // 초기화 핸들러 (원래 템플릿 복원)
+  const handleResetToOriginal = () => {
+    try {
+      localStorage.removeItem(VAULT_STORAGE_KEY);
+    } catch {}
+    const original = ensureTemplateAgentBlueprint(template);
+    setEditableTemplate(original);
+    showToast('💡 템플릿 스키마가 초기 상태로 복원되었습니다.', 'info');
+  };
+
+  // 1. DB 명칭 인라인 변경
+  const handleUpdateDatabaseName = (dbIndex: number, newName: string) => {
+    setEditableTemplate(prev => {
+      const oldName = prev.databases[dbIndex]?.name;
+      const updatedDbs = prev.databases.map((db, i) => {
+        if (i === dbIndex) {
+          return { ...db, name: newName };
+        }
+        if (oldName) {
+          const updatedProps = db.properties.map(p => {
+            if (p.type === 'relation' && p.target === oldName) {
+              return { ...p, target: newName };
+            }
+            return p;
+          });
+          return { ...db, properties: updatedProps };
+        }
+        return db;
+      });
+
+      return {
+        ...prev,
+        databases: updatedDbs
+      };
+    });
+    showToast(`데이터베이스 명칭이 '${newName}'(으)로 변경되었습니다.`, 'info');
+  };
+
+  // 2. 속성(컬럼)명 인라인 변경
+  const handleUpdatePropertyName = (dbIndex: number, propIndex: number, newName: string) => {
+    setEditableTemplate(prev => {
+      const updatedDbs = [...prev.databases];
+      if (!updatedDbs[dbIndex]) return prev;
+
+      const updatedProps = [...updatedDbs[dbIndex].properties];
+      if (!updatedProps[propIndex]) return prev;
+
+      updatedProps[propIndex] = {
+        ...updatedProps[propIndex],
+        name: newName
+      };
+
+      updatedDbs[dbIndex] = {
+        ...updatedDbs[dbIndex],
+        properties: updatedProps
+      };
+
+      return {
+        ...prev,
+        databases: updatedDbs
+      };
+    });
+    showToast(`속성명이 '${newName}'(으)로 변경되었습니다.`, 'info');
+  };
+
+  // 3. 속성 타입 드롭다운 변경
+  const handleUpdatePropertyType = (dbIndex: number, propIndex: number, newType: NotionPropertyType) => {
+    setEditableTemplate(prev => {
+      const updatedDbs = [...prev.databases];
+      if (!updatedDbs[dbIndex]) return prev;
+
+      const updatedProps = [...updatedDbs[dbIndex].properties];
+      const targetProp = updatedProps[propIndex];
+      if (!targetProp) return prev;
+
+      const newProp: NotionProperty = {
+        ...targetProp,
+        type: newType,
+      };
+
+      if (newType === 'formula') {
+        newProp.expression = 'ifs(prop("상태") == "완료", "■■■■■ 100% 🟢", "■■■□□ 60% 🟡")';
+      } else if (newType === 'select' || newType === 'multi_select' || newType === 'status') {
+        newProp.options = ['대기 중', '진행 중', '완료'];
+      } else if (newType === 'relation') {
+        const otherDb = prev.databases.find((_, i) => i !== dbIndex);
+        newProp.target = otherDb?.name || '관련 데이터베이스';
+      }
+
+      updatedProps[propIndex] = newProp;
+      updatedDbs[dbIndex] = {
+        ...updatedDbs[dbIndex],
+        properties: updatedProps
+      };
+
+      return {
+        ...prev,
+        databases: updatedDbs
+      };
+    });
+    showToast(`속성 타입이 '${newType}'(으)로 변경되었습니다.`, 'info');
+  };
+
+  // 4. 속성 삭제
+  const handleDeleteProperty = (dbIndex: number, propIndex: number) => {
+    const targetProp = editableTemplate.databases[dbIndex]?.properties[propIndex];
+    if (targetProp?.type === 'title') {
+      showToast('기본 제목(Title) 속성은 삭제할 수 없습니다.', 'info');
+      return;
+    }
+
+    setEditableTemplate(prev => {
+      const updatedDbs = [...prev.databases];
+      if (!updatedDbs[dbIndex]) return prev;
+
+      const updatedProps = updatedDbs[dbIndex].properties.filter((_, i) => i !== propIndex);
+      updatedDbs[dbIndex] = {
+        ...updatedDbs[dbIndex],
+        properties: updatedProps
+      };
+
+      return {
+        ...prev,
+        databases: updatedDbs
+      };
+    });
+    showToast('속성이 삭제되었습니다.', 'info');
+  };
+
+  // 5. 새 속성 추가
+  const handleAddProperty = (dbIndex: number) => {
+    setEditableTemplate(prev => {
+      const updatedDbs = [...prev.databases];
+      if (!updatedDbs[dbIndex]) return prev;
+
+      const newIndex = updatedDbs[dbIndex].properties.length + 1;
+      const newProp: NotionProperty = {
+        name: `새 속성 ${newIndex}`,
+        type: 'text'
+      };
+
+      updatedDbs[dbIndex] = {
+        ...updatedDbs[dbIndex],
+        properties: [...updatedDbs[dbIndex].properties, newProp]
+      };
+
+      return {
+        ...prev,
+        databases: updatedDbs
+      };
+    });
+    showToast('새 속성이 추가되었습니다. 캔버스에서 명칭과 타입을 설정하세요.', 'success');
+  };
+
+  // 6. 새 관계형 데이터베이스 추가
+  const handleAddDatabase = () => {
+    setEditableTemplate(prev => {
+      const newIdx = prev.databases.length + 1;
+      const newDb: NotionDatabase = {
+        name: `📂 신규 업무 DB ${newIdx}`,
+        description: '사용자가 캔버스에서 직접 추가한 상용 관계형 데이터베이스',
+        view_type: 'table',
+        properties: [
+          { name: '제목', type: 'title' },
+          { name: '마감일', type: 'date' },
+          { name: '진행 상태', type: 'status', options: ['대기 중', '진행 중', '완료'] },
+          { name: 'Quality_Status', type: 'select', options: ['초안', '검수 중', '승인', '반려'] },
+          { name: 'Verified', type: 'checkbox' },
+          { name: '진행률 수식', type: 'formula', expression: 'ifs(prop("진행 상태") == "완료", "100% 🟢", "50% 🟡")' }
+        ],
+        sample_rows: [
+          { '제목': '신규 업무 항목 1', '진행 상태': '진행 중', 'Quality_Status': '초안', 'Verified': false }
+        ]
+      };
+
+      return {
+        ...prev,
+        databases: [...prev.databases, newDb]
+      };
+    });
+    showToast('신규 데이터베이스가 추가되었습니다.', 'success');
+  };
 
   // 통계 계산: DB 수, 총 속성 수, Formulas 2.0 수식 수
-  const totalDatabases = activeTemplate.databases.length;
-  const totalProperties = activeTemplate.databases.reduce((sum, db) => sum + db.properties.length, 0);
-  const totalFormulas = activeTemplate.databases.reduce(
+  const totalDatabases = editableTemplate.databases.length;
+  const totalProperties = editableTemplate.databases.reduce((sum, db) => sum + db.properties.length, 0);
+  const totalFormulas = editableTemplate.databases.reduce(
     (sum, db) => sum + db.properties.filter((p) => p.type === 'formula').length,
     0
   );
@@ -76,7 +290,7 @@ export const TemplatePreviewCanvas: React.FC<TemplatePreviewCanvasProps> = ({ te
 
   // 대화창 수정 유도
   const handleModifyWithChat = () => {
-    const promptText = `"${activeTemplate.title}" 템플릿의 데이터베이스 속성을 고도화하고 맞춤형 수식을 추가해줘.`;
+    const promptText = `"${editableTemplate.title}" 템플릿의 데이터베이스 속성을 고도화하고 맞춤형 수식을 추가해줘.`;
     setPendingChatPrompt(promptText);
     setActiveMobileTab('chat');
     showToast('💬 대화창에 템플릿 수정 프롬프트가 자동 입력되었습니다.', 'info');
@@ -84,7 +298,7 @@ export const TemplatePreviewCanvas: React.FC<TemplatePreviewCanvasProps> = ({ te
 
   // 에이전트 스킬 프리셋 주입 핸들러
   const handleApplySkill = (skillPrompt: string, skillName: string) => {
-    setPendingChatPrompt(`현재 "${activeTemplate.title}" 템플릿에 [${skillName}]을 무손실 업그레이드로 적용해줘: ${skillPrompt}`);
+    setPendingChatPrompt(`현재 "${editableTemplate.title}" 템플릿에 [${skillName}]을 무손실 업그레이드로 적용해줘: ${skillPrompt}`);
     setActiveMobileTab('chat');
     showToast(`💬 "${skillName}" 요청이 대화창에 준비되었습니다.`, 'info');
   };
@@ -171,7 +385,7 @@ export const TemplatePreviewCanvas: React.FC<TemplatePreviewCanvasProps> = ({ te
                 </div>
 
                 <div className="space-y-1 max-h-48 overflow-y-auto pr-0.5">
-                  {activeTemplate.databases.map((db, idx) => (
+                  {editableTemplate.databases.map((db, idx) => (
                     <button
                       key={idx}
                       onClick={() => scrollToDb(db.name)}
@@ -397,12 +611,30 @@ export const TemplatePreviewCanvas: React.FC<TemplatePreviewCanvasProps> = ({ te
                 </div>
               </div>
 
-              {/* KPI 5: 무손실 검증 상태 뱃지 */}
+              {/* KPI 5: 무손실 검증 상태 뱃지 & Memory Vault 상태 */}
               <div className="flex items-center space-x-2 shrink-0">
                 <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-slate-200/80 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-700 whitespace-nowrap">
                   <ShieldCheck className="w-3 h-3 mr-1 text-slate-600 dark:text-slate-300" />
                   무손실 검증: PASS
                 </span>
+
+                <span 
+                  title="모든 인라인 스키마 수정 내역이 브라우저 로컬스토리지에 실시간 자동 보존됩니다"
+                  className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 whitespace-nowrap"
+                >
+                  <Database className="w-3 h-3 mr-1 text-purple-600 dark:text-purple-400" />
+                  Memory Vault: 동기화됨 💾
+                </span>
+
+                <button
+                  type="button"
+                  onClick={handleResetToOriginal}
+                  className="flex items-center space-x-1 px-1.5 py-0.5 rounded text-[10px] font-medium text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-slate-800 transition cursor-pointer"
+                  title="인라인 편집된 스키마를 원래 템플릿 상태로 복원합니다"
+                >
+                  <RotateCcw className="w-2.5 h-2.5" />
+                  <span>초기화</span>
+                </button>
               </div>
             </div>
 
@@ -410,52 +642,68 @@ export const TemplatePreviewCanvas: React.FC<TemplatePreviewCanvasProps> = ({ te
             <div className="w-full h-full min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
               {previewMode === 'tree' ? (
                 <div className="p-4 sm:p-8 pb-32">
-                  <StructureTreeView template={activeTemplate} />
+                  <StructureTreeView template={editableTemplate} />
                 </div>
               ) : (
                 <div className="pb-32">
                   {/* [Step 3] 최상단 커스텀 에이전트 3.0 원클릭 셋업 콜아웃 카드 */}
-                  {activeTemplate.agentBlueprint && (
+                  {editableTemplate.agentBlueprint && (
                     <div className="px-4 sm:px-10 md:px-12 pt-4">
                       <AgentBlueprintCallout
-                        blueprint={activeTemplate.agentBlueprint}
-                        templateTitle={activeTemplate.title}
+                        blueprint={editableTemplate.agentBlueprint}
+                        templateTitle={editableTemplate.title}
                       />
                     </div>
                   )}
 
                   {/* 상용 베스트셀러 대비 고도화 분석 아코디언 */}
                   <div className="px-4 sm:px-10 md:px-12 pt-2">
-                    <TemplateBenchmarkCard template={activeTemplate} />
+                    <TemplateBenchmarkCard template={editableTemplate} />
                   </div>
 
                   {/* 커버 이미지 */}
-                  <NotionCover coverUrl={activeTemplate.cover_url} />
+                  <NotionCover coverUrl={editableTemplate.cover_url} />
 
                   {/* 노션 페이지 헤더 (이모지, 제목, 설명, 메타) */}
                   <NotionHeader
-                    title={activeTemplate.title}
-                    icon={activeTemplate.icon}
-                    description={activeTemplate.description}
+                    title={editableTemplate.title}
+                    icon={editableTemplate.icon}
+                    description={editableTemplate.description}
                   />
 
                   {/* 페이지 레이아웃 블록들 */}
                   <div className="px-6 sm:px-10 md:px-12">
-                    <NotionBlocks blocks={activeTemplate.page_layout} />
+                    <NotionBlocks blocks={editableTemplate.page_layout} />
                   </div>
 
-                  {/* 다중 데이터베이스 섹션 */}
+                  {/* 다중 데이터베이스 섹션 (인라인 편집 지원) */}
                   <div className="px-6 sm:px-10 md:px-12 mt-6 space-y-6">
-                    {activeTemplate.databases.map((db: NotionDatabase, idx: number) => (
+                    {editableTemplate.databases.map((db: NotionDatabase, idx: number) => (
                       <div key={idx} id={`db-section-${db.name}`}>
-                        <NotionDatabaseView database={db} />
+                        <NotionDatabaseView 
+                          database={db}
+                          dbIndex={idx}
+                          onUpdateDatabaseName={handleUpdateDatabaseName}
+                          onUpdatePropertyName={handleUpdatePropertyName}
+                          onUpdatePropertyType={handleUpdatePropertyType}
+                          onDeleteProperty={handleDeleteProperty}
+                          onAddProperty={handleAddProperty}
+                        />
                       </div>
                     ))}
                   </div>
 
-                  {/* 스키마 명세 테이블 */}
+                  {/* 스키마 명세 테이블 (인라인 편집 및 새 속성/DB 추가 지원) */}
                   <div className="px-6 sm:px-10 md:px-12 mt-8">
-                    <TemplateSchemaTable databases={activeTemplate.databases} />
+                    <TemplateSchemaTable 
+                      databases={editableTemplate.databases} 
+                      onUpdateDatabaseName={handleUpdateDatabaseName}
+                      onUpdatePropertyName={handleUpdatePropertyName}
+                      onUpdatePropertyType={handleUpdatePropertyType}
+                      onDeleteProperty={handleDeleteProperty}
+                      onAddProperty={handleAddProperty}
+                      onAddDatabase={handleAddDatabase}
+                    />
                   </div>
 
                   {/* 하단 통합 액션 배너 */}
@@ -463,9 +711,9 @@ export const TemplatePreviewCanvas: React.FC<TemplatePreviewCanvasProps> = ({ te
                     <div className="p-5 sm:p-6 rounded-2xl bg-gradient-to-br from-neutral-900 via-indigo-950 to-neutral-900 text-white shadow-xl border border-indigo-800/40 flex flex-col md:flex-row md:items-center justify-between gap-4">
                       <div>
                         <div className="flex items-center space-x-2">
-                          <span className="text-xl">{activeTemplate.icon || '📑'}</span>
+                          <span className="text-xl">{editableTemplate.icon || '📑'}</span>
                           <h4 className="text-base sm:text-lg font-extrabold text-white">
-                            {activeTemplate.title}
+                            {editableTemplate.title}
                           </h4>
                         </div>
                         <p className="text-xs text-neutral-300 mt-1 max-w-xl leading-relaxed">

@@ -1,6 +1,6 @@
 // src/services/notionDynamicBuilder.ts
 // AI 오케스트레이터 payload 및 채팅 명령어를 최상급 NotionTemplate 구조체로 동적 인스턴스화
-// [Step 3]: 커스텀 에이전트 3.0 셋업 콜아웃, DB 품질 게이트 및 무손실 마이그레이션 결합
+// [Step 4]: 상용급 다중 관계형 DB 강제 팽창 엔진, 노션 에이전트 3.0 스킬팩 지능 결합 및 캔버스 인라인 편집기 지원
 
 import type {
   NotionTemplate,
@@ -21,7 +21,287 @@ export interface DynamicBuildParams {
 }
 
 /**
- * 1. 커스텀 에이전트 3.0 5대 벤치마크 규격을 준수하는 정형화된 agentBlueprint 생성기
+ * 0. 제목 정제기(Title Sanitizer) 엄격 가드레일
+ * 사용자의 음성 말버릇, 불필요한 조사, 명령어 패턴을 정규식으로 완벽히 제거하고
+ * 도메인에 걸맞은 격조 높은 공식 프로젝트 명칭을 추출합니다.
+ */
+export function sanitizeTemplateTitle(rawInput: string, topic?: string): string {
+  let cleaned = (rawInput || topic || '').trim();
+
+  // 음성 말버릇, 불필요한 조사, 요청/명령어 패턴 정규식 제거
+  const fillerPatterns = [
+    /^(어|음|저기|그|아|그냥|지금\s*그|어\s*참고해서|참고해서|그\s*템플릿|이번에|요번에|혹시|저)\s+/gi,
+    /\s*(만들어줘|만들어\s*주세요|제작해줘|생성해줘|보완해줘|추가해줘|설계해줘|짜줘|부탁해|해줘|해주세요|해봐)\s*$/gi,
+    /\s*(노션\s*템플릿|노션\s*페이지|템플릿|대시보드)\s*$/gi,
+    /^(노션\s*템플릿|템플릿|대시보드)\s+/gi,
+    /[!?,.~`'"@#$%^&*()_+={}\[\]:;<>\/\\|]/g
+  ];
+
+  fillerPatterns.forEach(pattern => {
+    cleaned = cleaned.replace(pattern, ' ').trim();
+  });
+
+  // 단어 사이 다중 공백 정리
+  cleaned = cleaned.replace(/\s+/g, ' ').trim();
+
+  // 도메인별 고품격 공식 타이틀 포맷팅
+  const lower = cleaned.toLowerCase();
+  if (lower.includes('시설') || lower.includes('객실') || lower.includes('하자') || lower.includes('아덴힐') || lower.includes('리조트') || lower.includes('호텔') || lower.includes('건물')) {
+    return cleaned.includes('아덴힐')
+      ? '[아덴힐 리조트] 객실 시설관리 및 하자보수 통합 관제 OS'
+      : `[시설 & 자산 관리] ${cleaned || '객실 점검 및 하자보수 관제'} OS`;
+  }
+  if (lower.includes('프로젝트') || lower.includes('개발') || lower.includes('스프린트') || lower.includes('스타트업') || lower.includes('기획')) {
+    return `[프로젝트 OS] ${cleaned || '애자일 로드맵 & 스프린트 마스터'} OS`;
+  }
+  if (lower.includes('합격') || lower.includes('시험') || lower.includes('자격증') || lower.includes('공부') || lower.includes('수험') || lower.includes('고시')) {
+    return `[합격 패스] ${cleaned || '수험 로드맵 & 기출 오답노트'} 올인원 OS`;
+  }
+  if (lower.includes('가계부') || lower.includes('지출') || lower.includes('소비') || lower.includes('돈') || lower.includes('재무') || lower.includes('자산')) {
+    return `[스마트 파이낸스] ${cleaned || '월간 소비 분석 & 고정비 가드'} OS`;
+  }
+  if (lower.includes('루틴') || lower.includes('해빗') || lower.includes('습관') || lower.includes('건강') || lower.includes('헬스') || lower.includes('피트니스')) {
+    return `[라이프 & 웰니스] ${cleaned || '24H 데일리 루틴 & 해빗 트래커'} OS`;
+  }
+  if (lower.includes('독서') || lower.includes('책') || lower.includes('서재') || lower.includes('인용구') || lower.includes('도서')) {
+    return `[지식 아카이브] ${cleaned || '디지털 서재 & 독서 인사이트'} OS`;
+  }
+
+  return cleaned.length > 2 ? `[통합 관리] ${cleaned} 마스터 OS` : '비즈니스 & 라이프 통합 관제 OS';
+}
+
+/**
+ * 1. 도메인 맞춤형 다중 관계형 DB 생태계 강제 팽창기 (Prompt Inflation)
+ * 사용자가 짧은 요청을 하더라도 단일 DB 생성을 원천 차단하고 상호 연결된 3대 마스터 DB를 조립합니다.
+ */
+export function getDomainEcoDatabases(domainOrTopic: string, title: string): NotionDatabase[] {
+  const t = (domainOrTopic + ' ' + title).toLowerCase();
+
+  // A. 시설/호텔/리조트/공간/인테리어 관리 도메인
+  if (t.includes('시설') || t.includes('객실') || t.includes('하자') || t.includes('리조트') || t.includes('호텔') || t.includes('건물')) {
+    return [
+      {
+        name: '🏢 객실/시설 자산 마스터 DB',
+        description: '호텔/리조트 전체 객실 및 부대시설 자산 현황과 점검 통과율을 실시간 관리하는 마스터 DB',
+        view_type: 'table',
+        properties: [
+          { name: '호실/자산명', type: 'title' },
+          { name: '구역/타입', type: 'select', options: ['스위트룸', '디럭스룸', '로비/공용부', '부대시설', '기계/전기실'] },
+          { name: '운영 상태', type: 'status', options: ['정상 운영', '점검 중', '보수 필요 ⚠️', '운영 중단'] },
+          { name: '책임 점검자', type: 'person' },
+          { 
+            name: '점검 통과율(수식)', 
+            type: 'formula', 
+            expression: 'ifs(prop("운영 상태") == "정상 운영", "■■■■■ 100% 🟢", prop("운영 상태") == "점검 중", "■■■□□ 60% 🟡", "□□□□□ 0% 🔴")' 
+          },
+          { name: '관련 점검 체크리스트', type: 'relation', target: '📋 구역별 정기 점검 체크리스트 DB' },
+          { name: '하자보수 티켓 이력', type: 'relation', target: '🛠️ 하자보수 & 조치 티켓 DB' },
+          { name: 'Quality_Status', type: 'select', options: ['초안', '검수 중', '승인', '반려'] },
+          { name: 'Verified', type: 'checkbox' }
+        ],
+        sample_rows: [
+          { '호실/자산명': '101호 로얄 스위트', '구역/타입': '스위트룸', '운영 상태': '정상 운영', '점검 통과율(수식)': '■■■■■ 100% 🟢', 'Quality_Status': '승인', 'Verified': true },
+          { '호실/자산명': '205호 오션 디럭스', '구역/타입': '디럭스룸', '운영 상태': '보수 필요 ⚠️', '점검 통과율(수식)': '■■■□□ 60% 🟡', 'Quality_Status': '검수 중', 'Verified': false },
+          { '호실/자산명': 'B1F 실내 수영장', '구역/타입': '부대시설', '운영 상태': '정상 운영', '점검 통과율(수식)': '■■■■■ 100% 🟢', 'Quality_Status': '승인', 'Verified': true }
+        ]
+      },
+      {
+        name: '📋 구역별 정기 점검 체크리스트 DB',
+        description: '공조, 배관, 가구, 조명, 위생 등 일일/정기 점검 항목을 정량 체크하는 서브 DB',
+        view_type: 'table',
+        properties: [
+          { name: '점검 항목명', type: 'title' },
+          { name: '점검 구역/자산', type: 'relation', target: '🏢 객실/시설 자산 마스터 DB' },
+          { name: '점검 일시', type: 'date' },
+          { name: '점검 분류', type: 'select', options: ['🚰 위생/욕실', '💡 조명/전기', '❄️ 에어컨/공조', '🛏️ 가구/린넨'] },
+          { name: '점검 결과', type: 'status', options: ['양호', '조치 필요', '보수 접수 완료'] },
+          { 
+            name: '통과 상태(수식)', 
+            type: 'formula', 
+            expression: 'ifs(prop("점검 결과") == "양호", "통과 ✅", prop("점검 결과") == "조치 필요", "이상 감지 ⚠️", "접수 완료 🔧")' 
+          },
+          { name: '하자보수 연계', type: 'relation', target: '🛠️ 하자보수 & 조치 티켓 DB' },
+          { name: 'Quality_Status', type: 'select', options: ['초안', '검수 중', '승인', '반려'] },
+          { name: 'Verified', type: 'checkbox' }
+        ],
+        sample_rows: [
+          { '점검 항목명': '101호 욕실 수압 및 배수 점검', '점검 분류': '🚰 위생/욕실', '점검 결과': '양호', '통과 상태(수식)': '통과 ✅', 'Quality_Status': '승인', 'Verified': true },
+          { '점검 항목명': '205호 시스템 에어컨 냉매 누출 의심', '점검 분류': '❄️ 에어컨/공조', '점검 결과': '조치 필요', '통과 상태(수식)': '이상 감지 ⚠️', 'Quality_Status': '검수 중', 'Verified': false }
+        ]
+      },
+      {
+        name: '🛠️ 하자보수 & 조치 티켓 DB',
+        description: '접수된 하자 및 보수 요청의 D-Day 기한과 완료 상태를 추적하는 티켓팅 DB',
+        view_type: 'table',
+        properties: [
+          { name: '하자 티켓명', type: 'title' },
+          { name: '대상 자산/객실', type: 'relation', target: '🏢 객실/시설 자산 마스터 DB' },
+          { name: '접수일자', type: 'date' },
+          { name: '조치 기한(마감)', type: 'date' },
+          { name: '긴급도', type: 'select', options: ['🔥 긴급(당일)', '⚡ 보통(3일내)', '🌱 정기보수'] },
+          { name: '조치 상태', type: 'status', options: ['접수', '수리 중', '조치 완료', '검수 합격'] },
+          { 
+            name: '조치 D-Day(수식)', 
+            type: 'formula', 
+            expression: 'ifs(empty(prop("조치 기한(마감)")), "일정 미정", dateBetween(dateStart(prop("조치 기한(마감)")), now(), "days") < 0, "기한 초과 ⚠️", dateBetween(dateStart(prop("조치 기한(마감)")), now(), "days") == 0, "D-Day 🔥", "D-" + dateBetween(dateStart(prop("조치 기한(마감)")), now(), "days") + "일")' 
+          },
+          { name: '소요 비용(원)', type: 'number' },
+          { name: 'Quality_Status', type: 'select', options: ['초안', '검수 중', '승인', '반려'] },
+          { name: 'Verified', type: 'checkbox' }
+        ],
+        sample_rows: [
+          { '하자 티켓명': '205호 에어컨 필터 교체 및 냉매 충전', '긴급도': '🔥 긴급(당일)', '조치 상태': '수리 중', '조치 D-Day(수식)': 'D-1일', '소요 비용(원)': 120000, 'Quality_Status': '검수 중', 'Verified': false },
+          { '하자 티켓명': '로비 센서등 감도 조절', '긴급도': '🌱 정기보수', '조치 상태': '조치 완료', '조치 D-Day(수식)': 'D-Day 🔥', '소요 비용(원)': 0, 'Quality_Status': '승인', 'Verified': true }
+        ]
+      }
+    ];
+  }
+
+  // B. 프로젝트/개발/IT/스타트업/기획 도메인
+  if (t.includes('프로젝트') || t.includes('개발') || t.includes('스타트업') || t.includes('스프린트') || t.includes('기획')) {
+    return [
+      {
+        name: '🎯 프로젝트 & OKR 마스터 로드맵',
+        description: '핵심 목표, 분기별 마일스톤 및 종합 달성률을 조망하는 프로젝트 총괄 DB',
+        view_type: 'table',
+        properties: [
+          { name: '프로젝트명', type: 'title' },
+          { name: '목표 기간', type: 'date' },
+          { name: '진행 상태', type: 'status', options: ['기획 단계', '개발 진행 중', 'QA/검수', '출시 완료'] },
+          { 
+            name: '종합 달성률(수식)', 
+            type: 'formula', 
+            expression: 'ifs(prop("진행 상태") == "출시 완료", "■■■■■ 100% 🟢", prop("진행 상태") == "개발 진행 중", "■■■□□ 60% 🟡", "■□□□□ 20% ⚪")' 
+          },
+          { name: '담당 PM', type: 'person' },
+          { name: '세부 스프린트 태스크', type: 'relation', target: '⚡ 태스크 & 스프린트 마일스톤 DB' },
+          { name: '자원 및 레퍼런스', type: 'relation', target: '📚 자원 & 기술 참고문서 아카이브' },
+          { name: 'Quality_Status', type: 'select', options: ['초안', '검수 중', '승인', '반려'] },
+          { name: 'Verified', type: 'checkbox' }
+        ],
+        sample_rows: [
+          { '프로젝트명': '모바일 앱 2.0 고도화 리뉴얼', '진행 상태': '개발 진행 중', '종합 달성률(수식)': '■■■□□ 60% 🟡', 'Quality_Status': '검수 중', 'Verified': false },
+          { '프로젝트명': '노션 커스텀 에이전트 3.0 연동 모듈', '진행 상태': '출시 완료', '종합 달성률(수식)': '■■■■■ 100% 🟢', 'Quality_Status': '승인', 'Verified': true }
+        ]
+      },
+      {
+        name: '⚡ 태스크 & 스프린트 마일스톤 DB',
+        description: '각 프로젝트 하위 태스크의 담당자, 마감일 및 D-Day 수식을 추적하는 실무 DB',
+        view_type: 'table',
+        properties: [
+          { name: '태스크명', type: 'title' },
+          { name: '상위 프로젝트', type: 'relation', target: '🎯 프로젝트 & OKR 마스터 로드맵' },
+          { name: '마감일', type: 'date' },
+          { name: '우선순위', type: 'select', options: ['🔥 P1 (긴급)', '⚡ P2 (중요)', '🌱 P3 (일반)'] },
+          { name: '진행 상태', type: 'status', options: ['대기 중', '진행 중', '코드 리뷰', '완료'] },
+          { 
+            name: '남은 일수(D-Day)', 
+            type: 'formula', 
+            expression: 'ifs(empty(prop("마감일")), "일정 미정", dateBetween(dateStart(prop("마감일")), now(), "days") < 0, "기한 초과 ⚠️", dateBetween(dateStart(prop("마감일")), now(), "days") == 0, "D-Day 🔥", "D-" + dateBetween(dateStart(prop("마감일")), now(), "days") + "일")' 
+          },
+          { name: '담당 엔지니어', type: 'person' },
+          { name: 'Quality_Status', type: 'select', options: ['초안', '검수 중', '승인', '반려'] },
+          { name: 'Verified', type: 'checkbox' }
+        ],
+        sample_rows: [
+          { '태스크명': 'Formulas 2.0 시각화 수식 파서 검증', '우선순위': '🔥 P1 (긴급)', '진행 상태': '진행 중', '남은 일수(D-Day)': 'D-2일', 'Quality_Status': '검수 중', 'Verified': false },
+          { '태스크명': '인라인 편집기 로컬스토리지 동기화 구현', '우선순위': '⚡ P2 (중요)', '진행 상태': '완료', '남은 일수(D-Day)': 'D-Day 🔥', 'Quality_Status': '승인', 'Verified': true }
+        ]
+      },
+      {
+        name: '📚 자원 & 기술 참고문서 아카이브',
+        description: '프로젝트에 필요한 API 규격, 기술 사양서 및 리스크 노트를 보관하는 지식 DB',
+        view_type: 'table',
+        properties: [
+          { name: '자료/문서명', type: 'title' },
+          { name: '연관 프로젝트', type: 'relation', target: '🎯 프로젝트 & OKR 마스터 로드맵' },
+          { name: '문서 분류', type: 'select', options: ['📐 아키텍처/기획', '🔌 API 스펙', '🎨 디자인 가이드', '🐛 트러블슈팅'] },
+          { name: '문서 URL', type: 'url' },
+          { name: '핵심 요약 메모', type: 'text' },
+          { name: 'Quality_Status', type: 'select', options: ['초안', '검수 중', '승인', '반려'] },
+          { name: 'Verified', type: 'checkbox' }
+        ],
+        sample_rows: [
+          { '자료/문서명': 'Notion API 공식 데이터베이스 속성 레퍼런스', '문서 분류': '🔌 API 스펙', '문서 URL': 'https://developers.notion.com', 'Quality_Status': '승인', 'Verified': true },
+          { '자료/문서명': '커스텀 에이전트 3.0 프롬프트 아키텍처 규격집', '문서 분류': '📐 아키텍처/기획', 'Quality_Status': '승인', 'Verified': true }
+        ]
+      }
+    ];
+  }
+
+  // C. 일반/기타 업무 마스터 도메인 (기본 3대 DB 팽창)
+  return [
+    {
+      name: `🎯 ${title} 핵심 마스터 트래커`,
+      description: `AI가 설계한 ${title}의 총괄 목표 및 주요 지표 트래킹 마스터 데이터베이스`,
+      view_type: 'table',
+      properties: [
+        { name: '핵심 과제/목표명', type: 'title' },
+        { name: '목표 일정', type: 'date' },
+        { name: '진행 상태', type: 'status', options: ['대기 중', '진행 중', '검수 중', '완료'] },
+        { name: '카테고리', type: 'select', options: ['핵심 로드맵', '운영 과제', '지표 개선'] },
+        { 
+          name: '진행률(수식)', 
+          type: 'formula', 
+          expression: 'ifs(prop("진행 상태") == "완료", "■■■■■ 100% 🟢", prop("진행 상태") == "진행 중", "■■■□□ 60% 🟡", "□□□□□ 0% ⚪")' 
+        },
+        { name: '하위 실행 과제', type: 'relation', target: `⚡ ${title} 세부 실행 체크리스트` },
+        { name: '관련 리스크/이슈', type: 'relation', target: `🚨 ${title} 이슈 & 리스크 레지스터` },
+        { name: 'Quality_Status', type: 'select', options: ['초안', '검수 중', '승인', '반려'] },
+        { name: 'Verified', type: 'checkbox' }
+      ],
+      sample_rows: [
+        { '핵심 과제/목표명': `${title} 1단계 마스터 플랜 수립`, '진행 상태': '완료', '진행률(수식)': '■■■■■ 100% 🟢', 'Quality_Status': '승인', 'Verified': true },
+        { '핵심 과제/목표명': `${title} 2단계 시스템 정밀 실행`, '진행 상태': '진행 중', '진행률(수식)': '■■■□□ 60% 🟡', 'Quality_Status': '검수 중', 'Verified': false }
+      ]
+    },
+    {
+      name: `⚡ ${title} 세부 실행 체크리스트`,
+      description: '마스터 과제를 구체화한 일일 액션 아이템 및 D-Day 카운터 관리 DB',
+      view_type: 'table',
+      properties: [
+        { name: '세부 과제명', type: 'title' },
+        { name: '상위 마스터 과제', type: 'relation', target: `🎯 ${title} 핵심 마스터 트래커` },
+        { name: '마감 기한', type: 'date' },
+        { name: '중요도', type: 'select', options: ['🔥 긴급 (P1)', '⚡ 중요 (P2)', '🌱 일반 (P3)'] },
+        { name: '완료 상태', type: 'status', options: ['시작 전', '진행 중', '제출/완료'] },
+        { 
+          name: '남은 일수(D-Day)', 
+          type: 'formula', 
+          expression: 'ifs(empty(prop("마감 기한")), "일정 미정", dateBetween(dateStart(prop("마감 기한")), now(), "days") < 0, "기한 초과 ⚠️", dateBetween(dateStart(prop("마감 기한")), now(), "days") == 0, "D-Day 🔥", "D-" + dateBetween(dateStart(prop("마감 기한")), now(), "days") + "일")' 
+        },
+        { name: 'Quality_Status', type: 'select', options: ['초안', '검수 중', '승인', '반려'] },
+        { name: 'Verified', type: 'checkbox' }
+      ],
+      sample_rows: [
+        { '세부 과제명': '품질 기준 점검표 작성 및 사전 승인', '중요도': '🔥 긴급 (P1)', '완료 상태': '진행 중', '남은 일수(D-Day)': 'D-1일', 'Quality_Status': '검수 중', 'Verified': false },
+        { '세부 과제명': '초기 데이터베이스 릴레이션 연결 검수', '중요도': '⚡ 중요 (P2)', '완료 상태': '제출/완료', '남은 일수(D-Day)': 'D-Day 🔥', 'Quality_Status': '승인', 'Verified': true }
+      ]
+    },
+    {
+      name: `🚨 ${title} 이슈 & 리스크 레지스터`,
+      description: '업무 지연, 품질 결함, 긴급 이슈의 조치 상태와 비용을 추적하는 리스크 DB',
+      view_type: 'table',
+      properties: [
+        { name: '이슈/리스크 항목', type: 'title' },
+        { name: '관련 과제', type: 'relation', target: `🎯 ${title} 핵심 마스터 트래커` },
+        { name: '발생 일자', type: 'date' },
+        { name: '심각도', type: 'select', options: ['🔴 심각 (Blocker)', '🟡 주의 (Warning)', '🟢 경미 (Minor)'] },
+        { name: '조치 상태', type: 'status', options: ['발생/접수', '조치 중', '해결 완료'] },
+        { name: '조치 계획 및 메모', type: 'text' },
+        { name: 'Quality_Status', type: 'select', options: ['초안', '검수 중', '승인', '반려'] },
+        { name: 'Verified', type: 'checkbox' }
+      ],
+      sample_rows: [
+        { '이슈/리스크 항목': '외부 연동 스케줄러 지연 감지', '심각도': '🟡 주의 (Warning)', '조치 상태': '조치 중', '조치 계획 및 메모': 'Heartbeat 감사 로그 확인 후 재시도 트리거 발동', 'Quality_Status': '검수 중', 'Verified': false },
+        { '이슈/리스크 항목': '속성명 중복 충돌 방지 패치', '심각도': '🟢 경미 (Minor)', '조치 상태': '해결 완료', '조치 계획 및 메모': '차분 빌더 검증 완료', 'Quality_Status': '승인', 'Verified': true }
+      ]
+    }
+  ];
+}
+
+/**
+ * 2. 커스텀 에이전트 3.0 5대 벤치마크 규격을 준수하는 정형화된 agentBlueprint 생성기
  */
 export function generateAgentBlueprint(
   topic: string,
@@ -49,7 +329,7 @@ export function generateAgentBlueprint(
     `2) [노션 내부 이벤트 트리거]:`,
     `   - 새 페이지 생성 시: 'Quality_Status'를 '초안'으로 기본 설정하고 필수 컬럼(제목, 마감일) 유효성 검수`,
     `   - 'Quality_Status'가 '검수 중'으로 변경 시: QA 게이트키퍼가 검증 수행 후 '승인' 또는 '반려' 처리`,
-    `   - 진행 상태가 '완료'로 변경 시: 달성률 100% 반영 및 감사 로그 기록`,
+    `   - 상태값이 '불량/지연/보수 필요'로 변경 시: 긴급 알림 큐 자동 적재 및 Heartbeat 경고 기록`,
     `3) [외부 이벤트 트리거]:`,
     `   - Notion Mail / 수퍼휴먼 수신 이메일에서 [긴급/일정] 키워드 감지 시 즉각 할일 생성`,
     `   - Slack 멘션 발생 시 노션 회의록 및 요약 데이터 자동 첨부 연동`,
@@ -98,7 +378,7 @@ export function generateAgentBlueprint(
       notionEvents: [
         `'Quality_Status'가 '검수 중'으로 변경 시 QA 게이트키퍼 자동 호출`,
         `신규 레코드 등록 시 'Quality_Status' 기본값 '초안' 부여 및 필수 속성 유효성 체크`,
-        `진행 상태 '완료' 변경 시 Formulas 2.0 달성률 100% 반영 및 감사 로그 기록`
+        `상태값이 '보수 필요/지연'으로 변경 시 긴급 알림 큐 적재 및 감사 로그 경고 기록`
       ],
       externalEvents: [
         `Notion Mail / 수퍼휴먼 수신 이메일에서 [긴급/일정] 키워드 감지 시 자동 태스크 생성`,
@@ -184,8 +464,7 @@ export function generateAgentBlueprint(
 }
 
 /**
- * 2. 데이터베이스 스키마 내 '품질 게이트(Quality Gate)' 속성 차분 주입 (Append-Only)
- * - 기존 속성을 일체 삭제하지 않고 무손실로 추가
+ * 3. 데이터베이스 스키마 내 '품질 게이트(Quality Gate)' 속성 차분 주입 (Append-Only)
  */
 export function injectQualityGateProperties(properties: NotionProperty[]): NotionProperty[] {
   const result = [...properties];
@@ -215,8 +494,7 @@ export function injectQualityGateProperties(properties: NotionProperty[]): Notio
 }
 
 /**
- * 3. 하단 Agent_Heartbeat_Log 경량 감사 DB 스키마 생성기
- * - 침묵의 실패(Silent Failure) 방지를 위해 에이전트 실행 내역을 기록하는 서브 DB
+ * 4. 하단 Agent_Heartbeat_Log 경량 감사 DB 스키마 생성기
  */
 export function createHeartbeatAuditDatabase(mainDbName: string): NotionDatabase {
   return {
@@ -251,13 +529,33 @@ export function createHeartbeatAuditDatabase(mainDbName: string): NotionDatabase
 }
 
 /**
- * 4. 무손실(Zero-Data-Loss) 템플릿 검증 & 에이전트 3.0 블루프린트 통합 보장 함수
- * - 기존 템플릿의 모든 원본 행과 속성을 100% 보존하면서
- * - Quality Gate 속성, Formulas 2.0, Heartbeat 감사 DB, 에이전트 셋업 콜아웃을 결합
+ * 5. 무손실(Zero-Data-Loss) 템플릿 검증 & 다중 DB 강제 팽창 보장 함수
+ * - 단일 DB(1개) 생성을 원천 차단하고 도메인에 맞는 최소 2~3개 관계형 DB + Heartbeat 감사 DB를 자동 결합합니다.
  */
 export function ensureTemplateAgentBlueprint(template: NotionTemplate): NotionTemplate {
-  // 1. 기존 DB 목록 복사 및 품질 게이트 속성 차분 추가
-  const updatedDatabases: NotionDatabase[] = template.databases.map(db => {
+  // 제목 정제 수행
+  const cleanTitle = sanitizeTemplateTitle(template.title, template.cover_query);
+
+  // 1. 단일 DB인 경우 상용급 다중 관계형 DB 생태계로 강제 팽창 (Prompt Inflation)
+  let baseDatabases: NotionDatabase[] = [...template.databases];
+  const regularDbs = baseDatabases.filter(d => !d.name.includes('Heartbeat') && !d.name.includes('감사 로그'));
+
+  if (regularDbs.length <= 1) {
+    const inflatedDbs = getDomainEcoDatabases(template.cover_query || template.title, cleanTitle);
+    // 기존 DB가 있다면 첫 번째 DB로 안전하게 교체/병합하고 나머지 2대 DB 추가
+    if (regularDbs[0]) {
+      inflatedDbs[0] = {
+        ...inflatedDbs[0],
+        name: regularDbs[0].name || inflatedDbs[0].name,
+        properties: injectQualityGateProperties(regularDbs[0].properties.length > 0 ? regularDbs[0].properties : inflatedDbs[0].properties),
+        sample_rows: regularDbs[0].sample_rows && regularDbs[0].sample_rows.length > 0 ? regularDbs[0].sample_rows : inflatedDbs[0].sample_rows
+      };
+    }
+    baseDatabases = inflatedDbs;
+  }
+
+  // 2. 각 DB에 품질 게이트 속성 및 Heartbeat 연결 보장
+  const updatedDatabases: NotionDatabase[] = baseDatabases.map(db => {
     const isAuditDb = db.name.includes('Heartbeat') || db.name.includes('감사 로그');
     if (isAuditDb) return db;
 
@@ -281,24 +579,24 @@ export function ensureTemplateAgentBlueprint(template: NotionTemplate): NotionTe
     };
   });
 
-  // 2. Heartbeat 감사 DB 누락 시 자동 생성 결합
+  // 3. Heartbeat 감사 DB 누락 시 자동 생성 결합
   const hasAuditDb = updatedDatabases.some(
     db => db.name.includes('Heartbeat') || db.name.includes('감사 로그')
   );
   if (!hasAuditDb) {
-    const mainDbName = updatedDatabases[0]?.name || `${template.title} 마스터 DB`;
+    const mainDbName = updatedDatabases[0]?.name || `${cleanTitle} 마스터 DB`;
     updatedDatabases.push(createHeartbeatAuditDatabase(mainDbName));
   }
 
-  // 3. 에이전트 3.0 블루프린트 생성 (없거나 보강 필요 시)
+  // 4. 에이전트 3.0 블루프린트 생성 (없거나 보강 필요 시)
   const dbNames = updatedDatabases.filter(d => !d.name.includes('감사 로그')).map(d => d.name);
   const agentBlueprint = template.agentBlueprint || generateAgentBlueprint(
-    template.cover_query || template.title,
-    template.title,
+    template.cover_query || cleanTitle,
+    cleanTitle,
     dbNames
   );
 
-  // 4. 최상단 [🤖 커스텀 에이전트 3.0 원클릭 셋업] 콜아웃 블록 주입
+  // 5. 최상단 [🤖 커스텀 에이전트 3.0 원클릭 셋업] 콜아웃 블록 주입
   const hasAgentCallout = template.page_layout.some(
     block => block.type === 'callout' && (block as any).content?.includes('커스텀 에이전트 3.0')
   );
@@ -316,6 +614,7 @@ export function ensureTemplateAgentBlueprint(template: NotionTemplate): NotionTe
 
   return {
     ...template,
+    title: cleanTitle,
     databases: updatedDatabases,
     page_layout: updatedLayout,
     agentBlueprint
@@ -323,29 +622,36 @@ export function ensureTemplateAgentBlueprint(template: NotionTemplate): NotionTe
 }
 
 /**
- * 5. 동적 템플릿 빌더 (대화형 오케스트레이터 및 신규 생성용)
+ * 6. 동적 템플릿 빌더 (대화형 오케스트레이터 및 신규 생성용)
+ * - 단일 DB 생성을 원천 차단하고 상용급 다중 DB 생태계 강제 조립
  */
 export function buildDynamicTemplateFromPayload(params: DynamicBuildParams): NotionTemplate {
-  const { topic, title, dbSchemas, formulas, valueAdd } = params;
+  const { topic, initialPrompt, dbSchemas, formulas, valueAdd } = params;
+
+  // 제목 정제기 가드레일 적용
+  const cleanTitle = sanitizeTemplateTitle(params.title || initialPrompt || topic, topic);
 
   const templateId = `dyn-template-${Date.now()}`;
-  const icon = topic.includes('합격') || topic.includes('시험') || topic.includes('자격증') ? '🎯'
+  const icon = topic.includes('시설') || topic.includes('객실') || topic.includes('하자') ? '🏢'
+    : topic.includes('합격') || topic.includes('시험') || topic.includes('자격증') ? '🎯'
     : topic.includes('독서') || topic.includes('책') ? '📚'
     : topic.includes('프로젝트') || topic.includes('개발') ? '💻'
     : topic.includes('가계부') || topic.includes('돈') || topic.includes('지출') ? '💰'
     : topic.includes('루틴') || topic.includes('스케줄') ? '📅'
     : '✨';
 
-  const coverUrl = topic.includes('합격') || topic.includes('시험')
+  const coverUrl = topic.includes('시설') || topic.includes('객실') || topic.includes('리조트')
+    ? 'https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=1600&q=80'
+    : topic.includes('합격') || topic.includes('시험')
     ? 'https://images.unsplash.com/photo-1434030216411-0b793f4b4173?auto=format&fit=crop&w=1600&q=80'
     : topic.includes('독서')
     ? 'https://images.unsplash.com/photo-1457369804613-52c61a468e7d?auto=format&fit=crop&w=1600&q=80'
     : 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1600&q=80';
 
-  // 1. 다중 DB 빌드 (payload.db_schema 기반)
-  const databases: NotionDatabase[] = [];
+  // 1. 단일 DB 원천 차단 & 다중 관계형 DB 생태계 강제 팽창
+  let databases: NotionDatabase[] = [];
 
-  if (Array.isArray(dbSchemas) && dbSchemas.length > 0) {
+  if (Array.isArray(dbSchemas) && dbSchemas.length >= 2) {
     dbSchemas.forEach((schema, idx) => {
       const props: NotionProperty[] = [];
 
@@ -366,55 +672,35 @@ export function buildDynamicTemplateFromPayload(params: DynamicBuildParams): Not
         });
       }
 
-      // 기본 이름 필수 속성이 없다면 추가
       if (!props.some(p => p.type === 'title')) {
         props.unshift({ name: '제목', type: 'title' });
       }
 
-      // 품질 게이트 속성 자동 주입
       const finalProps = injectQualityGateProperties(props);
 
       databases.push({
-        name: schema.db_name || `${title} 마스터 DB ${idx + 1}`,
+        name: schema.db_name || `${cleanTitle} 마스터 DB ${idx + 1}`,
         description: `AI가 동적으로 맞춤 구성한 ${schema.db_name || '마스터 DB'}입니다.`,
         view_type: 'table',
         properties: finalProps,
         sample_rows: [
-          { '제목': `${title} 예시 가이드 데이터 1`, '진행 상태': '진행 중', 'Quality_Status': '초안', 'Verified': false },
-          { '제목': `${title} 핵심 완료 목표 2`, '진행 상태': '완료', 'Quality_Status': '승인', 'Verified': true }
+          { '제목': `${cleanTitle} 예시 가이드 데이터 1`, '진행 상태': '진행 중', 'Quality_Status': '초안', 'Verified': false },
+          { '제목': `${cleanTitle} 핵심 완료 목표 2`, '진행 상태': '완료', 'Quality_Status': '승인', 'Verified': true }
         ]
       });
     });
   } else {
-    // 기본 고품질 관계형 DB 구성
-    databases.push({
-      name: `🎯 ${title} 핵심 마스터 트래커`,
-      description: `AI 맞춤 제작 메인 마스터 데이터베이스`,
-      view_type: 'table',
-      properties: [
-        { name: '이름', type: 'title' },
-        { name: '목표일', type: 'date' },
-        { name: '진행 상태', type: 'status', options: ['대기 중', '진행 중', '완료'] },
-        { name: '카테고리', type: 'select', options: ['핵심 목표', '중요 과제', '일반 메모'] },
-        { name: 'Quality_Status', type: 'select', options: ['초안', '검수 중', '승인', '반려'] },
-        { name: 'Verified', type: 'checkbox' },
-        { name: '진행률 Formula 2.0', type: 'formula', expression: 'if(prop("진행 상태") == "완료", "100% 🟢", "50% 🟡")' },
-        { name: 'AI 핵심 요약', type: 'text' }
-      ],
-      sample_rows: [
-        { '이름': `${title} 1단계 실행 계획`, '진행 상태': '진행 중', '카테고리': '핵심 목표', 'Quality_Status': '검수 중', 'Verified': false },
-        { '이름': `${title} 2단계 목표 검수`, '진행 상태': '완료', '카테고리': '중요 과제', 'Quality_Status': '승인', 'Verified': true }
-      ]
-    });
+    // 단일 DB 생성을 원천 차단하고 도메인별 3대 상호 관계형 DB 생태계 강제 주입
+    databases = getDomainEcoDatabases(topic, cleanTitle);
   }
 
   // 2. Heartbeat 감사 DB 연동
-  const mainDbName = databases[0]?.name || `${title} 마스터 트래커`;
+  const mainDbName = databases[0]?.name || `${cleanTitle} 마스터 트래커`;
   databases.push(createHeartbeatAuditDatabase(mainDbName));
 
   // 3. 에이전트 3.0 블루프린트 생성
   const dbNames = databases.filter(d => !d.name.includes('감사 로그')).map(d => d.name);
-  const agentBlueprint = generateAgentBlueprint(topic, title, dbNames);
+  const agentBlueprint = generateAgentBlueprint(topic, cleanTitle, dbNames);
 
   // 4. 가이드 블록 및 최상단 에이전트 셋업 콜아웃 빌드
   const page_layout: NotionBlock[] = [
@@ -427,20 +713,20 @@ export function buildDynamicTemplateFromPayload(params: DynamicBuildParams): Not
     {
       type: 'callout',
       icon: icon,
-      content: `${title} AI 맞춤형 노션 템플릿에 오신 것을 환영합니다!\nNotion Architect v2.0 AI 오케스트레이터가 사용자의 요청("${params.initialPrompt || topic}")을 완벽히 분석하여 자동 인스턴스화했습니다.`,
+      content: `${cleanTitle} AI 맞춤형 노션 템플릿에 오신 것을 환영합니다!\nNotion Architect v2.0 AI 오케스트레이터가 사용자의 요청("${params.initialPrompt || topic}")을 완벽히 분석하여 자동 인스턴스화했습니다.`,
       color: 'blue'
     },
     {
       type: 'heading_1',
-      content: `📌 ${title} 특장점 및 차별화 스펙`
+      content: `📌 ${cleanTitle} 특장점 및 차별화 스펙`
     },
     {
       type: 'bulleted_list_item',
-      content: (valueAdd && valueAdd[0]) || 'Formulas 2.0 자동 계산 수식 및 D-Day 연동'
+      content: (valueAdd && valueAdd[0]) || 'Formulas 2.0 시각화 수식(진행률 바) 및 실시간 D-Day 연동'
     },
     {
       type: 'bulleted_list_item',
-      content: (valueAdd && valueAdd[1]) || '다중 관계형 DB 간 상호 연결 및 Agent_Heartbeat_Log 감사 연동'
+      content: (valueAdd && valueAdd[1]) || '3대 핵심 DB 상호 관계형(Relation) 생태계 및 Agent_Heartbeat_Log 감사 연동'
     },
     {
       type: 'divider'
@@ -449,19 +735,19 @@ export function buildDynamicTemplateFromPayload(params: DynamicBuildParams): Not
 
   return {
     id: templateId,
-    title: title || `${topic} AI 맞춤형 템플릿`,
+    title: cleanTitle,
     icon,
     cover_query: topic,
     cover_url: coverUrl,
-    description: `AI 오케스트레이터가 대화 명령을 바탕으로 최신 스키마 및 수식을 적용하여 자동 빌드한 템플릿입니다.`,
-    tags: ['#AI맞춤제작', '#Formulas2.0', '#에이전트3.0', `#${topic.replace(/\s+/g, '')}`, '#자동생성'],
+    description: `AI 오케스트레이터가 대화 명령을 바탕으로 단일 DB 생성을 원천 차단하고 상용급 다중 관계형 스키마 및 Formulas 2.0을 적용하여 자동 빌드한 템플릿입니다.`,
+    tags: ['#상용급다중DB', '#Formulas2.0', '#에이전트3.0', `#${topic.replace(/\s+/g, '')}`, '#무손실마이그레이션'],
     databases,
     page_layout,
     agentBlueprint,
     formulas2Specs: Array.isArray(formulas) ? formulas : [
       { name: '진행률 수식', formula: 'if(prop("진행 상태")=="완료","100%","50%")', use_case: 'D-Day 및 과제 진행도 실시간 트래킹' }
     ],
-    valueAddList: valueAdd || ['AI 자동 스키마 최적화', 'Formulas 2.0 고성능 수식 연동', '커스텀 에이전트 3.0 규격 탑재'],
+    valueAddList: valueAdd || ['상용급 3대 관계형 DB 자동 팽창', 'Formulas 2.0 고성능 수식 연동', '커스텀 에이전트 3.0 규격 탑재'],
     created_at: new Date().toISOString()
   };
 }
