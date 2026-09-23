@@ -55,6 +55,7 @@ export const TemplatePreviewCanvas: React.FC<TemplatePreviewCanvasProps> = ({ te
     setPreviewMode,
     setIsRawJsonModalOpen,
     setIsExportModalOpen,
+    isGenerating,
   } = useApp();
 
   const [selectedDbId, setSelectedDbId] = useState<string | null>(null);
@@ -682,7 +683,24 @@ export const TemplatePreviewCanvas: React.FC<TemplatePreviewCanvasProps> = ({ te
 
             {/* 3. 세로 휠 스크롤(Vertical Scroll) 해제된 메인 캔버스 뷰 */}
             <div className="w-full h-full min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
-              {previewMode === 'tree' ? (
+              {isGenerating ? (
+                <div className="flex flex-col items-center justify-center min-h-[500px] p-8 text-center animate-fade-in">
+                  <div className="relative mb-6">
+                    <div className="w-16 h-16 rounded-full border-4 border-indigo-200 dark:border-indigo-900/60 border-t-indigo-600 animate-spin" />
+                    <Sparkles className="w-7 h-7 text-indigo-600 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 animate-pulse" />
+                  </div>
+                  <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 text-xs font-bold mb-3">
+                    <Zap className="w-3.5 h-3.5" />
+                    <span>AI 템플릿 아키텍트 실시간 분석 & 설계 중</span>
+                  </div>
+                  <h3 className="text-xl sm:text-2xl font-black text-neutral-800 dark:text-neutral-100 mb-2 tracking-tight">
+                    기존 캔버스 상태를 초기화하고 새 템플릿을 빌드하고 있습니다...
+                  </h3>
+                  <p className="text-sm text-neutral-500 dark:text-neutral-400 max-w-md leading-relaxed">
+                    첨부된 엑셀 데이터의 시트 구조, 스마트 헤더 행, 관계형 DB 스키마 및 Formula 2.0 수식을 정밀 분석하여 맞춤형 대시보드 뷰를 생성합니다.
+                  </p>
+                </div>
+              ) : previewMode === 'tree' ? (
                 <div className="p-4 sm:p-8 pb-32">
                   <StructureTreeView template={editableTemplate} />
                 </div>

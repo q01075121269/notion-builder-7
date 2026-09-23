@@ -1,7 +1,36 @@
-import * as XLSX from 'xlsx';
+import * as XLSXRaw from 'xlsx';
 import mammoth from 'mammoth';
 import * as pdfjsLib from 'pdfjs-dist';
 import type { AttachedFile, FileTypeCategory, ParsedSheetData } from '../types/fileAttachment';
+
+// SheetJS (xlsx) ESM/CJS 번들러 환경 호환 안전 참조 객체 획득 헬퍼
+let cachedXLSX: any = null;
+export async function getSafeXLSX(): Promise<any> {
+  if (cachedXLSX && cachedXLSX.utils && cachedXLSX.read) {
+    return cachedXLSX;
+  }
+  if (typeof window !== 'undefined' && (window as any).XLSX?.utils) {
+    cachedXLSX = (window as any).XLSX;
+    return cachedXLSX;
+  }
+  try {
+    const rawModule = await import('xlsx');
+    let mod = (rawModule as any).default || rawModule;
+    if (!mod.utils && (rawModule as any).utils) {
+      mod = rawModule;
+    }
+    cachedXLSX = mod;
+    return cachedXLSX;
+  } catch (err) {
+    console.warn('[SheetJS Dynamic Import Warning, using static fallback]', err);
+    let staticMod = (XLSXRaw as any).default || XLSXRaw;
+    if (!staticMod.utils && (XLSXRaw as any).utils) {
+      staticMod = XLSXRaw;
+    }
+    cachedXLSX = staticMod;
+    return cachedXLSX;
+  }
+}
 
 // PDF.js 워커 경로 설정 (안전한 CDN 워커 fallback 설정)
 try {
@@ -43,9 +72,36 @@ export async function parseSpreadsheet(file: File): Promise<{
   markdownReport: string;
   sheets: ParsedSheetData[];
 }> {
-  const arrayBuffer = await file.arrayBuffer();
-  const workbook = XLSX.read(arrayBuffer, { type: 'array', cellFormula: true });
-  
+  const XLSX = await getSafeXLSX();
+
+  if (!XLSX || !XLSX.read || !XLSX.utils) {
+    throw new Error('SheetJS(xlsx) 라이브러리를 초기화할 수 없습니다.');
+  }
+
+  // .xls 및 .xlsx 포맷 안전 파싱 파이프라인 (ArrayBuffer -> BinaryString 2단계 fallback)
+  let workbook: any;
+  try {
+    const arrayBuffer = await file.arrayBuffer();
+    workbook = XLSX.read(arrayBuffer, { type: 'array', cellFormula: true });
+  } catch (readErr: any) {
+    console.warn('[XLSX ArrayBuffer Read Fail, trying binary string]', readErr);
+    try {
+      const binaryStr = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => resolve(e.target?.result as string);
+        reader.onerror = reject;
+        reader.readAsBinaryString(file);
+      });
+      workbook = XLSX.read(binaryStr, { type: 'binary', cellFormula: true });
+    } catch (binErr: any) {
+      throw new Error(`엑셀 파일 파싱 실패: ${binErr.message || readErr.message || '파일이 손상되었거나 지원되지 않는 형식입니다.'}`);
+    }
+  }
+
+  if (!workbook || !workbook.SheetNames || workbook.SheetNames.length === 0) {
+    throw new Error('엑셀 파일 내 유효한 워크시트가 존재하지 않습니다.');
+  }
+
   const parsedSheets: ParsedSheetData[] = [];
   const reportParts: string[] = [];
 
@@ -53,18 +109,24 @@ export async function parseSpreadsheet(file: File): Promise<{
   reportParts.push(`- 포함된 시트 목록: ${workbook.SheetNames.join(', ')}\n`);
 
   for (const sheetName of workbook.SheetNames) {
-    // 렌더링 스레드 블로킹 방지: 다중 시트/수식 파싱 중 이벤트 루프에 제어권 양보
-    await new Promise(resolve => setTimeout(resolve, 0));
+    await new Promise((resolve) => setTimeout(resolve, 0));
 
     const worksheet = workbook.Sheets[sheetName];
     if (!worksheet) continue;
 
     // 2차원 배열 데이터 추출
-    const rawData: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
+    let rawData: any[][] = [];
+    try {
+      rawData = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
+    } catch (sheetJsonErr) {
+      console.warn(`[SheetJS] sheet_to_json failed for sheet "${sheetName}":`, sheetJsonErr);
+      continue;
+    }
+
     if (!rawData || rawData.length === 0) continue;
 
     // [스마트 헤더 행 감지 알고리즘 (Smart Header Row Detection)]
-    // 1행이 전체 병합 제목("아덴힐 리조트앤골프...")일 경우를 감지하여 1~5행 중 유효 텍스트 셀이 3개 이상인 행을 진짜 헤더 행으로 자동 채택
+    // 1행이 전체 병합 제목("아덴힐 리조트앤골프...", "실시간 검침정보...")일 경우 감지하여 1~5행 중 유효 텍스트 셀이 3개 이상인 행 채택
     let headerRowIndex = 0;
     let maxValidCells = 0;
 
@@ -76,7 +138,6 @@ export async function parseSpreadsheet(file: File): Promise<{
         return str !== '' && !str.startsWith('__EMPTY') && !str.startsWith('열_');
       }).length;
 
-      // 3개 이상 유효 셀이 있으면 진짜 표 헤더 행으로 즉시 채택
       if (validCells >= 3) {
         headerRowIndex = r;
         maxValidCells = validCells;
@@ -89,14 +150,13 @@ export async function parseSpreadsheet(file: File): Promise<{
     }
 
     const rawHeaderRow = rawData[headerRowIndex] || [];
-    
+
     // 유효한 열 인덱스 추출 (내용이 있는 열만 선별하여 '열_2', '열_3', '__EMPTY' 생성 원천 금지)
     const validColIndices: number[] = [];
     rawHeaderRow.forEach((h: any, idx: number) => {
       const colTitle = String(h ?? '').trim();
-      // 헤더명이 있거나, 해당 열 아래 데이터에 유효값이 하나라도 있는 경우만 포함
       const hasHeader = colTitle !== '' && !colTitle.startsWith('__EMPTY');
-      const hasColumnData = rawData.slice(headerRowIndex + 1, headerRowIndex + 10).some((row) => {
+      const hasColumnData = rawData.slice(headerRowIndex + 1, headerRowIndex + 15).some((row) => {
         const val = String((row || [])[idx] ?? '').trim();
         return val !== '';
       });
@@ -106,11 +166,10 @@ export async function parseSpreadsheet(file: File): Promise<{
       }
     });
 
-    // 헤더명 정제 (빈 이름은 도메인 추론 또는 안전한 기본명 부여)
+    // 헤더명 정제
     const headers: string[] = validColIndices.map((colIdx, i) => {
       let title = String(rawHeaderRow[colIdx] ?? '').trim();
-      if (!title || title.startsWith('__EMPTY') || /^열_d+$/i.test(title)) {
-        // 첫 번째 열이면 '구분/항목', 날짜나 상태가 아래에 보이면 유추
+      if (!title || title.startsWith('__EMPTY') || /^열_\d+$/i.test(title)) {
         title = i === 0 ? '항목명' : `속성_${i + 1}`;
       }
       return title;
@@ -122,18 +181,20 @@ export async function parseSpreadsheet(file: File): Promise<{
       .filter((row) => row && row.some((cell: any) => cell !== '' && cell !== null && cell !== undefined))
       .map((row) => validColIndices.map((colIdx) => row[colIdx] ?? ''));
 
-    // 적용된 수식 셀 탐색
+    // 수식 셀 탐색
     const formulas: Array<{ cell: string; formula: string }> = [];
-    Object.keys(worksheet).forEach(cellKey => {
-      if (cellKey.startsWith('!')) return;
-      const cell = worksheet[cellKey];
-      if (cell && cell.f) {
-        formulas.push({ cell: cellKey, formula: `=${cell.f}` });
-      }
-    });
+    try {
+      Object.keys(worksheet).forEach((cellKey) => {
+        if (cellKey.startsWith('!')) return;
+        const cell = worksheet[cellKey];
+        if (cell && cell.f) {
+          formulas.push({ cell: cellKey, formula: `=${cell.f}` });
+        }
+      });
+    } catch {}
 
     // 객체 행 데이터 구성
-    const objectRows: Record<string, any>[] = dataRows.map(row => {
+    const objectRows: Record<string, any>[] = dataRows.map((row) => {
       const obj: Record<string, any> = {};
       headers.forEach((h, idx) => {
         obj[h] = row[idx] ?? '';
@@ -141,12 +202,12 @@ export async function parseSpreadsheet(file: File): Promise<{
       return obj;
     });
 
-    // Markdown Table 생성 (최대 상위 15행 미리보기로 토큰 최적화)
+    // Markdown Table 생성 (최대 상위 40행 요약으로 AI 컨텍스트 주입)
     let mdTable = `| ${headers.join(' | ')} |\n`;
     mdTable += `| ${headers.map(() => '---').join(' | ')} |\n`;
 
-    const previewRows = dataRows.slice(0, 15);
-    previewRows.forEach(row => {
+    const previewRows = dataRows.slice(0, 40);
+    previewRows.forEach((row) => {
       const rowValues = headers.map((_, idx) => {
         const val = row[idx];
         return String(val ?? '').replace(/\|/g, '\\|').replace(/\n/g, ' ');
@@ -154,8 +215,8 @@ export async function parseSpreadsheet(file: File): Promise<{
       mdTable += `| ${rowValues.join(' | ')} |\n`;
     });
 
-    if (dataRows.length > 15) {
-      mdTable += `*... 외 ${dataRows.length - 15}개 데이터 행 생략*\n`;
+    if (dataRows.length > 40) {
+      mdTable += `*... 외 ${dataRows.length - 40}개 데이터 행 생략*\n`;
     }
 
     parsedSheets.push({
@@ -164,7 +225,7 @@ export async function parseSpreadsheet(file: File): Promise<{
       rows: objectRows,
       formulas,
       markdownTable: mdTable,
-      rowCount: dataRows.length
+      rowCount: dataRows.length,
     });
 
     reportParts.push(`### [시트: "${sheetName}"] (총 ${dataRows.length}개 행)`);
@@ -172,7 +233,7 @@ export async function parseSpreadsheet(file: File): Promise<{
 
     if (formulas.length > 0) {
       reportParts.push(`📌 적용된 주요 수식 셀:`);
-      formulas.slice(0, 8).forEach(f => {
+      formulas.slice(0, 8).forEach((f) => {
         reportParts.push(`- 셀 ${f.cell}: \`${f.formula}\``);
       });
       if (formulas.length > 8) {
@@ -184,7 +245,7 @@ export async function parseSpreadsheet(file: File): Promise<{
 
   return {
     markdownReport: reportParts.join('\n'),
-    sheets: parsedSheets
+    sheets: parsedSheets,
   };
 }
 

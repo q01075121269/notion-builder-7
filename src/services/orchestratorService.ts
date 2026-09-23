@@ -140,8 +140,15 @@ async function fallbackClientOrchestration(
         });
 
         const isArdenhill = userText.includes('ardenhill') || userText.includes('아덴힐');
+        const isMetering = userText.includes('검침') || userText.includes('계량기') || userText.includes('에너지') || userText.includes('전력') || userText.includes('수도');
+        let attachedDbName = '📋 첨부 데이터 점검 및 운영 마스터 DB';
+        if (isMetering) {
+          attachedDbName = '⚡ [시설 & 에너지] 실시간 검침 및 사용량 마스터 DB';
+        } else if (isArdenhill) {
+          attachedDbName = '🏢 [아덴힐] 객실 및 시설 점검 마스터 DB';
+        }
         attachedDbSchemas = [{
-          db_name: isArdenhill ? '🏢 [아덴힐] 객실 및 시설 점검 마스터 DB' : '📋 첨부 데이터 점검 및 운영 마스터 DB',
+          db_name: attachedDbName,
           properties,
           sample_rows: sampleRows.length > 0 ? sampleRows : undefined
         }];
@@ -161,7 +168,9 @@ async function fallbackClientOrchestration(
     lower.includes('시설') || lower.includes('객실') || lower.includes('하자') || 
     lower.includes('아덴힐') || lower.includes('체크리스트') || lower.includes('자격증') || 
     lower.includes('수험생') || lower.includes('공부') || lower.includes('시험') || 
-    lower.includes('오답') || lower.includes('합격');
+    lower.includes('오답') || lower.includes('합격') || 
+    lower.includes('검침') || lower.includes('계량기') || lower.includes('에너지') || 
+    lower.includes('수도') || lower.includes('전기');
 
   if (isBuilderMode || hasAttachment || hasBuilderKeywords) {
     const isCertification = lower.includes('자격증') || lower.includes('수험생') || lower.includes('시험') || lower.includes('공부') || lower.includes('오답노트');

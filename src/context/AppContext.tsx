@@ -104,6 +104,7 @@ interface AppContextType {
   currentTemplate: NotionTemplate | null;
   setCurrentTemplate: (template: NotionTemplate | null) => void;
   isGenerating: boolean;
+  setIsGenerating: (generating: boolean) => void;
   sendMessage: (prompt: string, attachedFiles?: import('../types/fileAttachment').AttachedFile[]) => Promise<void>;
   clearChatHistory: () => void;
   applyPreset: (presetKey: string) => void;
@@ -868,6 +869,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         currentTemplate,
         setCurrentTemplate,
         isGenerating,
+        setIsGenerating,
         sendMessage,
         clearChatHistory,
         applyPreset,

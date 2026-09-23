@@ -167,6 +167,7 @@ export const OmniChatBar: React.FC = () => {
     setCurrentView,
     currentTemplate,
     setCurrentTemplate,
+    setIsGenerating,
     setIsViewingCurationHub,
   } = useApp();
 
@@ -403,6 +404,13 @@ export const OmniChatBar: React.FC = () => {
 
     isLoadingRef.current = true;
     lastSentRef.current = { text, time: now };
+
+    // [전송 시작 시 기존 캔버스 상태(previewTemplate) 초기화 및 로딩 스피너 활성화]
+    setIsGenerating(true);
+    setCurrentTemplate(null);
+    try {
+      localStorage.removeItem('notion_template_vault_draft');
+    } catch {}
 
     const pureText = text;
     const attachedDataBlocks = attachedFiles
@@ -865,6 +873,7 @@ export const OmniChatBar: React.FC = () => {
       }]);
     } finally {
       setIsLoading(false);
+      setIsGenerating(false);
       isLoadingRef.current = false;
       setInputValue('');
       baseTextRef.current = '';

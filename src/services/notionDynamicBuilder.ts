@@ -30,6 +30,14 @@ export function sanitizeTemplateTitle(rawInput: string, topic?: string): string 
   const lowerCombined = combinedRaw.toLowerCase();
 
   // [Hotfix 1: 특정 도메인 및 파일명 키워드 우선 고정 매핑 (Fail-Safe)]
+  if (
+    lowerCombined.includes('검침') ||
+    lowerCombined.includes('계량기') ||
+    lowerCombined.includes('에너지') ||
+    (lowerCombined.includes('시설') && (lowerCombined.includes('수도') || lowerCombined.includes('전기') || lowerCombined.includes('가스')))
+  ) {
+    return '[시설 & 에너지 관제] 실시간 검침 관리 및 시설 점검 OS';
+  }
   // 첨부 파일명이 ardenhill_room_maintenance_checklist 이거나 아덴힐 관련인 경우 무조건 강제 치환
   if (
     lowerCombined.includes('ardenhill') || 
@@ -52,6 +60,9 @@ export function sanitizeTemplateTitle(rawInput: string, topic?: string): string 
 
   // 오염되었거나 텍스트가 30자 이상으로 길면 즉시 폐기 후 도메인 추론 fallback 가동
   if (isContaminated || text.length > 30) {
+    if (lowerCombined.includes('검침') || lowerCombined.includes('계량기') || lowerCombined.includes('에너지')) {
+      return '[시설 & 에너지 관제] 실시간 검침 관리 및 시설 점검 OS';
+    }
     if (lowerCombined.includes('시설') || lowerCombined.includes('객실') || lowerCombined.includes('하자') || lowerCombined.includes('호텔') || lowerCombined.includes('건물')) {
       return '[시설 & 자산 관리] 객실 점검 및 하자보수 관제 OS';
     }
@@ -105,6 +116,9 @@ export function sanitizeTemplateTitle(rawInput: string, topic?: string): string 
   const lower = text.toLowerCase();
 
   // 도메인별 고품격 공식 타이틀 포맷팅
+  if (lower.includes('검침') || lower.includes('계량기') || lower.includes('에너지')) {
+    return '[시설 & 에너지 관제] 실시간 검침 관리 및 시설 점검 OS';
+  }
   if (lower.includes('아덴힐') || (lower.includes('리조트') && (lower.includes('시설') || lower.includes('객실')))) {
     return '[아덴힐 리조트] 객실 시설관리 및 정기 점검 OS';
   }
@@ -136,6 +150,94 @@ export function sanitizeTemplateTitle(rawInput: string, topic?: string): string 
  */
 export function getDomainEcoDatabases(domainOrTopic: string, title: string): NotionDatabase[] {
   const t = (domainOrTopic + ' ' + title).toLowerCase();
+
+  // A-0. 실시간 검침/계량기/에너지 및 시설 관리 도메인
+  if (t.includes('검침') || t.includes('계량기') || t.includes('에너지') || (t.includes('시설') && (t.includes('수도') || t.includes('전기') || t.includes('가스')))) {
+    return [
+      {
+        name: '⚡ 실시간 에너지 & 검침 관리 마스터 DB',
+        description: '동/호수별 계량기 지침 및 전력/수도/가스 실시간 사용량과 이상 과다 사용 경보를 관제하는 마스터 DB',
+        view_type: 'table',
+        properties: [
+          { name: '호수/계량기 위치', type: 'title' },
+          { name: '에너지 구분', type: 'select', options: ['⚡ 전기', '🚰 상수도', '🔥 도시가스', '♨️ 온수/난방'] },
+          { name: '계량기 번호', type: 'text' },
+          { name: '전월 지침', type: 'number' },
+          { name: '당월 지침', type: 'number' },
+          { 
+            name: '당월 사용량(수식)', 
+            type: 'formula', 
+            expression: 'prop("당월 지침") - prop("전월 지침")' 
+          },
+          { 
+            name: '사용량 이상 경보(수식)', 
+            type: 'formula', 
+            expression: 'ifs(prop("당월 사용량(수식)") > 500, "🚨 누수/과부하 의심", prop("당월 사용량(수식)") > 350, "⚠️ 주의 사용", "🟢 정상 사용")' 
+          },
+          { name: '검침 일자', type: 'date' },
+          { name: '검침 담당자', type: 'person' },
+          { name: '설비 점검 연계', type: 'relation', target: '🛠️ 계량기 및 시설 설비 점검 DB' },
+          { name: '이상 조치 티켓', type: 'relation', target: '🚨 이상 징후 및 긴급 보수 티켓 DB' },
+          { name: 'Quality_Status', type: 'select', options: ['초안', '검수 중', '승인', '반려'] },
+          { name: 'Verified', type: 'checkbox' }
+        ],
+        sample_rows: [
+          { '호수/계량기 위치': '101동 302호', '에너지 구분': '⚡ 전기', '계량기 번호': 'EM-2024-0012', '전월 지침': 1420, '당월 지침': 1680, '당월 사용량(수식)': 260, '사용량 이상 경보(수식)': '🟢 정상 사용', 'Quality_Status': '승인', 'Verified': true },
+          { '호수/계량기 위치': '102동 1104호', '에너지 구분': '🚰 상수도', '계량기 번호': 'WM-2024-0541', '전월 지침': 340, '당월 지침': 890, '당월 사용량(수식)': 550, '사용량 이상 경보(수식)': '🚨 누수/과부하 의심', 'Quality_Status': '검수 중', 'Verified': false },
+          { '호수/계량기 위치': '지하 1층 기계실', '에너지 구분': '♨️ 온수/난방', '계량기 번호': 'HM-2024-0003', '전월 지침': 5800, '당월 지침': 6120, '당월 사용량(수식)': 320, '사용량 이상 경보(수식)': '🟢 정상 사용', 'Quality_Status': '승인', 'Verified': true }
+        ]
+      },
+      {
+        name: '🛠️ 계량기 및 시설 설비 점검 DB',
+        description: '각 동 EPS/TPS실, 기계실 계량기 기물 상태 및 정기 교체 주기를 점검하는 서브 DB',
+        view_type: 'table',
+        properties: [
+          { name: '설비/계량기명', type: 'title' },
+          { name: '설치 구역', type: 'select', options: ['1동 EPS실', '2동 EPS실', '지하 기계실', '옥상 물탱크실', '중앙 관제실'] },
+          { name: '계량기 종류', type: 'select', options: ['원격 디지털 계량기', '기계식 유량계', '전자식 전력량계', '가스 누출 감지기'] },
+          { name: '정기 점검일', type: 'date' },
+          { name: '설비 상태', type: 'status', options: ['정상 작동', '오차 보정 필요', '단선/통신 장애 ⚠️', '교체 예정'] },
+          { 
+            name: '점검 판정(수식)', 
+            type: 'formula', 
+            expression: 'ifs(prop("설비 상태") == "정상 작동", "적격 🟢", prop("설비 상태") == "오차 보정 필요", "조정 🟡", "부적격 🔴")' 
+          },
+          { name: '마스터 검침 연계', type: 'relation', target: '⚡ 실시간 에너지 & 검침 관리 마스터 DB' },
+          { name: 'Quality_Status', type: 'select', options: ['초안', '검수 중', '승인', '반려'] },
+          { name: 'Verified', type: 'checkbox' }
+        ],
+        sample_rows: [
+          { '설비/계량기명': '1동 3층 원격 검침 중계기', '설치 구역': '1동 EPS실', '계량기 종류': '원격 디지털 계량기', '설비 상태': '정상 작동', '점검 판정(수식)': '적격 🟢', 'Quality_Status': '승인', 'Verified': true },
+          { '설비/계량기명': '102동 급수 감압 밸브 및 유량계', '설치 구역': '지하 기계실', '계량기 종류': '기계식 유량계', '설비 상태': '오차 보정 필요', '점검 판정(수식)': '조정 🟡', 'Quality_Status': '검수 중', 'Verified': false }
+        ]
+      },
+      {
+        name: '🚨 이상 징후 및 긴급 보수 티켓 DB',
+        description: '급격한 수치 급증(누수/누전), 원격 단절 등 검침 이상 징후 발생 시 현장 출동 및 조치 이력을 추적하는 티켓 DB',
+        view_type: 'table',
+        properties: [
+          { name: '이상 조치 티켓명', type: 'title' },
+          { name: '이상 유형', type: 'select', options: ['💧 누수 의심 (사용량 급증)', '⚡ 누전/과전력 위험', '📡 검침 데이터 미수신', '🔧 계량기 파손/동파'] },
+          { name: '긴급도', type: 'select', options: ['🔥 당일 긴급 출동', '⚡ 24시간 내 점검', '🌱 정기 교체/보수'] },
+          { name: '조치 상태', type: 'status', options: ['이상 감지', '현장 확인 중', '부품 교체/수리', '조치 완료 ✅'] },
+          { name: '접수 일시', type: 'date' },
+          { 
+            name: '조치 기한 D-Day(수식)', 
+            type: 'formula', 
+            expression: 'ifs(prop("조치 상태") == "조치 완료 ✅", "완료 완료 🎉", "조치 대기 중 ⚠️")' 
+          },
+          { name: '현장 조치 담당자', type: 'person' },
+          { name: '연관 검침 기록', type: 'relation', target: '⚡ 실시간 에너지 & 검침 관리 마스터 DB' },
+          { name: 'Quality_Status', type: 'select', options: ['초안', '검수 중', '승인', '반려'] },
+          { name: 'Verified', type: 'checkbox' }
+        ],
+        sample_rows: [
+          { '이상 조치 티켓명': '102동 1104호 야간 급수량 비정상 급증(누수 조사)', '이상 유형': '💧 누수 의심 (사용량 급증)', '긴급도': '🔥 당일 긴급 출동', '조치 상태': '현장 확인 중', '조치 기한 D-Day(수식)': '조치 대기 중 ⚠️', 'Quality_Status': '검수 중', 'Verified': false },
+          { '이상 조치 티켓명': '지하 기계실 온수 메인 계량기 통신 모듈 리셋', '이상 유형': '📡 검침 데이터 미수신', '긴급도': '⚡ 24시간 내 점검', '조치 상태': '조치 완료 ✅', '조치 기한 D-Day(수식)': '완료 완료 🎉', 'Quality_Status': '승인', 'Verified': true }
+        ]
+      }
+    ];
+  }
 
   // A. 시설/호텔/리조트/공간/인테리어 관리 도메인
   if (t.includes('시설') || t.includes('객실') || t.includes('하자') || t.includes('리조트') || t.includes('호텔') || t.includes('건물')) {
