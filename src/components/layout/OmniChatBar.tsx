@@ -30,7 +30,7 @@ import type { DiagnosticResult } from '../common/SelfDiagnosticCard';
 import { saveTodayOverrideConfig } from '../../services/dailyRoutineStorage';
 import { archiveAudioArtifact, archiveTextDiscussionArtifact } from '../../services/zeroRotArchiver';
 import { isNotionUrlPrompt, extractNotionUrl, generateMasterHubTemplateFromUrl } from '../../services/notionLinkAnalyzer';
-import { buildDynamicTemplateFromPayload } from '../../services/notionDynamicBuilder';
+import { buildDynamicTemplateFromPayload, sanitizeTemplateTitle } from '../../services/notionDynamicBuilder';
 import { createNotionTemplateInWorkspace } from '../../services/notionApi';
 import type { NotionTemplate } from '../../types/notion';
 
@@ -96,6 +96,49 @@ function buildReceipts(intent: string): ActionReceipt[] {
   }];
 }
 
+
+// ─── 옴니 챗 4대 모드 퀵 프리셋 칩 규격 ─────────────────────────────────────
+export type ChapterModeKey = 'builder' | 'life' | 'devlab' | 'media_lab';
+
+interface ChatModeConfig {
+  key: ChapterModeKey;
+  label: string;
+  emoji: string;
+  placeholder: string;
+  activeClass: string;
+}
+
+const CHAT_MODES: ChatModeConfig[] = [
+  {
+    key: 'builder',
+    label: '템플릿 마스터',
+    emoji: '🏗️',
+    placeholder: '어떤 업무를 위한 노션 템플릿을 만들어 드릴까요? (예: 아덴힐 시설관리, 분기 OKR 기획)',
+    activeClass: 'bg-amber-500/20 border-amber-500/50 text-amber-800 dark:text-amber-200 font-bold shadow-xs',
+  },
+  {
+    key: 'life',
+    label: '라이프 비서',
+    emoji: '👔',
+    placeholder: '일정이나 할 일을 말씀해 주세요. (예: 내일 오후 3시 디자인 미팅 등록해 줘, 오늘 점심 15,000원)',
+    activeClass: 'bg-emerald-500/20 border-emerald-500/50 text-emerald-800 dark:text-emerald-200 font-bold shadow-xs',
+  },
+  {
+    key: 'devlab',
+    label: '오피스 스튜디오',
+    emoji: '📄',
+    placeholder: '작성할 문서나 기획서 주제를 입력하세요. (예: 신규 사업 제안서 개요 작성, 주간 회고록)',
+    activeClass: 'bg-blue-500/20 border-blue-500/50 text-blue-800 dark:text-blue-200 font-bold shadow-xs',
+  },
+  {
+    key: 'media_lab',
+    label: 'AI 미디어 랩',
+    emoji: '🎨',
+    placeholder: '생성할 이미지나 사운드 프롬프트를 입력하세요. (예: 미니멀 테크 데스크 커버, 팟캐스트 인트로 BGM)',
+    activeClass: 'bg-purple-500/20 border-purple-500/50 text-purple-800 dark:text-purple-200 font-bold shadow-xs',
+  },
+];
+
 // ─── OmniChatBar 컴포넌트 ────────────────────────────────────────────────────
 export const OmniChatBar: React.FC = () => {
   const {
@@ -106,6 +149,8 @@ export const OmniChatBar: React.FC = () => {
     createdNotionResource,
     setIsNotionSettingsModalOpen,
     showToast,
+    selectedModel,
+    currentView,
     setCurrentView,
     setCurrentTemplate,
     setIsViewingCurationHub,
@@ -113,6 +158,23 @@ export const OmniChatBar: React.FC = () => {
 
   // 채팅 상태
   const [messages, setMessages] = useState<OmniMessage[]>([]);
+  // 4대 챕터 모드 칩 상태
+  const [activeMode, setActiveMode] = useState<ChapterModeKey>('builder');
+
+  useEffect(() => {
+    if (['builder', 'life', 'devlab', 'media_lab'].includes(currentView)) {
+      setActiveMode(currentView as ChapterModeKey);
+    }
+  }, [currentView]);
+
+  const handleModeClick = (modeKey: ChapterModeKey) => {
+    setActiveMode(modeKey);
+    setCurrentView(modeKey as any);
+    setTimeout(() => {
+      inputRef.current?.focus();
+    }, 50);
+  };
+
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
@@ -464,12 +526,7 @@ export const OmniChatBar: React.FC = () => {
         return;
       }
 
-      const response: OrchestratorResponse = await sendToOrchestrator(
-        fullMessageText,
-        [...messages, userMsg],
-        apiKey,
-        authUser?.email,
-      );
+      const response: OrchestratorResponse = await sendToOrchestrator(fullMessageText, [...messages, userMsg], apiKey, authUser?.email, selectedModel);
 
       let finalReply = response.reply_message;
       let receipts: ActionReceipt[] = [];
@@ -581,9 +638,14 @@ export const OmniChatBar: React.FC = () => {
           targetTemplate = PRESET_TEMPLATES.certification_exam;
         } else {
           // AI 오케스트레이터 payload 기반 동적 템플릿 즉석 빌드
+          const rawTopic = (response.payload?.template_topic as string) || text;
+          const rawTitle = (response.payload?.suggested_title as string) || `${text} AI 템플릿`;
+          const sanitizedTopic = sanitizeTemplateTitle(rawTopic);
+          const sanitizedTitle = sanitizeTemplateTitle(rawTitle);
+
           targetTemplate = buildDynamicTemplateFromPayload({
-            topic: (response.payload?.template_topic as string) || text,
-            title: (response.payload?.suggested_title as string) || `${text} AI 템플릿`,
+            topic: sanitizedTopic,
+            title: sanitizedTitle,
             initialPrompt: text,
             dbSchemas: response.payload?.db_schema as any[],
             formulas: response.payload?.formulas as any[],
@@ -691,6 +753,7 @@ export const OmniChatBar: React.FC = () => {
     }
   };
 
+  const currentPlaceholder = CHAT_MODES.find(m => m.key === activeMode)?.placeholder || '무엇이든 물어보세요 — 일정·지출·템플릿·개발 등 (Enter 전송)';
   const hasMessages = messages.length > 0;
 
   // ── 의도 배지 색상 ────────────────────────────────────────────────────────
@@ -1073,6 +1136,32 @@ export const OmniChatBar: React.FC = () => {
           mb-14 md:mb-0
         "
       >
+        
+        {/* ── 4대 모드 퀵 프리셋 칩 (Pill Chips) ── */}
+        <div className="flex items-center gap-1.5 mb-2 overflow-x-auto no-scrollbar py-0.5">
+          {CHAT_MODES.map((mode) => {
+            const isActive = activeMode === mode.key;
+            return (
+              <button
+                key={mode.key}
+                type="button"
+                onClick={() => handleModeClick(mode.key)}
+                className={`
+                  shrink-0 inline-flex items-center space-x-1.5 px-3 py-1 rounded-full text-xs transition-all duration-200 cursor-pointer
+                  border
+                  ${isActive
+                    ? mode.activeClass
+                    : 'bg-white/70 dark:bg-neutral-800/70 border-slate-200/90 dark:border-neutral-700/80 text-neutral-600 dark:text-neutral-400 hover:bg-slate-100 dark:hover:bg-neutral-700 hover:text-neutral-900 dark:hover:text-neutral-200'
+                  }
+                `}
+              >
+                <span className="text-xs">{mode.emoji}</span>
+                <span className="font-medium text-[11px]">{mode.label}</span>
+              </button>
+            );
+          })}
+        </div>
+
         {/* 첨부 파일 칩 노출 영역 */}
         {attachedFiles.length > 0 && (
           <div className="flex flex-wrap gap-1.5 mb-2 px-1">
@@ -1150,7 +1239,7 @@ export const OmniChatBar: React.FC = () => {
                 ? '🧠 Gemini가 요청을 분석하고 화면을 업데이트하고 있습니다...'
                 : isListening
                 ? '🎙️ 단방향 음성 인식 중... (말을 멈춰도 유지됨, 전송 또는 마이크 재클릭)'
-                : '무엇이든 물어보세요 — 일정·지출·템플릿·개발 등 (Enter 전송)'
+                : currentPlaceholder
             }
             disabled={isLoading}
             className="

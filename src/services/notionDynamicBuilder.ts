@@ -28,41 +28,56 @@ export interface DynamicBuildParams {
 export function sanitizeTemplateTitle(rawInput: string, topic?: string): string {
   let cleaned = (rawInput || topic || '').trim();
 
-  // 음성 말버릇, 불필요한 조사, 요청/명령어 패턴 정규식 제거
+  // [Step 5-B 완벽 수정] 사용자의 음성 말버릇, 불필요한 조사, 요청/명령형 서술어 패턴 정규식 완벽 제거
+  // "아덴힐 시설관리 템플릿 만들어 줘" -> "만들어 줘", "템플릿" 등을 완벽히 도려내고 핵심 명사구만 추출
   const fillerPatterns = [
-    /^(어|음|저기|그|아|그냥|지금\s*그|어\s*참고해서|참고해서|그\s*템플릿|이번에|요번에|혹시|저)\s+/gi,
-    /\s*(만들어줘|만들어\s*주세요|제작해줘|생성해줘|보완해줘|추가해줘|설계해줘|짜줘|부탁해|해줘|해주세요|해봐)\s*$/gi,
+    /^(어|음|저기|그|아|그냥|지금s*그|어s*참고해서|참고해서|그s*템플릿|이번에|요번에|혹시|저)s+/gi,
+    /\s*(만들어\s*줘|만들어줘|만들어\s*주세요|만들어\s*줄래|만들어\s*주라|만들어\s*봐|만들어\s*보자|제작해\s*줘|제작해줘|제작해\s*주세요|생성해\s*줘|생성해줘|생성해\s*주세요|보완해\s*줘|보완해줘|추가해\s*줘|추가해줘|설계해\s*줘|설계해줘|작성해\s*줘|작성해줘|짜\s*줘|짜줘|구축해\s*줘|구축해줘|뽑아\s*줘|뽑아줘|해\s*줘|해줘|해\s*주세요|해주세요|해\s*봐|해봐|부탁해)\s*$/gi,
+    /\b(만들어\s*줘|만들어줘|만들어\s*주세요|만들어\s*줄래|만들어\s*주라|제작해\s*줘|생성해\s*줘|설계해\s*줘|작성해\s*줘|짜\s*줘|해\s*줘|해줘)\b/gi,
     /\s*(노션\s*템플릿|노션\s*페이지|템플릿|대시보드)\s*$/gi,
     /^(노션\s*템플릿|템플릿|대시보드)\s+/gi,
-    /[!?,.~`'"@#$%^&*()_+={}\[\]:;<>\/\\|]/g
+    /[!?,.~^`'"@#$%^&*()_+={}\[\]:;<>/\\|]/g
   ];
 
   fillerPatterns.forEach(pattern => {
     cleaned = cleaned.replace(pattern, ' ').trim();
   });
 
-  // 단어 사이 다중 공백 정리
+  // 다중 공백 정리
   cleaned = cleaned.replace(/\s+/g, ' ').trim();
 
   // 도메인별 고품격 공식 타이틀 포맷팅
   const lower = cleaned.toLowerCase();
-  if (lower.includes('시설') || lower.includes('객실') || lower.includes('하자') || lower.includes('아덴힐') || lower.includes('리조트') || lower.includes('호텔') || lower.includes('건물')) {
-    return cleaned.includes('아덴힐')
-      ? '[아덴힐 리조트] 객실 시설관리 및 하자보수 통합 관제 OS'
-      : `[시설 & 자산 관리] ${cleaned || '객실 점검 및 하자보수 관제'} OS`;
+
+  // 1. 아덴힐 및 시설/리조트/객실/하자 관리 도메인
+  if (lower.includes('아덴힐') || ((lower.includes('시설') || lower.includes('객실') || lower.includes('하자')) && lower.includes('아덴힐'))) {
+    return '[아덴힐 리조트] 객실 시설관리 통합 관제 OS';
   }
-  if (lower.includes('프로젝트') || lower.includes('개발') || lower.includes('스프린트') || lower.includes('스타트업') || lower.includes('기획')) {
+  if (lower.includes('시설') || lower.includes('객실') || lower.includes('하자') || lower.includes('리조트') || lower.includes('호텔') || lower.includes('건물')) {
+    return `[시설 & 자산 관리] ${cleaned || '객실 점검 및 하자보수 관제'} OS`;
+  }
+
+  // 2. 프로젝트/스타트업/애자일/기획 도메인
+  if (lower.includes('프로젝트') || lower.includes('개발') || lower.includes('스프린트') || lower.includes('스타트업') || lower.includes('기획') || lower.includes('okr')) {
     return `[프로젝트 OS] ${cleaned || '애자일 로드맵 & 스프린트 마스터'} OS`;
   }
+
+  // 3. 자격증/수험생/시험/공부 도메인
   if (lower.includes('합격') || lower.includes('시험') || lower.includes('자격증') || lower.includes('공부') || lower.includes('수험') || lower.includes('고시')) {
     return `[합격 패스] ${cleaned || '수험 로드맵 & 기출 오답노트'} 올인원 OS`;
   }
+
+  // 4. 재무/가계부/자산/소비 도메인
   if (lower.includes('가계부') || lower.includes('지출') || lower.includes('소비') || lower.includes('돈') || lower.includes('재무') || lower.includes('자산')) {
     return `[스마트 파이낸스] ${cleaned || '월간 소비 분석 & 고정비 가드'} OS`;
   }
+
+  // 5. 루틴/해빗/습관 도메인
   if (lower.includes('루틴') || lower.includes('해빗') || lower.includes('습관') || lower.includes('건강') || lower.includes('헬스') || lower.includes('피트니스')) {
     return `[라이프 & 웰니스] ${cleaned || '24H 데일리 루틴 & 해빗 트래커'} OS`;
   }
+
+  // 6. 독서/서재 도메인
   if (lower.includes('독서') || lower.includes('책') || lower.includes('서재') || lower.includes('인용구') || lower.includes('도서')) {
     return `[지식 아카이브] ${cleaned || '디지털 서재 & 독서 인사이트'} OS`;
   }

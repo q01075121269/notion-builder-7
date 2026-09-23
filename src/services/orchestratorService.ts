@@ -2,6 +2,8 @@
 // 2단계 & 3단계: 대화형 오케스트레이터 클라이언트 서비스 및 TTS 연동
 
 import { processOfficeOrchestration } from './aiOfficeDualEngine';
+import type { GeminiModelType } from '../types/chat';
+import { sanitizeTemplateTitle } from './notionDynamicBuilder';
 
 export interface OrchestratorResponse {
   intent: 'CHAT' | 'LIFE' | 'DEVLAB' | 'BUILDER';
@@ -28,7 +30,8 @@ export async function sendToOrchestrator(
   text: string,
   history: ChatMessage[] = [],
   apiKey?: string,
-  userEmail?: string
+  userEmail?: string,
+  model?: GeminiModelType
 ): Promise<OrchestratorResponse> {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -40,9 +43,13 @@ export async function sendToOrchestrator(
   if (userEmail) {
     headers['x-user-email'] = userEmail;
   }
+  if (model) {
+    headers['x-gemini-model'] = model;
+  }
 
   const payload = {
     text,
+    model: model || 'auto',
     conversation_history: history.slice(-6).map((h) => ({
       role: h.role,
       content: h.content,
@@ -151,25 +158,29 @@ async function fallbackClientOrchestration(
     };
   }
 
-  // 2. 템플릿 빌더 & 수험생/자격증 템플릿 감지
+  // 2. 템플릿 빌더 & 수험생/자격증 템플릿 감지 (Title Sanitizer 엄격 적용)
   if (
     lower.includes('템플릿') || lower.includes('빌더') || lower.includes('대시보드') || lower.includes('노션 페이지') ||
-    lower.includes('자격증') || lower.includes('수험생') || lower.includes('공부') || lower.includes('시험') || lower.includes('오답노트') || lower.includes('합격')
+    lower.includes('자격증') || lower.includes('수험생') || lower.includes('공부') || lower.includes('시험') || lower.includes('오답노트') || lower.includes('합격') ||
+    lower.includes('시설') || lower.includes('객실') || lower.includes('하자') || lower.includes('아덴힐')
   ) {
     const isCertification = lower.includes('자격증') || lower.includes('수험생') || lower.includes('시험') || lower.includes('공부') || lower.includes('오답노트');
+    const cleanTopicTitle = sanitizeTemplateTitle(userText);
+
     return {
       intent: 'BUILDER',
       reply_message: isCertification
         ? `🎯 [자격증/수험생 올인원 합격 스케줄러] 템플릿 제작을 시작했습니다! 템플릿 빌더 라이브 캔버스에 결과물이 즉시 투영되었습니다.`
-        : `"${userText}" 템플릿 제작을 시작할게요! 템플릿 빌더 작업실로 안내해 드립니다.`,
+        : `"${cleanTopicTitle}" 템플릿 제작을 시작할게요! 템플릿 빌더 작업실로 안내해 드립니다.`,
       needs_clarification: false,
       redirect_url: '/builder',
       payload: {
         preset_key: isCertification ? 'certification_exam' : 'custom',
-        template_topic: userText,
-        suggested_title: isCertification ? '자격증/수험생 올인원 합격 스케줄러 & 오답노트' : `${userText} 템플릿`,
+        template_topic: cleanTopicTitle,
+        suggested_title: isCertification ? '자격증/수험생 올인원 합격 스케줄러 & 오답노트' : cleanTopicTitle,
+        title: cleanTopicTitle,
         complexity: 'intermediate',
-        initial_prompt: userText,
+        initial_prompt: cleanTopicTitle,
       },
     };
   }

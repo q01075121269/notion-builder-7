@@ -55,8 +55,10 @@ export const Navbar: React.FC = () => {
   };
 
   const modelLabels: Record<GeminiModelType, { label: string; short: string }> = {
-    'gemini-3.6-flash': { label: 'Gemini 3.6 Flash (권장)', short: '3.6 Flash' },
-    'gemini-3.8-flash': { label: 'Gemini 3.8 Flash (최신)', short: '3.8 Flash' },
+    'auto': { label: '⚡ Auto (스마트 라우팅: 기본 권장)', short: '⚡ Auto' },
+    'gemini-3.8-flash': { label: '🚀 Gemini 3.8 Flash (초고속 / 일상 처리)', short: '🚀 3.8 Flash' },
+    'gemini-3.1-pro': { label: '🧠 Gemini 3.1 Pro (심층 추론 / 복합 템플릿 설계)', short: '🧠 3.1 Pro' },
+    'gemini-3.6-flash': { label: 'Gemini 3.6 Flash (표준 추천)', short: '3.6 Flash' },
     'gemini-2.0-flash': { label: 'Gemini 2.0 Flash (레거시)', short: '2.0 Flash' },
     'gemini-1.5-flash': { label: 'Gemini 1.5 Flash (레거시)', short: '1.5 Flash' },
     'gemini-1.5-pro': { label: 'Gemini 1.5 Pro (고성능)', short: '1.5 Pro' }
@@ -201,11 +203,11 @@ export const Navbar: React.FC = () => {
                     className="fixed inset-0 z-40" 
                     onClick={() => setIsModelDropdownOpen(false)} 
                   />
-                  <div className="absolute right-0 mt-1.5 w-44 bg-white dark:bg-notion-dark-card rounded-2xl shadow-xl border border-neutral-200 dark:border-neutral-700 p-1.5 z-50 animate-fadeIn">
+                  <div className="absolute right-0 mt-1.5 w-64 bg-white dark:bg-notion-dark-card rounded-2xl shadow-xl border border-neutral-200 dark:border-neutral-700 p-1.5 z-50 animate-fadeIn">
                     <div className="px-2.5 py-1 text-[10px] font-bold text-neutral-400 uppercase tracking-wider">
                       Gemini 모델 선택
                     </div>
-                    {(['gemini-3.6-flash', 'gemini-3.8-flash', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'] as GeminiModelType[]).map((m) => (
+                    {(['auto', 'gemini-3.8-flash', 'gemini-3.1-pro', 'gemini-3.6-flash', 'gemini-2.0-flash'] as GeminiModelType[]).map((m) => (
                       <button
                         key={m}
                         onClick={() => {
