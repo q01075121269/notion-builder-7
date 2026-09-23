@@ -16,7 +16,7 @@ export const BuilderPage: React.FC = () => {
   );
 
   return (
-    <div className="flex-1 flex flex-col h-full w-full overflow-hidden relative bg-white dark:bg-notion-dark-bg">
+    <div className="flex-1 flex flex-col h-full w-full min-h-0 overflow-hidden relative bg-white dark:bg-notion-dark-bg">
       {/* 제1챕터 상단 서브 헤더 바 & 서브 스위처 */}
       <div className="h-10 px-4 flex items-center justify-between border-b border-neutral-200/80 dark:border-neutral-800 bg-neutral-50/90 dark:bg-neutral-900/80 backdrop-blur-xs text-xs select-none shrink-0 z-10">
         <div className="flex items-center space-x-3">
@@ -67,7 +67,7 @@ export const BuilderPage: React.FC = () => {
       </div>
 
       {/* 탭 전환 렌더링: [🔨 템플릿 빌더] vs [🗂️ 템플릿 보관함] */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
         {subTab === 'builder' ? <SplitLayout /> : <DashboardView />}
       </div>
     </div>

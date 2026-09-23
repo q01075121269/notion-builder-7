@@ -326,7 +326,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   // 접속 월(2026년 9월) 시즌 TOP 10 큐레이션 허브 & 인터랙티브 분석 뷰 상태
   // 첫 접속 시 오른쪽 영역에 큐레이션 보드 리스트가 기본 노출됨
-  const [isViewingCurationHub, setIsViewingCurationHub] = useState<boolean>(true);
+  const [isViewingCurationHub, setIsViewingCurationHub] = useState<boolean>(false);
   const [selectedCuratedId, setSelectedCuratedId] = useState<string | null>('curated-1');
   const [pendingChatPrompt, setPendingChatPrompt] = useState<string>('');
 
