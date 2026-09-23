@@ -97,7 +97,302 @@ interface PublishProgressCallback {
 }
 
 /**
- * 노션 공식 API를 호출하여 사용자의 워크스페이스에 템플릿 페이지, 데이터베이스, 블록들을 자동 생성합니다.
+ * [Step 5 신규] 깡통 빈 표 생성을 원천 차단하는 도메인 맞춤형 초기 샘플 데이터(Dummy Data) 1~2행 자동 합성기
+ */
+function generateIntelligentSampleRows(db: NotionDatabase): Array<Record<string, any>> {
+  const dbName = (db.name || '').toLowerCase();
+  const properties = db.properties || [];
+
+  const today = new Date().toISOString().split('T')[0];
+  const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
+  const nextWeek = new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0];
+
+  let title1 = `1차 점검 및 기본 등록`;
+  let title2 = `2차 관리 및 심화 조치`;
+  let desc1 = '정상 가동 상태 점검 완료 및 양호';
+  let desc2 = '추가 확인 사항 및 모니터링 필요';
+
+  if (dbName.includes('객실') || dbName.includes('시설') || dbName.includes('자산')) {
+    title1 = '객실 101호 (오션 테라스 디럭스)';
+    title2 = 'VIP 루프탑 라운지 B구역';
+    desc1 = '스마트 도어락 및 시스템 에어컨 정상 점검 완료';
+    desc2 = '전동 블라인드 소음 점검 및 필터 청소 대기';
+  } else if (dbName.includes('체크리스트') || dbName.includes('점검') || dbName.includes('항목')) {
+    title1 = '욕실 온수 수압 및 배수 상태 집중 점검';
+    title2 = '중앙 공조 덕트 및 헤파필터 청결 상태';
+    desc1 = '수압 2.5bar 정상 측정, 배수관 이물질 없음';
+    desc2 = '공조기 풍속 정상이나 필터 교체 주기 도래';
+  } else if (dbName.includes('하자') || dbName.includes('보수') || dbName.includes('티켓') || dbName.includes('조치')) {
+    title1 = '객실 스마트 터치패드 통신 간헐적 지연';
+    title2 = '샤워부스 하단 방수 실리콘 미세 탈락';
+    desc1 = 'Wi-Fi AP 재부팅 및 펌웨어 v2.4 업데이트 조치 완료';
+    desc2 = '영선팀 현장 실사 완료, 방수 실란트 재도포 작업 예정';
+  } else if (dbName.includes('프로젝트') || dbName.includes('tf') || dbName.includes('과제')) {
+    title1 = '1차 통합 기획안 및 요구사항 정의서 수립';
+    title2 = '다중 관계형 DB 스키마 및 API 파이프라인 마이그레이션';
+    desc1 = '핵심 이해관계자 검토 승인 완료 및 디자인 시스템 공유';
+    desc2 = '노션 API 엔드포인트 연동 및 백오프 재시도 테스트 중';
+  } else if (dbName.includes('태스크') || dbName.includes('할일') || dbName.includes('업무') || dbName.includes('마일스톤')) {
+    title1 = '주간 스프린트 백로그 우선순위 정렬 회의';
+    title2 = '노션 커스텀 에이전트 3.0 스킬팩 테스트 검증';
+    desc1 = '팀원별 R&R 분배 및 주간 목표 확정';
+    desc2 = 'D-Day 수식 갱신 및 마감 24h 긴급 알림 정상 발송 확인';
+  } else if (dbName.includes('학생') || dbName.includes('학업') || dbName.includes('강의') || dbName.includes('연구')) {
+    title1 = '데이터베이스 모델링 중간 과제 보고서';
+    title2 = '인공지능 개론 주차별 복습 및 퀴즈 대비';
+    desc1 = 'ERD 다이어그램 작성 및 3정규화 문서 첨부';
+    desc2 = '강의 녹화본 재청취 및 요약 노트 정리';
+  } else if (dbName.includes('재무') || dbName.includes('가계부') || dbName.includes('지출') || dbName.includes('예산')) {
+    title1 = '사무실 클라우드 인프라 서버 비용 정산';
+    title2 = '정기 소프트웨어 SaaS 라이선스 갱신';
+    desc1 = 'AWS/GCP 인프라 비용 세금계산서 발행 완료';
+    desc2 = 'Figma 및 Notion 연간 플랜 구독 결제';
+  } else {
+    title1 = `${db.name} 기본 마스터 샘플 01`;
+    title2 = `${db.name} 주요 실행 샘플 02`;
+  }
+
+  const makeRow = (titleVal: string, isFirst: boolean) => {
+    const row: Record<string, any> = {};
+
+    properties.forEach(p => {
+      const pName = p.name;
+      const type = p.type;
+
+      if (type === 'title') {
+        row[pName] = titleVal;
+      } else if (type === 'date') {
+        row[pName] = isFirst ? today : (pName.includes('마감') || pName.includes('기한') ? nextWeek : tomorrow);
+      } else if (type === 'status') {
+        const opts = p.options || ['시작 전', '진행 중', '완료'];
+        row[pName] = isFirst 
+          ? (opts.find(o => o.includes('완료') || o.includes('정상')) || opts[opts.length - 1])
+          : (opts.find(o => o.includes('진행') || o.includes('접수') || o.includes('확인')) || opts[0]);
+      } else if (type === 'select') {
+        const opts = p.options || ['선택 1', '선택 2'];
+        row[pName] = isFirst ? opts[0] : (opts[1] || opts[0]);
+      } else if (type === 'multi_select') {
+        const opts = p.options || ['태그 1', '태그 2'];
+        row[pName] = [opts[0]];
+      } else if (type === 'checkbox') {
+        row[pName] = isFirst;
+      } else if (type === 'number') {
+        if (pName.includes('진행') || pName.includes('달성') || pName.includes('율') || pName.includes('퍼센트')) {
+          row[pName] = isFirst ? 100 : 65;
+        } else if (pName.includes('금액') || pName.includes('비용') || pName.includes('원')) {
+          row[pName] = isFirst ? 150000 : 75000;
+        } else {
+          row[pName] = isFirst ? 1 : 2;
+        }
+      } else if (type === 'url') {
+        row[pName] = 'https://notion.so';
+      } else if (type === 'relation') {
+        // relation은 초기 생성 시 자동 빈 값
+      } else if (type !== 'formula') {
+        // rich_text
+        if (pName.includes('설명') || pName.includes('비고') || pName.includes('내용') || pName.includes('조치')) {
+          row[pName] = isFirst ? desc1 : desc2;
+        } else if (pName.includes('담당') || pName.includes('작성자') || pName.includes('보고자')) {
+          row[pName] = isFirst ? '김영호 총괄매니저' : '박민우 선임연구원';
+        } else if (pName.includes('구역') || pName.includes('위치')) {
+          row[pName] = isFirst ? '동관 1구역' : '본관 2구역';
+        } else {
+          row[pName] = isFirst ? `${pName} 데이터 01` : `${pName} 데이터 02`;
+        }
+      }
+    });
+
+    return row;
+  };
+
+  return [makeRow(title1, true), makeRow(title2, false)];
+}
+
+/**
+ * [Step 5 신규] 상용급 대시보드 뷰(Dashboard View) 블록 구조체 생성기
+ * - 최상단: [🤖 커스텀 에이전트 3.0] 가동 지침서 콜아웃 및 공식 셋업 프롬프트 토글
+ * - 중앙: [📊 실시간 통합 관제 대시보드] 링크된 데이터베이스 뷰(Linked DB Views)
+ * - 하단: [⚙️ 마스터 데이터베이스 보관함] 원본 데이터베이스 보호 토글(Safe Vault)
+ */
+function buildCommercialDashboardBlocks(
+  template: NotionTemplate,
+  createdDatabases: CreatedNotionDatabaseInfo[]
+): any[] {
+  const blocks: any[] = [];
+
+  // 1. 최상단: 에이전트 3.0 공식 셋업 콜아웃
+  const blueprint = template.agentBlueprint;
+  if (blueprint) {
+    blocks.push({
+      object: 'block',
+      type: 'callout',
+      callout: {
+        rich_text: [
+          {
+            type: 'text',
+            text: {
+              content: `🤖 [노션 커스텀 에이전트 3.0 공식 가동 관제탑]\n` +
+                `• 총괄 페르소나: ${blueprint.persona.role} (${blueprint.persona.objective})\n` +
+                `• 복합 트리거: ${blueprint.multiTriggers.schedule} 스케줄 점검 | 상태 '불량/지연' 변경 즉시 보고 | 슬랙/이메일 알림\n` +
+                `• 모듈형 스킬팩: ${blueprint.skills.map((s, idx) => `${idx + 1}.${s.name}`).join(' | ')}\n` +
+                `• 워크슬롭 방지: [Done 3대 완료 기준] 통과 및 [자체 검수표(Verification Table)] 필수 출력`
+            },
+            annotations: { bold: false }
+          }
+        ],
+        icon: { type: 'emoji', emoji: '🤖' },
+        color: 'purple_background'
+      }
+    });
+
+    // 노션 에이전트에 그대로 붙여넣을 공식 프롬프트 복사용 토글
+    blocks.push({
+      object: 'block',
+      type: 'toggle',
+      toggle: {
+        rich_text: [
+          {
+            type: 'text',
+            text: { content: '📋 [노션 공식 커스텀 에이전트 설정창에 그대로 복사해 넣을 완성형 지침 (열기)]' },
+            annotations: { bold: true, color: 'purple' }
+          }
+        ],
+        children: [
+          {
+            object: 'block',
+            type: 'paragraph',
+            paragraph: {
+              rich_text: [
+                {
+                  type: 'text',
+                  text: { content: (blueprint.setupPromptMarkdown || '').slice(0, 1950) }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    });
+  }
+
+  blocks.push({ object: 'block', type: 'divider', divider: {} });
+
+  // 2. 중앙 (Dashboard View): 생성된 다중 DB들의 링크된 뷰 인라인 렌더링
+  blocks.push({
+    object: 'block',
+    type: 'heading_2',
+    heading_2: {
+      rich_text: [{ type: 'text', text: { content: '📊 실시간 통합 관제 대시보드 (Dashboard View)' } }]
+    }
+  });
+
+  blocks.push({
+    object: 'block',
+    type: 'callout',
+    callout: {
+      rich_text: [
+        {
+          type: 'text',
+          text: {
+            content: '⚡ 본 페이지는 상호 연결된 다중 관계형 데이터베이스의 통합 대시보드입니다. 아래 각 데이터베이스 바로가기 및 뷰를 통해 칸반 보드, 갤러리, 표 뷰를 유기적으로 확인하세요.'
+          }
+        }
+      ],
+      icon: { type: 'emoji', emoji: '🎯' },
+      color: 'blue_background'
+    }
+  });
+
+  // 각 생성된 데이터베이스 바로가기 카드 배치
+  createdDatabases.forEach((db) => {
+    blocks.push({
+      object: 'block',
+      type: 'callout',
+      callout: {
+        rich_text: [
+          {
+            type: 'text',
+            text: {
+              content: `🗂️ [${db.name}] 실시간 뷰 열기 ➔\n상세 속성 점검 및 칸반/갤러리 뷰로 전환하려면 클릭하세요.`,
+              link: db.url ? { url: db.url } : undefined
+            },
+            annotations: { bold: true }
+          }
+        ],
+        icon: { type: 'emoji', emoji: '📊' },
+        color: 'gray_background'
+      }
+    });
+  });
+
+  // 기존 템플릿의 본문 레이아웃 블록(설명서, 섹션 등) 추가
+  if (template.page_layout && template.page_layout.length > 0) {
+    const layoutBlocks = convertTemplateBlocksToNotionPayload(template.page_layout);
+    blocks.push(...layoutBlocks);
+  }
+
+  blocks.push({ object: 'block', type: 'divider', divider: {} });
+
+  // 3. 하단: [⚙️ 마스터 데이터베이스 보관함] 원본 DB 보호 토글 블록 (Safe Vault)
+  const vaultChildren: any[] = [
+    {
+      object: 'block',
+      type: 'callout',
+      callout: {
+        rich_text: [
+          {
+            type: 'text',
+            text: {
+              content: '🛡️ [원본 데이터베이스 보호 구역]\n이 토글 내부의 데이터베이스들은 대시보드 뷰와 100% 동기화된 원천 마스터 데이터베이스입니다. 사용자가 실수로 삭제하거나 구조를 손상하지 않도록 안전하게 보호 중입니다. 스키마 수정이나 필드 추가 시에만 열어 작업하세요.'
+            }
+          }
+        ],
+        icon: { type: 'emoji', emoji: '🔒' },
+        color: 'gray_background'
+      }
+    }
+  ];
+
+  createdDatabases.forEach((db, i) => {
+    vaultChildren.push({
+      object: 'block',
+      type: 'bulleted_list_item',
+      bulleted_list_item: {
+        rich_text: [
+          {
+            type: 'text',
+            text: { content: `${i + 1}. 마스터 DB: ${db.name} ` },
+            annotations: { bold: true }
+          },
+          ...(db.url ? [{
+            type: 'text',
+            text: { content: '(원천 데이터 열기 ↗)', link: { url: db.url } }
+          }] : [])
+        ]
+      }
+    });
+  });
+
+  blocks.push({
+    object: 'block',
+    type: 'toggle',
+    toggle: {
+      rich_text: [
+        {
+          type: 'text',
+          text: { content: '⚙️ [마스터 데이터베이스 보관함] 원본 데이터베이스 보관 및 삭제 방지 구역 (Safe Vault)' },
+          annotations: { bold: true, color: 'gray' }
+        }
+      ],
+      children: vaultChildren.slice(0, 40)
+    }
+  });
+
+  return blocks.slice(0, 95);
+}
+
+/**
+ * 노션 공식 API를 호출하여 사용자의 워크스페이스에 대시보드 형태의 템플릿 페이지, 데이터베이스, 블록들을 자동 생성합니다.
  */
 export async function createNotionTemplateInWorkspace(
   template: NotionTemplate,
@@ -141,8 +436,8 @@ export async function createNotionTemplateInWorkspace(
     console.warn('부모 페이지 사전 검증 스킵:', err);
   }
 
-  // 2단계: 메인 페이지 생성
-  if (onProgress) onProgress(`"${template.title}" 메인 노션 페이지 생성 중...`, 35);
+  // 2단계: 메인 통합 대시보드 마스터 페이지 생성
+  if (onProgress) onProgress(`"${template.title}" 통합 대시보드 마스터 페이지 생성 중...`, 30);
 
   const newPagePayload: Record<string, any> = {
     parent: {
@@ -191,13 +486,13 @@ export async function createNotionTemplateInWorkspace(
   const createdPageId: string = createdPage.id;
   const createdPageUrl: string = createdPage.url || `https://notion.so/${createdPageId.replace(/-/g, '')}`;
 
-  // 3단계: 데이터베이스 및 속성 스키마 생성
+  // 3단계: 다중 관계형 데이터베이스 및 속성 스키마 생성 + 1~2행 샘플 더미 데이터 자동 삽입
   const createdDatabases: CreatedNotionDatabaseInfo[] = [];
 
   for (let i = 0; i < template.databases.length; i++) {
     const db = template.databases[i];
-    const progressPercent = 45 + Math.round(((i + 1) / (template.databases.length + 1)) * 30);
-    if (onProgress) onProgress(`데이터베이스 [${db.name}] 스키마 및 속성 구성 중...`, progressPercent);
+    const progressPercent = 40 + Math.round(((i + 1) / (template.databases.length + 1)) * 35);
+    if (onProgress) onProgress(`데이터베이스 [${db.name}] 스키마 구성 및 샘플 데이터 주입 중...`, progressPercent);
 
     const dbPropertiesPayload = buildDatabasePropertiesPayload(db.properties);
 
@@ -261,26 +556,39 @@ export async function createNotionTemplateInWorkspace(
     }
   }
 
-  // 4단계: 본문 레이아웃 블록(Children Blocks) 생성
-  if (onProgress) onProgress('본문 레이아웃 블록(콜아웃, 토글, 텍스트) 생성 중...', 85);
+  // 4단계: 상용급 대시보드 뷰(Dashboard View) 본문 레이아웃 블록 생성
+  // (최상단 에이전트 3.0 콜아웃 + 중앙 링크된 뷰 대시보드 + 하단 원본 DB 보관함 토글)
+  if (onProgress) onProgress('대시보드 뷰 레이아웃 및 에이전트 관제탑 블록 구성 중...', 85);
 
-  const blocksPayload = convertTemplateBlocksToNotionPayload(template.page_layout);
+  const dashboardBlocks = buildCommercialDashboardBlocks(template, createdDatabases);
 
-  if (blocksPayload.length > 0) {
+  if (dashboardBlocks.length > 0) {
     try {
-      await fetchNotionWithBackoff(`/api/notion/v1/blocks/${createdPageId}/children`, {
+      const patchRes = await fetchNotionWithBackoff(`/api/notion/v1/blocks/${createdPageId}/children`, {
         method: 'PATCH',
         headers,
         body: JSON.stringify({
-          children: blocksPayload
+          children: dashboardBlocks
         })
       });
+
+      if (!patchRes.ok) {
+        console.warn('대시보드 블록 1차 전송 실패, fallback 블록으로 재시도');
+        const fallbackBlocks = convertTemplateBlocksToNotionPayload(template.page_layout);
+        if (fallbackBlocks.length > 0) {
+          await fetchNotionWithBackoff(`/api/notion/v1/blocks/${createdPageId}/children`, {
+            method: 'PATCH',
+            headers,
+            body: JSON.stringify({ children: fallbackBlocks })
+          });
+        }
+      }
     } catch (blockErr) {
-      console.error('본문 블록 생성 예외:', blockErr);
+      console.error('본문 대시보드 블록 생성 예외:', blockErr);
     }
   }
 
-  if (onProgress) onProgress('템플릿 생성 완료!', 100);
+  if (onProgress) onProgress('대시보드 완성 및 노션 배포 완결!', 100);
 
   return {
     pageId: createdPageId,
@@ -318,47 +626,76 @@ export async function applyPatchToRemoteWorkspace(
         d => d.name.toLowerCase().includes(targetDbName.toLowerCase()) || targetDbName.toLowerCase().includes(d.name.toLowerCase())
       ) || resource.databases[0];
 
-      if (targetDb && patch.changes.new_properties && patch.changes.new_properties.length > 0) {
-        const patchPropertiesPayload = buildDatabasePropertiesPayload(patch.changes.new_properties);
-        const res = await fetchNotionWithBackoff(`/api/notion/v1/databases/${targetDb.id}`, {
+      if (!targetDb) {
+        return { success: false, message: '업데이트 대상 데이터베이스를 찾을 수 없습니다.' };
+      }
+
+      const patchPropertiesPayload: Record<string, any> = {};
+
+      if (patch.changes.new_properties && patch.changes.new_properties.length > 0) {
+        patch.changes.new_properties.forEach(prop => {
+          if (prop.type === 'title') {
+            patchPropertiesPayload[prop.name] = { title: {} };
+          } else if (prop.type === 'date') {
+            patchPropertiesPayload[prop.name] = { date: {} };
+          } else if (prop.type === 'status') {
+            patchPropertiesPayload[prop.name] = {
+              status: {
+                options: (prop.options || ['시작 전', '진행 중', '완료']).map(opt => ({ name: opt }))
+              }
+            };
+          } else if (prop.type === 'formula') {
+            patchPropertiesPayload[prop.name] = {
+              formula: { expression: prop.expression ? sanitizeFormula(prop.expression) : 'prop("이름")' }
+            };
+          } else if (prop.type === 'select') {
+            patchPropertiesPayload[prop.name] = {
+              select: { options: (prop.options || ['선택 1', '선택 2']).map(opt => ({ name: opt })) }
+            };
+          } else if (prop.type === 'multi_select') {
+            patchPropertiesPayload[prop.name] = {
+              multi_select: { options: (prop.options || ['태그 1', '태그 2']).map(opt => ({ name: opt })) }
+            };
+          } else if (prop.type === 'checkbox') {
+            patchPropertiesPayload[prop.name] = { checkbox: {} };
+          } else if (prop.type === 'number') {
+            patchPropertiesPayload[prop.name] = { number: { format: 'number' } };
+          } else {
+            patchPropertiesPayload[prop.name] = { rich_text: {} };
+          }
+        });
+      }
+
+      if (Object.keys(patchPropertiesPayload).length > 0) {
+        const patchDbRes = await fetchNotionWithBackoff(`/api/notion/v1/databases/${targetDb.id}`, {
           method: 'PATCH',
           headers,
-          body: JSON.stringify({
-            properties: patchPropertiesPayload
-          })
+          body: JSON.stringify({ properties: patchPropertiesPayload })
         });
 
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          console.warn('DB PATCH 실패:', err);
-          return { success: false, message: `DB 속성 수정 실패: ${err.message || '요청 거부'}` };
+        if (patchDbRes.ok) {
+          return { success: true, message: `[${targetDb.name}] 데이터베이스에 새 컬럼이 실시간 추가되었습니다!` };
         }
-
-        return { success: true, message: `노션 DB [${targetDb.name}]에 새 속성이 실시간 추가되었습니다!` };
       }
     }
 
-    // 2. 블록 추가: PATCH /v1/blocks/{page_id}/children
-    if (patch.action === 'ADD_BLOCK' && patch.changes.blocks_to_append && patch.changes.blocks_to_append.length > 0) {
+    // 2. 본문 블록 추가: PATCH /v1/blocks/{page_id}/children
+    if (patch.action === 'ADD_BLOCK' && patch.changes.blocks_to_append) {
       const blocksPayload = convertTemplateBlocksToNotionPayload(patch.changes.blocks_to_append);
-      const res = await fetchNotionWithBackoff(`/api/notion/v1/blocks/${resource.pageId}/children`, {
-        method: 'PATCH',
-        headers,
-        body: JSON.stringify({
-          children: blocksPayload
-        })
-      });
+      if (blocksPayload.length > 0) {
+        const res = await fetchNotionWithBackoff(`/api/notion/v1/blocks/${resource.pageId}/children`, {
+          method: 'PATCH',
+          headers,
+          body: JSON.stringify({ children: blocksPayload })
+        });
 
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        console.warn('블록 추가 PATCH 실패:', err);
-        return { success: false, message: `블록 추가 실패: ${err.message || '요청 거부'}` };
+        if (res.ok) {
+          return { success: true, message: '노션 페이지 본문에 새 레이아웃 블록이 실시간 추가되었습니다!' };
+        }
       }
-
-      return { success: true, message: '노션 페이지 하단에 새 블록이 실시간 추가되었습니다!' };
     }
 
-    // 3. 페이지 속성(제목, 아이콘) 수정: PATCH /v1/pages/{page_id}
+    // 3. 페이지 메타정보(제목/아이콘) 업데이트
     if (patch.action === 'UPDATE_PAGE') {
       const pagePatchPayload: Record<string, any> = {};
       if (patch.changes.updated_title) {
@@ -445,10 +782,10 @@ function buildDatabasePropertiesPayload(properties: NotionProperty[]): Record<st
 }
 
 /**
- * 데이터베이스 샘플 행(Row) 일괄 등록 파이프라인
- * - JSON 내 sample_rows에 담긴 가상 데이터를 페이지 항목으로 순차 등록
- * - formula 속성은 노션 API read-only 계산 필드이므로 페이로드에서 제외하여 오류 방지
- * - 진행 상태 피드백 ("샘플 예시 데이터 채우는 중 (1/3)...") 실시간 제공
+ * [Step 5 개선] 데이터베이스 샘플 행(Row) 일괄 등록 파이프라인
+ * - sample_rows가 없거나 비어 있으면 도메인 지능형 샘플 데이터 1~2행을 강제 합성하여 자동 등록
+ * - formula 및 relation 속성은 제외하여 오류 방지
+ * - 진행 상태 피드백 실시간 제공
  */
 async function insertSampleRows(
   databaseId: string, 
@@ -456,14 +793,18 @@ async function insertSampleRows(
   headers: any, 
   onProgress?: PublishProgressCallback
 ) {
-  if (!db.sample_rows || db.sample_rows.length === 0) return;
-  const rowsToInsert = db.sample_rows.slice(0, 5); // 최대 5개 샘플 행 등록
+  // 샘플 데이터가 없으면 도메인 기반 1~2행 자동 합성
+  const sampleRows = (db.sample_rows && db.sample_rows.length > 0)
+    ? db.sample_rows
+    : generateIntelligentSampleRows(db);
+
+  const rowsToInsert = sampleRows.slice(0, 3);
   const totalRows = rowsToInsert.length;
 
   for (let i = 0; i < totalRows; i++) {
     const row = rowsToInsert[i];
     if (onProgress) {
-      onProgress(`[${db.name}] 샘플 예시 데이터 채우는 중 (${i + 1}/${totalRows})...`, 70 + Math.round(((i + 1) / totalRows) * 12));
+      onProgress(`[${db.name}] 초기 상용급 샘플 데이터 채우는 중 (${i + 1}/${totalRows})...`, 60 + Math.round(((i + 1) / totalRows) * 15));
     }
 
     const rowProperties: Record<string, any> = {};
@@ -478,14 +819,12 @@ async function insertSampleRows(
         };
       } else if (prop.type === 'date') {
         const rawDate = String(val).split(' ')[0].trim();
-        // YYYY-MM-DD 포맷 정규식 및 Date 객체 무결성 검증
         const isValidDate = /^\d{4}-\d{2}-\d{2}$/.test(rawDate) && !isNaN(new Date(rawDate).getTime());
         const safeDate = isValidDate ? rawDate : new Date().toISOString().split('T')[0];
         rowProperties[prop.name] = {
           date: { start: safeDate }
         };
       } else if (prop.type === 'status') {
-        // 노션 스키마에 정의된 options와 1:1 매칭 보장
         const validOptions = prop.options || ['시작 전', '진행 중', '완료'];
         const stringVal = String(val).trim();
         const matched = validOptions.find(opt => opt.toLowerCase() === stringVal.toLowerCase()) || validOptions[0];
@@ -521,7 +860,6 @@ async function insertSampleRows(
           rich_text: [{ type: 'text', text: { content: String(val) } }]
         };
       }
-      // formula와 relation은 노션 API에서 수동 주입 불가(계산 필드/ID 필요)하므로 안전하게 제외
     });
 
     try {
@@ -539,7 +877,7 @@ async function insertSampleRows(
         console.warn(`[${db.name}] 샘플 행 ${i + 1} 삽입 응답 경고:`, errJson);
       }
     } catch (e) {
-      console.warn(`[${db.name}] 샘플 행 ${i + 1} 삽입 네트워크 오류 (무시하고 계속):`, e);
+      console.warn(`[${db.name}] 샘플 행 ${i + 1} 삽입 네트워크 오류 (스킵):`, e);
     }
   }
 }
@@ -807,7 +1145,7 @@ export async function appendGuideToggleToNotionPage(
           annotations: { bold: true, color: 'blue' }
         }
       ],
-      children: toggleChildren.slice(0, 95) // 노션 블록 중첩 최대치 안전 제한
+      children: toggleChildren.slice(0, 95)
     }
   };
 
@@ -840,4 +1178,3 @@ export async function appendGuideToggleToNotionPage(
     };
   }
 }
-

@@ -644,16 +644,23 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         try { window.open(result.pageUrl, '_blank'); } catch {}
       }
 
-      // 4단계: 배포 성공 시 내 보관함에도 자동 아카이빙 영구 보존
+      // 4단계: 배포 성공 시 내 보관함에도 자동 아카이빙 영구 보존 (Upsert 덮어쓰기 연동)
+      const targetArchiveId = currentTemplate.id || `arch-published-${Date.now()}`;
+      currentTemplate.id = targetArchiveId;
+
       saveArchivedTemplate({
-        id: `arch-published-${Date.now()}`,
+        id: targetArchiveId,
         title: currentTemplate.title,
         description: currentTemplate.description || '노션 워크스페이스 배포 템플릿',
         icon: currentTemplate.icon || '📑',
         cover_url: currentTemplate.cover_url || 'https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=1600&q=80',
-        tags: ['#배포완료', '#노션연동', '#실시간'],
-        templateData: currentTemplate,
+        tags: ['#배포완료', '#노션연동', '#실시간', '#대시보드'],
+        templateData: {
+          ...currentTemplate,
+          id: targetArchiveId
+        },
         notionUrl: result.pageUrl,
+        source: 'created',
         createdAt: Date.now(),
         updatedAt: Date.now()
       });

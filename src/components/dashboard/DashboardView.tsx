@@ -14,6 +14,8 @@ import {
   getArchivedTemplates, 
   deleteArchivedTemplate, 
   saveArchivedTemplate,
+  clearChatSlopTemplates,
+  resetArchiveToDefault,
   getTemplateFolders,
   deleteTemplateFolder,
   moveTemplateToFolder,
@@ -225,24 +227,65 @@ export const DashboardView: React.FC = () => {
     showToast(`"${tplItem.title}" 템플릿이 빌더에 로드되었습니다.`, 'info');
   };
 
-  // 핸들러: 현재 작업물 보관함에 저장
+  // 핸들러: 현재 작업물 보관함에 저장 (기존 ID 또는 동일 제목 존재 시 덮어쓰기 Upsert)
+  
+  // 핸들러: 과거 말버릇 및 중복 템플릿 일괄 정리
+  const handleCleanSlopTemplates = () => {
+    clearChatSlopTemplates();
+    refreshData();
+    showToast('과거 음성 말버릇 제목 및 중복 더미 템플릿이 깔끔하게 정리되었습니다! ✨', 'success');
+  };
+
+  // 핸들러: 보관함 시드 리셋
+  const handleResetArchive = () => {
+    if (window.confirm('보관함을 초기 추천 템플릿 상태로 리셋하시겠습니까? (직접 작성한 템플릿이 초기화됩니다)')) {
+      resetArchiveToDefault();
+      refreshData();
+      showToast('보관함이 초기 추천 템플릿으로 리셋되었습니다.', 'info');
+    }
+  };
+
   const handleArchiveCurrent = () => {
     if (!currentTemplate) return;
-    const newArchived: ArchivedTemplate = {
-      id: `arch-${Date.now()}`,
-      title: currentTemplate.title,
+    
+    const existingList = getArchivedTemplates();
+    const cleanTitle = currentTemplate.title.trim();
+    
+    // 기존 템플릿 검색 (ID 일치, templateData.id 일치, 또는 동일 제목)
+    const existing = existingList.find(t => 
+      (currentTemplate.id && t.id === currentTemplate.id) ||
+      (currentTemplate.id && t.templateData?.id === currentTemplate.id) ||
+      (t.title === cleanTitle && (t.source === 'created' || !t.id.startsWith('arch-tpl-')))
+    );
+
+    const targetId = existing ? existing.id : (currentTemplate.id || `arch-${Date.now()}`);
+    currentTemplate.id = targetId;
+
+    const targetArchived: ArchivedTemplate = {
+      id: targetId,
+      title: cleanTitle,
       description: currentTemplate.description || '빌더 작성 템플릿',
       icon: currentTemplate.icon || '📑',
       cover_url: currentTemplate.cover_url || 'https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=1600&q=80',
-      tags: ['#내가만든템플릿', '#맞춤제작'],
-      templateData: currentTemplate,
-      source: 'created',
-      createdAt: Date.now(),
+      tags: ['#내가만든템플릿', '#맞춤제작', '#에이전트3.0'],
+      templateData: {
+        ...currentTemplate,
+        id: targetId,
+        title: cleanTitle
+      },
+      source: existing?.source || 'created',
+      createdAt: existing?.createdAt || Date.now(),
       updatedAt: Date.now()
     };
-    saveArchivedTemplate(newArchived);
+
+    saveArchivedTemplate(targetArchived);
     refreshData();
-    showToast(`"${currentTemplate.title}" 템플릿이 내 보관함에 저장되었습니다.`, 'success');
+
+    if (existing) {
+      showToast(`"${cleanTitle}" 기존 템플릿의 스키마와 데이터가 최신 상태로 덮어쓰기(업데이트)되었습니다!`, 'success');
+    } else {
+      showToast(`"${cleanTitle}" 템플릿이 내 보관함에 새롭게 저장되었습니다.`, 'success');
+    }
   };
 
   // 핸들러: 스마트폰식 DnD 두 카드 병합 모달 호출
@@ -338,6 +381,25 @@ export const DashboardView: React.FC = () => {
                   <span>현재 빌더 템플릿 저장</span>
                 </button>
               )}
+
+              {/* 말버릇/중복 템플릿 정리 버튼 */}
+              <button
+                onClick={handleCleanSlopTemplates}
+                className="flex-1 md:flex-none px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-neutral-800 dark:hover:bg-neutral-700 text-slate-700 dark:text-slate-200 text-xs font-semibold flex items-center justify-center space-x-1.5 transition cursor-pointer border border-slate-200/80 dark:border-neutral-700/80"
+                title="과거 음성 말버릇 제목이나 중복 생성된 템플릿을 한 번에 정제합니다"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-indigo-500" />
+                <span>말버릇·중복 정리</span>
+              </button>
+
+              {/* 보관함 리셋 버튼 */}
+              <button
+                onClick={handleResetArchive}
+                className="flex-1 md:flex-none px-2.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-neutral-800 dark:hover:bg-neutral-700 text-slate-500 dark:text-slate-400 text-xs font-semibold flex items-center justify-center space-x-1 transition cursor-pointer border border-slate-200/80 dark:border-neutral-700/80"
+                title="보관함을 초기 추천 템플릿 상태로 리셋합니다"
+              >
+                <span>리셋</span>
+              </button>
             </div>
           </div>
 

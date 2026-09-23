@@ -6,6 +6,7 @@ import type {
   GoogleSyncConfig 
 } from '../types/dashboard';
 import { PRESET_TEMPLATES } from './presetTemplates';
+import { sanitizeTemplateTitle } from './notionDynamicBuilder';
 
 const STORAGE_KEYS = {
   TEMPLATES: 'notion_archived_templates',
@@ -294,56 +295,103 @@ const DEFAULT_GOOGLE_SYNC_CONFIG: GoogleSyncConfig = {
 
 // =================== 스토리지 API =================== //
 
-// 템플릿 목록 조회 (초기 시드 자동 병합 및 무결성 보장)
+// 템플릿 목록 조회 (초기 시드 자동 병합, 제목 정제기 가드레일 및 무결성 보장)
 export const getArchivedTemplates = (): ArchivedTemplate[] => {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.TEMPLATES);
+    let templates: any[] = [];
     if (!raw) {
       localStorage.setItem(STORAGE_KEYS.TEMPLATES, JSON.stringify(SEED_TEMPLATES));
-      return SEED_TEMPLATES;
+      templates = SEED_TEMPLATES;
+    } else {
+      const parsed = JSON.parse(raw);
+      templates = Array.isArray(parsed) ? parsed : SEED_TEMPLATES;
     }
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) {
-      localStorage.setItem(STORAGE_KEYS.TEMPLATES, JSON.stringify(SEED_TEMPLATES));
-      return SEED_TEMPLATES;
-    }
-    // 데이터 손상 방어: 누락된 필수 필드 기본값 보장
-    return parsed.map((item, idx) => ({
-      id: item?.id || `arch-${Date.now()}-${idx}`,
-      title: item?.title || '제목 없는 템플릿',
-      description: item?.description || '',
-      icon: item?.icon || '📑',
-      cover_url: item?.cover_url || 'https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=1600&q=80',
-      tags: Array.isArray(item?.tags) ? item.tags : ['#템플릿'],
-      templateData: item?.templateData || {
-        title: item?.title || '기본 템플릿',
+
+    // 데이터 손상 방어 및 음성 말버릇/비정형 제목 자동 정제(Sanitization)
+    return templates.map((item, idx) => {
+      const rawTitle = item?.title || '제목 없는 템플릿';
+      const cleanTitle = sanitizeTemplateTitle(rawTitle);
+      
+      const tplData = item?.templateData || {
+        title: cleanTitle,
         description: item?.description || '',
         icon: item?.icon || '📑',
         databases: [],
         page_layout: []
-      },
-      createdAt: typeof item?.createdAt === 'number' ? item.createdAt : Date.now(),
-      updatedAt: typeof item?.updatedAt === 'number' ? item.updatedAt : Date.now(),
-      source: item?.source || (item?.id?.startsWith('arch-tpl-') ? 'curated' : 'created'),
-      notionUrl: item?.notionUrl || undefined
-    }));
+      };
+      if (tplData.title) {
+        tplData.title = sanitizeTemplateTitle(tplData.title);
+      }
+
+      return {
+        id: item?.id || `arch-${Date.now()}-${idx}`,
+        title: cleanTitle,
+        description: item?.description || '',
+        icon: item?.icon || '📑',
+        cover_url: item?.cover_url || 'https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=1600&q=80',
+        tags: Array.isArray(item?.tags) ? item.tags : ['#템플릿'],
+        templateData: tplData,
+        createdAt: typeof item?.createdAt === 'number' ? item.createdAt : Date.now(),
+        updatedAt: typeof item?.updatedAt === 'number' ? item.updatedAt : Date.now(),
+        source: item?.source || (item?.id?.startsWith('arch-tpl-') ? 'curated' : 'created'),
+        notionUrl: item?.notionUrl || undefined,
+        folderId: item?.folderId || null
+      };
+    });
   } catch (e) {
     console.error('Failed to get archived templates:', e);
     return SEED_TEMPLATES;
   }
 };
 
-// 템플릿 저장 (추가/수정)
+// 템플릿 저장 (동일 ID 또는 동일 제목 존재 시 덮어쓰기(Upsert) 지능형 매칭)
 export const saveArchivedTemplate = (template: ArchivedTemplate): ArchivedTemplate[] => {
   const current = getArchivedTemplates();
-  const existsIndex = current.findIndex(t => t.id === template.id);
+  const cleanTitle = sanitizeTemplateTitle(template.title);
+
+  const safeTemplate: ArchivedTemplate = {
+    ...template,
+    title: cleanTitle,
+    templateData: {
+      ...template.templateData,
+      title: cleanTitle
+    }
+  };
+
+  // 기존 템플릿 탐색 (ID 일치, templateData.id 일치, 또는 동일 제목의 created/curated 템플릿)
+  const existsIndex = current.findIndex(t => 
+    t.id === safeTemplate.id ||
+    (safeTemplate.templateData?.id && t.templateData?.id === safeTemplate.templateData.id) ||
+    (safeTemplate.templateData?.id && t.id === safeTemplate.templateData.id) ||
+    (safeTemplate.id && t.templateData?.id === safeTemplate.id) ||
+    (t.title === cleanTitle && (t.source === safeTemplate.source || safeTemplate.source === 'created'))
+  );
+
   let updated: ArchivedTemplate[];
   if (existsIndex >= 0) {
+    // 기존 데이터 덮어쓰기 (기존 ID 및 최초 생성일 보존)
+    const existing = current[existsIndex];
+    const merged: ArchivedTemplate = {
+      ...existing,
+      ...safeTemplate,
+      id: existing.id,
+      createdAt: existing.createdAt,
+      folderId: safeTemplate.folderId !== undefined ? safeTemplate.folderId : existing.folderId,
+      updatedAt: Date.now(),
+      templateData: {
+        ...safeTemplate.templateData,
+        id: existing.id,
+        title: cleanTitle
+      }
+    };
     updated = [...current];
-    updated[existsIndex] = { ...template, updatedAt: Date.now() };
+    updated[existsIndex] = merged;
   } else {
-    updated = [template, ...current];
+    // 신규 등록
+    updated = [safeTemplate, ...current];
   }
+
   localStorage.setItem(STORAGE_KEYS.TEMPLATES, JSON.stringify(updated));
   return updated;
 };
@@ -354,6 +402,54 @@ export const deleteArchivedTemplate = (id: string): ArchivedTemplate[] => {
   const updated = current.filter(t => t.id !== id);
   localStorage.setItem(STORAGE_KEYS.TEMPLATES, JSON.stringify(updated));
   return updated;
+};
+
+// [Step 5 신규] 과거 말버릇 및 중복 생성된 템플릿 일괄 정제 클리너
+export const clearChatSlopTemplates = (): ArchivedTemplate[] => {
+  const current = getArchivedTemplates();
+  const seenTitles = new Set<string>();
+  const cleaned: ArchivedTemplate[] = [];
+
+  for (const item of current) {
+    const cleanTitle = sanitizeTemplateTitle(item.title);
+    
+    // 공식 시드(curated)는 무조건 보존
+    if (item.source === 'curated' || item.id.startsWith('arch-tpl-')) {
+      cleaned.push({
+        ...item,
+        title: cleanTitle,
+        templateData: { ...item.templateData, title: cleanTitle }
+      });
+      seenTitles.add(cleanTitle);
+      continue;
+    }
+
+    // 중복된 제목의 사용자 생성 템플릿은 최신 1건만 유지
+    if (seenTitles.has(cleanTitle)) {
+      continue;
+    }
+    seenTitles.add(cleanTitle);
+
+    // 무의미한 빈 더미 데이터 제거
+    if (!cleanTitle || cleanTitle === '제목 없는 템플릿' || cleanTitle === '기본 템플릿') {
+      continue;
+    }
+
+    cleaned.push({
+      ...item,
+      title: cleanTitle,
+      templateData: { ...item.templateData, title: cleanTitle }
+    });
+  }
+
+  localStorage.setItem(STORAGE_KEYS.TEMPLATES, JSON.stringify(cleaned));
+  return cleaned;
+};
+
+// [Step 5 신규] 보관함을 기본 추천 시드 템플릿으로 완전 초기화
+export const resetArchiveToDefault = (): ArchivedTemplate[] => {
+  localStorage.setItem(STORAGE_KEYS.TEMPLATES, JSON.stringify(SEED_TEMPLATES));
+  return SEED_TEMPLATES;
 };
 
 // 프롬프트 스니펫 목록 조회

@@ -10,9 +10,11 @@ import { TemplateBenchmarkCard } from './preview/TemplateBenchmarkCard';
 import { StructureTreeView } from './preview/StructureTreeView';
 import { AgentBlueprintCallout } from './preview/AgentBlueprintCallout';
 import { ensureTemplateAgentBlueprint } from '../services/notionDynamicBuilder';
+import { saveArchivedTemplate } from '../services/archiveStorage';
 import { useApp } from '../context/AppContext';
 import {
   Layers,
+  BookmarkCheck,
   Sparkles,
   Database,
   ShieldCheck,
@@ -89,6 +91,36 @@ export const TemplatePreviewCanvas: React.FC<TemplatePreviewCanvasProps> = ({ te
   }, [editableTemplate]);
 
   // 초기화 핸들러 (원래 템플릿 복원)
+  
+  // [Step 5 신규] 캔버스에서 인라인 수정한 스키마를 보관함에 즉시 덮어쓰기(Upsert) 저장
+  const handleSaveToArchive = () => {
+    if (!editableTemplate) return;
+
+    const targetId = editableTemplate.id || template.id || `arch-${Date.now()}`;
+    const targetTitle = editableTemplate.title.trim();
+
+    const updatedTemplate: NotionTemplate = {
+      ...editableTemplate,
+      id: targetId,
+      title: targetTitle
+    };
+
+    saveArchivedTemplate({
+      id: targetId,
+      title: targetTitle,
+      description: updatedTemplate.description || '캔버스 인라인 편집 템플릿',
+      icon: updatedTemplate.icon || '📑',
+      cover_url: updatedTemplate.cover_url || 'https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=1600&q=80',
+      tags: ['#내가만든템플릿', '#캔버스편집', '#에이전트3.0'],
+      templateData: updatedTemplate,
+      source: 'created',
+      createdAt: Date.now(),
+      updatedAt: Date.now()
+    });
+
+    showToast(`"${targetTitle}" 템플릿이 내 보관함에 안전하게 덮어쓰기(업데이트) 저장되었습니다!`, 'success');
+  };
+
   const handleResetToOriginal = () => {
     try {
       localStorage.removeItem(VAULT_STORAGE_KEY);
@@ -532,6 +564,16 @@ export const TemplatePreviewCanvas: React.FC<TemplatePreviewCanvasProps> = ({ te
 
               {/* 우측 유틸리티 버튼 (JSON 보기, 배포, 내보내기) */}
               <div className="flex items-center space-x-1.5 sm:space-x-2 shrink-0">
+                
+                <button
+                  onClick={handleSaveToArchive}
+                  className="flex items-center space-x-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 shadow-2xs transition cursor-pointer whitespace-nowrap"
+                  title="현재 인라인 수정한 스키마를 내 보관함에 즉시 덮어쓰기(업데이트) 저장합니다"
+                >
+                  <BookmarkCheck className="w-3.5 h-3.5 text-amber-500" />
+                  <span className="hidden sm:inline">보관함 저장</span>
+                </button>
+
                 <button
                   onClick={() => setIsRawJsonModalOpen(true)}
                   className="flex items-center space-x-1 px-2.5 py-1 rounded-lg text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 transition cursor-pointer whitespace-nowrap"
