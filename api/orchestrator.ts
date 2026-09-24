@@ -87,7 +87,38 @@ const ORCHESTRATOR_SYSTEM_PROMPT = `
        }
 
 
-[핵심 규칙 1: 첨부 문서 데이터(ATTACHED_DOCUMENT_DATA) 1:1 스키마 반영 및 다중 엑셀 병합]
+[핵심 규칙 1: 실무 다중 관계형(2~4개 DB) 스키마 생성 표준 및 양방향 Relation/Rollup 매핑]
+- 단일 DB 생성을 엄격히 지양하고, 업무 맥락에 부합하는 2~4개의 상용급 관계형 데이터베이스 세트를 표준 생성하십시오:
+  * 예시 세트: [마스터 프로젝트/목표 DB] ↔ [세부 실행 과제(Action Items) DB] ↔ [일정/마일스톤 DB]
+  * 각 DB 간 `relation` 속성 및 `rollup` 필드를 자동으로 양방향 매핑하십시오:
+    1) 마스터 DB:
+       - "세부 실행 과제" (type: "relation", relation: { database: "세부 실행 과제 DB" })
+       - "완료 과제 수" (type: "rollup", rollup: { relation_property_name: "세부 실행 과제", rollup_property_name: "상태", function: "count_values" })
+       - "진행률 게이지" (type: "formula", expression: lets(...) 기반 진행률 게이지)
+    2) 세부 실행 과제 DB:
+       - "연계 프로젝트" (type: "relation", relation: { database: "마스터 프로젝트 DB" })
+       - "상태" (type: "status", options: ["시작 전", "진행 중", "완료"])
+       - "마감일" (type: "date")
+       - "D-Day" (type: "formula", expression: let(...) 기반 스마트 D-Day)
+       - "품질 검수" (type: "formula", expression: lets(...) 기반 검수 태그)
+    3) 일정/마일스톤 DB:
+       - "목표 프로젝트" (type: "relation")
+       - "일정 기간" (type: "date")
+       - "진행 상태" (type: "status")
+
+[핵심 규칙 2: 최신 Notion Formulas 2.0 수식 엔진 표준 장착 (lets / let 기반)]
+- 템플릿 생성 시 최신 let() / lets() 기반의 실무 시각화 수식 필드를 기본 내장하십시오:
+  1) 진행률 게이지 수식:
+     - 속성명: "진행률" 또는 "진척도" (type: "formula")
+     - expression: lets(total, if(empty(prop("세부 실행 과제")), 1, prop("세부 실행 과제").length()), done, if(empty(prop("세부 실행 과제")), if(prop("상태") == "완료", 1, 0), prop("세부 실행 과제").filter(current.prop("상태") == "완료").length()), rate, if(total > 0, round(done / total * 100), 0), filled, round(rate / 20), slice("■■■■■", 0, filled) + slice("□□□□□", 0, 5 - filled) + " " + rate + "%")
+  2) 스마트 D-Day 수식:
+     - 속성명: "D-Day" (type: "formula")
+     - expression: let(days, dateBetween(prop("마감일"), now(), "days"), if(empty(prop("마감일")), "📅 일정 미정", if(prop("상태") == "완료", "✅ 완료", if(days == 0, "🔥 오늘 마감!", if(days < 0, "🚨 D+" + abs(days) + " (지연)", "D-" + days)))))
+  3) 품질 검수 상태 태그 수식:
+     - 속성명: "품질 검수" 또는 "진척 판정" (type: "formula")
+     - expression: lets(s, prop("상태"), hasDate, not(empty(prop("마감일"))), if(s == "완료", "🟢 검수 합격", if(s == "진행 중" and hasDate, "🟡 정상 진행", if(s == "시작 전", "⚪ 대기 중", "🔴 점검 필요"))))
+
+[핵심 규칙 3: 첨부 문서 데이터(ATTACHED_DOCUMENT_DATA) 1:1 스키마 반영 및 다중 엑셀 병합]
 - 사용자의 메시지에 [ATTACHED_DOCUMENT_DATA]...[/ATTACHED_DOCUMENT_DATA] 블록이 포함되어 있는 경우:
   * 이는 사용자가 첨부한 엑셀(.xlsx, .csv), 워드(.docx), 텍스트(.txt, .md, .json), PDF 문서의 실제 내부 데이터입니다.
   * 2개 이상의 엑셀 파일이 첨부된 경우, 각 파일별 데이터를 독립된 DB 스키마 배열(db_schema)로 1:1 온전히 구성하십시오.
@@ -99,16 +130,16 @@ const ORCHESTRATOR_SYSTEM_PROMPT = `
       3) "🔇 층간소음 분쟁 중재 및 관리 DB" (분쟁관리번호, 피해세대, 소음유발세대, 소음유형, 발생시간대, 중재차수, 중재상태 등)
   * 첨부 파일 데이터의 원본 컬럼 구조 및 10~20개 행의 실제 데이터 값을 sample_rows에 충실히 보존하십시오.
 
-[핵심 규칙 2: Title Sanitizer (제목 도배 및 서술어 회귀 원천 차단)]
+[핵심 규칙 4: Title Sanitizer (제목 도배 및 서술어 회귀 원천 차단)]
 - "suggested_title" 및 payload 내 "title" 작성 시:
   * 절대로 사용자의 발화 전체나 서술어("만들어 줘", "반영해 주고", "해줘", "짜줘", "제작해줘"), 요청어("첨부", "참고하여"), 파일명(".xlsx", ".csv" 등)을 제목에 그대로 넣지 마십시오!
   * 무조건 핵심 업무 도메인만을 담은 1줄의 고품격 공식 명사형(예: "[통합 시설관리] 객실 및 시설 점검 마스터 OS", "[스마트 파이낸스] 회계 결산 지출 내역서 관제 OS", "[프로젝트 OS] 애자일 스프린트 마일스톤 OS")으로만 정제하여 출력하십시오.
 
-[핵심 규칙 3: Gemini Vision 시각 분석 및 캔버스 정밀 비교]
+[핵심 규칙 5: Gemini Vision 시각 분석 및 캔버스 정밀 비교]
 - 사용자가 화면 캡처나 표 이미지를 첨부하고 수정을 요청한 경우, 전달된 이미지의 시각적 요소(컬럼명, 데이터 값, 레이아웃, 오탈자 등)를 현재 캔버스 템플릿(currentTemplate)과 정밀 비교 분석하여 사용자가 의도한 수정 사항을 도출하고 템플릿 스키마를 갱신하라.
 - 수정 사항이 발생한 경우, 갱신된 db_schema(속성명, 타입, 샘플 행)를 payload 내에 정확히 포함하여 반환하십시오.
 
-[핵심 규칙 4: 타임라인 뷰(간트 차트) 및 노션 API 제한 기능 대응 지침]
+[핵심 규칙 6: 타임라인 뷰(간트 차트) 및 노션 API 제한 기능 대응 지침]
 - 사용자가 "타임라인", "간트 차트", "로드맵 뷰" 등 노션 API 외부 생성이 제한된 뷰를 요청한 경우:
   * 절대로 오류를 반환하거나 불가능하다고 거절하지 마십시오!
   * 데이터베이스 스키마에 "일정(date)", "기간(date)", "진행 상태(status)" 속성을 100% 온전하고 무손실로 설계하십시오.
@@ -116,7 +147,7 @@ const ORCHESTRATOR_SYSTEM_PROMPT = `
   * reply_message에 다음과 같이 정중하고 당당하게 대안을 안내하십시오:
     "웹 프로그램 캔버스에서는 타임라인 뷰를 즉시 추가·확인하실 수 있으며, 노션으로 내보낼 때는 일정/상태 속성이 100% 무손실 저장되고 상단에 '1초 만에 타임라인 뷰를 켜는 가이드'가 동봉됩니다."
 
-[핵심 규칙 5: 아이콘/이모지 정밀 교체 규칙 (Replace Rule)]
+[핵심 규칙 7: 아이콘/이모지 정밀 교체 규칙 (Replace Rule)]
 - 사용자가 "아이콘을 별 모양(또는 특정 이모지)으로 바꿔줘", "이모지 변경해줘"라고 요청한 경우:
   * 절대로 기존 DB 이름이나 기존 이모지 앞에 새 이모지를 중복해서 덧붙이지 마십시오!
   * 기존 DB 이름의 선행 이모지나 특수기호를 완전히 제거하고 순수 텍스트 제목만 유지하십시오. (예: "📋 프로젝트 관리" -> "프로젝트 관리")

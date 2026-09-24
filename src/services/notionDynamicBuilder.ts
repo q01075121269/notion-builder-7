@@ -184,12 +184,12 @@ export function ensureTemplateAgentBlueprint(template: NotionTemplate): NotionTe
  */
 export function buildDynamicDatabases(title: string, description?: string): NotionDatabase[] {
   const cleanTitle = sanitizeTemplateTitle(title);
+  const todayStr = new Date().toISOString().split('T')[0];
   
   // 업무일지/시설점검/소방 감지: 레거시 PARA 속성(Quality_Status, Verified) 차단 및 3대 전용 스키마 강제 매핑
   const isFacilityOrDailyReport = /업무일지|일지|점검|시설|소방|점검내용|특이사항|결함|설비/i.test(title + ' ' + (description || ''));
 
   if (isFacilityOrDailyReport) {
-    const todayStr = new Date().toISOString().split('T')[0];
     return [
       {
         name: `📌 [일일 업무일지] 마스터 관제 트래커`,
@@ -255,16 +255,21 @@ export function buildDynamicDatabases(title: string, description?: string): Noti
         { name: '일정', type: 'date' },
         { name: '우선순위', type: 'select', options: ['높음 (P1)', '보통 (P2)', '낮음 (P3)'] },
         {
-          name: '진행률(%)',
+          name: '진행률 게이지',
           type: 'formula',
-          expression: 'ifs(prop("진행상태") == "완료", "100%", prop("진행상태") == "진행중", "50%", "0%")'
+          expression: 'lets(total, if(empty(prop("세부 실행 과제")), 1, prop("세부 실행 과제").length()), done, if(empty(prop("세부 실행 과제")), if(prop("진행상태") == "완료", 1, 0), prop("세부 실행 과제").filter(current.prop("상태") == "완료").length()), rate, if(total > 0, round(done / total * 100), 0), filled, round(rate / 20), slice("■■■■■", 0, filled) + slice("□□□□□", 0, 5 - filled) + " " + rate + "%")'
+        },
+        {
+          name: '품질 검수',
+          type: 'formula',
+          expression: 'lets(s, prop("진행상태"), hasDate, not(empty(prop("일정"))), if(s == "완료", "🟢 검수 합격", if(s == "진행중" and hasDate, "🟡 정상 진행", if(s == "대기", "⚪ 대기 중", "🔴 점검 필요"))))'
         },
         { name: 'Quality_Status', type: 'select', options: ['미검수', '검수중', '승인', '반려'] },
         { name: 'Verified', type: 'checkbox' }
       ],
       sample_rows: [
-        { '항목명': `${cleanTitle} 기획 수립`, '진행상태': '완료', '우선순위': '높음 (P1)', 'Quality_Status': '승인', 'Verified': true },
-        { '항목명': `${cleanTitle} 모니터링 적용`, '진행상태': '진행중', '우선순위': '보통 (P2)', 'Quality_Status': '검수중', 'Verified': false }
+        { '항목명': `${cleanTitle} 기획 수립`, '진행상태': '완료', '일정': todayStr, '우선순위': '높음 (P1)', 'Quality_Status': '승인', 'Verified': true },
+        { '항목명': `${cleanTitle} 모니터링 적용`, '진행상태': '진행중', '일정': todayStr, '우선순위': '보통 (P2)', 'Quality_Status': '검수중', 'Verified': false }
       ]
     },
     {
@@ -280,7 +285,12 @@ export function buildDynamicDatabases(title: string, description?: string): Noti
         {
           name: 'D-Day',
           type: 'formula',
-          expression: 'ifs(empty(prop("마감일")), "미정", dateBetween(dateStart(prop("마감일")), now(), "days") < 0, "기한초과", dateBetween(dateStart(prop("마감일")), now(), "days") == 0, "D-Day", "D-" + dateBetween(dateStart(prop("마감일")), now(), "days"))'
+          expression: 'let(days, dateBetween(prop("마감일"), now(), "days"), if(empty(prop("마감일")), "📅 일정 미정", if(prop("상태") == "완료", "✅ 완료", if(days == 0, "🔥 오늘 마감!", if(days < 0, "🚨 D+" + abs(days) + " (지연)", "D-" + days)))))'
+        },
+        {
+          name: '품질 검수',
+          type: 'formula',
+          expression: 'lets(s, prop("상태"), hasDate, not(empty(prop("마감일"))), if(s == "완료", "🟢 검수 합격", if(s == "진행중" and hasDate, "🟡 정상 진행", if(s == "시작전", "⚪ 대기 중", "🔴 점검 필요"))))'
         },
         { name: 'Quality_Status', type: 'select', options: ['미검수', '검수중', '승인', '반려'] },
         { name: 'Verified', type: 'checkbox' }

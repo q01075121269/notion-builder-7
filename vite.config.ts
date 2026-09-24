@@ -87,6 +87,60 @@ function geminiApiProxyPlugin(): Plugin {
           return
         }
 
+        // /api/notion/export 로컬 개발 서버 프록시 및 내보내기 핸들러
+        if (req.url && req.url.startsWith('/api/notion/export')) {
+          if (req.method === 'OPTIONS') {
+            res.statusCode = 204
+            res.setHeader('Access-Control-Allow-Origin', '*')
+            res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
+            res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, Notion-Version, x-notion-api-key')
+            res.end()
+            return
+          }
+
+          let bodyBuffer = ''
+          req.on('data', (chunk) => {
+            bodyBuffer += chunk
+          })
+
+          req.on('end', async () => {
+            try {
+              const exportHandler = (await import('./api/notion/export.ts')).default
+              const mockRes: any = {
+                statusCode: 200,
+                headers: {},
+                setHeader(k: string, v: string) {
+                  this.headers[k] = v
+                  res.setHeader(k, v)
+                },
+                status(code: number) {
+                  this.statusCode = code
+                  res.statusCode = code
+                  return this
+                },
+                json(data: any) {
+                  res.setHeader('Content-Type', 'application/json')
+                  res.end(JSON.stringify(data))
+                },
+                end() {
+                  res.end()
+                }
+              }
+              const mockReq: any = {
+                method: req.method,
+                headers: req.headers,
+                body: bodyBuffer
+              }
+              await exportHandler(mockReq, mockRes)
+            } catch (err: any) {
+              res.statusCode = 500
+              res.setHeader('Content-Type', 'application/json')
+              res.end(JSON.stringify({ error: err.message || 'Export failed' }))
+            }
+          })
+          return
+        }
+
         // /api/orchestrator 로컬 개발 서버 프록시 및 멀티모달 오케스트레이터 핸들러 (404 방지)
         if (req.url && req.url.startsWith('/api/orchestrator')) {
           if (req.method === 'OPTIONS') {
@@ -172,18 +226,26 @@ function geminiApiProxyPlugin(): Plugin {
   }
 }
 
-[핵심 규칙 - Vision 시각 분석 및 캔버스 스키마 수정]
-1. 사용자가 화면 캡처, 표 이미지 등을 첨부했거나 캔버스 스키마 수정을 요청한 경우:
+[핵심 규칙 - 실무 다중 관계형 스키마, Formulas 2.0, Vision 분석 및 캔버스 스키마 수정]
+1. 실무 다중 관계형(2~4개 DB) 스키마 생성 표준:
+   - 단일 DB 생성을 지양하고, 업무 맥락에 부합하는 2~4개의 상용급 관계형 데이터베이스 세트를 표준 생성하십시오:
+     * 예시: [마스터 프로젝트/목표 DB] ↔ [세부 실행 과제(Action Items) DB] ↔ [일정/마일스톤 DB]
+   - 각 DB 간 'relation' 속성 및 'rollup' 필드를 자동으로 양방향 매핑하십시오.
+2. 최신 Notion Formulas 2.0 수식 엔진 표준 장착 (lets / let 기반):
+   - 진행률 게이지 수식: lets(total, if(empty(prop("세부 실행 과제")), 1, prop("세부 실행 과제").length()), done, if(empty(prop("세부 실행 과제")), if(prop("상태") == "완료", 1, 0), prop("세부 실행 과제").filter(current.prop("상태") == "완료").length()), rate, if(total > 0, round(done / total * 100), 0), filled, round(rate / 20), slice("■■■■■", 0, filled) + slice("□□□□□", 0, 5 - filled) + " " + rate + "%")
+   - 스마트 D-Day 수식: let(days, dateBetween(prop("마감일"), now(), "days"), if(empty(prop("마감일")), "📅 일정 미정", if(prop("상태") == "완료", "✅ 완료", if(days == 0, "🔥 오늘 마감!", if(days < 0, "🚨 D+" + abs(days) + " (지연)", "D-" + days)))))
+   - 품질 검수 상태 태그 수식: lets(s, prop("상태"), hasDate, not(empty(prop("마감일"))), if(s == "완료", "🟢 검수 합격", if(s == "진행 중" and hasDate, "🟡 정상 진행", if(s == "시작 전", "⚪ 대기 중", "🔴 점검 필요"))))
+3. 사용자가 화면 캡처, 표 이미지 등을 첨부했거나 캔버스 스키마 수정을 요청한 경우:
    - "intent": "BUILDER"로 설정하고, 현재 캔버스 템플릿의 databases 스키마를 정밀 분석하여 사용자가 의도한 수정사항(컬럼 추가, 삭제, 명칭/타입 변경, 수식 보정 등)을 완벽히 반영한 갱신된 "db_schema"를 payload에 반드시 포함하십시오.
-2. 사용자가 "타임라인(간트 차트)" 등 노션 API 외부 생성이 제한된 뷰를 요청한 경우:
+4. 사용자가 "타임라인(간트 차트)" 등 노션 API 외부 생성이 제한된 뷰를 요청한 경우:
    - 절대로 에러를 내지 말고, 데이터베이스 스키마에 "일정(date)", "기간(date)", "진행 상태(status)" 속성을 100% 무손실 설계하십시오.
    - 타깃 DB의 "views" 배열에 반드시 { "id": "timeline", "type": "timeline", "name": "타임라인" } 을 추가하고 view_type도 "timeline"으로 지정하십시오.
    - reply_message에 "웹 프로그램 캔버스에서는 타임라인 뷰를 즉시 추가·확인하실 수 있으며, 노션으로 내보낼 때는 일정/상태 속성이 100% 무손실 저장되고 상단에 '1초 만에 타임라인 뷰를 켜는 가이드'가 동봉됩니다." 형태로 정중하고 당당하게 대안을 제시하십시오.
-3. 사용자가 "아이콘을 별 모양(또는 특정 이모지)으로 바꿔줘", "이모지 변경해줘"라고 요청한 경우:
+5. 사용자가 "아이콘을 별 모양(또는 특정 이모지)으로 바꿔줘", "이모지 변경해줘"라고 요청한 경우:
    - 절대로 기존 DB 이름이나 기존 이모지 앞에 새 이모지를 중복해서 덧붙이지 마십시오!
    - 기존 DB 이름의 선행 이모지나 특수기호를 완전히 제거하고 순수 텍스트 제목만 유지하십시오. (예: "📋 프로젝트 관리" -> "프로젝트 관리")
    - DB 객체의 "icon" 필드에 요청된 새 이모지(예: "⭐")를 단독 설정하여 깨끗하게 대체(Replace)하십시오.
-4. 일반 대화인 경우:
+6. 일반 대화인 경우:
    - "intent": "CHAT", "reply_message": "답변", "payload": null 로 응답하십시오.`
 
             // 멀티모달 parts 조립

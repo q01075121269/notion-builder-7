@@ -50,47 +50,69 @@ export function formatUuid(id: string): string {
 }
 
 /**
- * 노션 공식 API Rate Limit(초당 3회 요청 제한) 방어 및 지수 백오프(Exponential Backoff) 재시도 엔진
+ * 노션 공식 API Rate Limit(초당 3회 요청 제한) 방어를 위한 전역 순차 비동기 큐 (Promise Queue)
+ */
+let lastRequestTime = 0;
+let queuePromise = Promise.resolve();
+
+async function enqueueNotionRequest<T>(task: () => Promise<T>): Promise<T> {
+  const execute = async (): Promise<T> => {
+    const now = Date.now();
+    const timeSinceLast = now - lastRequestTime;
+    const minInterval = 350; // 초당 최대 2.8회로 제한하여 안전 마진 확보
+    if (timeSinceLast < minInterval) {
+      await new Promise(r => setTimeout(r, minInterval - timeSinceLast));
+    }
+    lastRequestTime = Date.now();
+    return task();
+  };
+
+  const nextPromise = queuePromise.then(execute, execute);
+  queuePromise = nextPromise.then(() => {}, () => {});
+  return nextPromise;
+}
+
+/**
+ * 노션 공식 API Rate Limit(초당 3회) 방어 및 지수 백오프(Exponential Backoff) 재시도 엔진
  */
 export async function fetchNotionWithBackoff(
   url: string,
   options: RequestInit,
   maxRetries = 3
 ): Promise<Response> {
-  // 선제적 호출 간격 350ms 보장 (초당 3회 초과 선제 방지)
-  await new Promise(r => setTimeout(r, 350));
+  return enqueueNotionRequest(async () => {
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        const res = await fetch(url, options);
 
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    try {
-      const res = await fetch(url, options);
-
-      // 429 Too Many Requests 감지 시 Exponential Backoff 재시도
-      if (res.status === 429) {
-        if (attempt === maxRetries) {
-          return res;
+        // 429 Too Many Requests 감지 시 Exponential Backoff 재시도
+        if (res.status === 429) {
+          if (attempt === maxRetries) {
+            return res;
+          }
+          const retryAfterHeader = res.headers.get('Retry-After');
+          let delayMs = retryAfterHeader ? parseInt(retryAfterHeader, 10) * 1000 : Math.pow(2, attempt) * 600 + Math.random() * 300;
+          if (isNaN(delayMs) || delayMs <= 0) delayMs = 1200;
+          console.warn(`[Notion Rate Limit 429] ${delayMs}ms 후 자동 재시도합니다... (시도 ${attempt + 1}/${maxRetries})`);
+          await new Promise(r => setTimeout(r, delayMs));
+          continue;
         }
-        const retryAfterHeader = res.headers.get('Retry-After');
-        let delayMs = retryAfterHeader ? parseInt(retryAfterHeader, 10) * 1000 : Math.pow(2, attempt) * 600 + Math.random() * 300;
-        if (isNaN(delayMs) || delayMs <= 0) delayMs = 1000;
-        console.warn(`[Notion Rate Limit 429] ${delayMs}ms 후 자동 재시도합니다... (시도 ${attempt + 1}/${maxRetries})`);
-        await new Promise(r => setTimeout(r, delayMs));
-        continue;
-      }
 
-      // 일시적 서버 오류(502, 503, 504) 시 1회 재시도
-      if ((res.status === 502 || res.status === 503 || res.status === 504) && attempt < maxRetries) {
+        // 일시적 서버 오류(502, 503, 504) 시 1회 재시도
+        if ((res.status === 502 || res.status === 503 || res.status === 504) && attempt < maxRetries) {
+          await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
+          continue;
+        }
+
+        return res;
+      } catch (netErr) {
+        if (attempt === maxRetries) throw netErr;
         await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
-        continue;
       }
-
-      return res;
-    } catch (netErr) {
-      if (attempt === maxRetries) throw netErr;
-      await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
     }
-  }
 
-  throw new Error('노션 API 통신 재시도 한도를 초과했습니다.');
+    throw new Error('노션 API 통신 재시도 한도를 초과했습니다.');
+  });
 }
 
 interface PublishProgressCallback {
@@ -98,8 +120,13 @@ interface PublishProgressCallback {
 }
 
 /**
- * [Step 5-A 신규] 최상단 [💡 1초 뷰 세팅 가이드] 및 메타 태그 콜아웃,
- * 압축된 에이전트 3.0 관제 지침 및 인라인 대시보드 헤더 블록 구성
+ * [Step 3 무손실 내보내기]
+ * 페이지 최상단 첫 번째 블록: 접이식 토글(Toggle)
+ * 타이틀: ▶ 💡 [1초 뷰 세팅 가이드 & AI 에이전트 지침서] (세팅 완료 후 본 블록을 삭제하세요)
+ * 내부:
+ *  ① 타임라인 및 보드 뷰 1초 활성화 방법 안내 (+ 뷰 추가 ➔ 타임라인/보드)
+ *  ② 2026 노션 자율 에이전트 3.0 복붙용 지침서 (SKILL.md 규격)
+ * 하단: KPI 통계 및 구분선 블록
  */
 function buildCompactHeaderBlocks(template: NotionTemplate): any[] {
   const blocks: any[] = [];
@@ -110,7 +137,89 @@ function buildCompactHeaderBlocks(template: NotionTemplate): any[] {
   const totalRows = dbs.reduce((sum, db) => sum + (db.sample_rows?.length || 0), 0);
   const cleanTitle = template.title || '통합 관제 대시보드';
 
-  // 1. [100% 동적 KPI 3종 통계 콜아웃 컬럼 리스트] - 하드코딩 텍스트 완전 박멸
+  // 1. [최상단 필수 1번 블록: 접이식 토글(Toggle)]
+  const toggleChildren: any[] = [
+    // ① 타임라인 및 보드 뷰 1초 활성화 방법 안내
+    {
+      object: 'block',
+      type: 'callout',
+      callout: {
+        rich_text: [
+          {
+            type: 'text',
+            text: {
+              content: 
+                `⏱️ [1초 뷰 세팅 가이드 - 타임라인 & 보드 뷰 활성화]\n` +
+                `1. 생성된 아래 데이터베이스 우측 상단의 '+ (뷰 추가)' 버튼을 클릭합니다.\n` +
+                `2. [⏱️ 타임라인(Timeline)] 또는 [📋 보드(Board)] 뷰를 선택합니다.\n` +
+                `3. 타임라인 날짜 기준은 자동 생성된 '일정/마감일(Date)' 속성이 1:1 매핑되어 즉시 활성화됩니다!\n` +
+                `4. 보드 뷰는 '상태(Status)' 속성 기준으로 자동 컬럼 분기되어 실무 칸반으로 동작합니다.`
+            }
+          }
+        ],
+        icon: { type: 'emoji', emoji: '⏱️' },
+        color: 'blue_background'
+      }
+    },
+    // ② 2026 노션 자율 에이전트 3.0 복붙용 지침서 (SKILL.md 규격)
+    {
+      object: 'block',
+      type: 'callout',
+      callout: {
+        rich_text: [
+          {
+            type: 'text',
+            text: {
+              content:
+                `🤖 [2026 노션 자율 에이전트 3.0 공식 지침서 (SKILL.md 규격)]\n` +
+                `• 페르소나/역할: ${blueprint?.persona?.role || `${cleanTitle} 총괄 업무 PM 에이전트`}\n` +
+                `• 핵심 목표: ${blueprint?.persona?.objective || `${cleanTitle} 무결성 검수 및 실시간 공정 자동화`}\n` +
+                `• 복합 트리거: 매일 09:00 정기 점검 | 상태 '불량/지연' 감지 시 즉시 보고 | 슬랙/이메일 알림\n` +
+                `• 워크슬롭 방지 완료 3원칙:\n` +
+                `  1) 모든 필수 속성(제목, 상태, 마감일) 100% 정상 입력\n` +
+                `  2) 다중 데이터베이스 간 Relation 및 Rollup 양방향 정상 연결\n` +
+                `  3) Formulas 2.0 lets() 진행률 게이지 및 D-Day 정상 산출`
+            }
+          }
+        ],
+        icon: { type: 'emoji', emoji: '🤖' },
+        color: 'purple_background'
+      }
+    }
+  ];
+
+  if (blueprint && blueprint.setupPromptMarkdown) {
+    toggleChildren.push({
+      object: 'block',
+      type: 'paragraph',
+      paragraph: {
+        rich_text: [
+          {
+            type: 'text',
+            text: { content: (blueprint.setupPromptMarkdown || '').slice(0, 1950) }
+          }
+        ]
+      }
+    });
+  }
+
+  // 최상단 첫 번째 블록으로 토글 삽입
+  blocks.push({
+    object: 'block',
+    type: 'toggle',
+    toggle: {
+      rich_text: [
+        {
+          type: 'text',
+          text: { content: '▶ 💡 [1초 뷰 세팅 가이드 & AI 에이전트 지침서] (세팅 완료 후 본 블록을 삭제하세요)' },
+          annotations: { bold: true, color: 'blue' }
+        }
+      ],
+      children: toggleChildren
+    }
+  });
+
+  // 2. [동적 KPI 3종 통계 콜아웃 컬럼 리스트]
   blocks.push({
     object: 'block',
     type: 'column_list',
@@ -161,7 +270,7 @@ function buildCompactHeaderBlocks(template: NotionTemplate): any[] {
                     },
                     {
                       type: 'text',
-                      text: { content: '실시간 상태·수식(Formula) 연동 추적' },
+                      text: { content: '실시간 상태·Formulas 2.0 연동' },
                       annotations: { italic: true }
                     }
                   ],
@@ -189,7 +298,7 @@ function buildCompactHeaderBlocks(template: NotionTemplate): any[] {
                     },
                     {
                       type: 'text',
-                      text: { content: '무손실 100% 동기화 및 실시간 업데이트' },
+                      text: { content: '무손실 100% 동기화 완결' },
                       annotations: { italic: true }
                     }
                   ],
@@ -201,89 +310,6 @@ function buildCompactHeaderBlocks(template: NotionTemplate): any[] {
           }
         }
       ]
-    }
-  });
-
-  // 2. [100% 동적 하위 DB 네비게이션 콜아웃] - 실제 생성된 DB 목록으로 동적 구성
-  let guideContent = 
-    `💡 [1초 뷰 전환 뷰어 가이드]\n` +
-    `현재 데이터베이스는 노션 API 규격상 '기본 표(Table)'로 인라인 생성되었습니다.\n` +
-    `표 우측 상단의 [+ 뷰 추가] 버튼을 클릭하고 [보드(Board)] 또는 [캘린더(Calendar)]를 선택하시면 맞춤형 대시보드 뷰로 즉시 전환됩니다!\n\n` +
-    `🔗 연계 마스터 데이터베이스 (${totalDbs}종) 바로가기:\n`;
-
-  dbs.forEach((db, idx) => {
-    guideContent += `${idx + 1}️⃣ [DB ${idx + 1}] ${db.name}${db.description ? ` (${db.description})` : ''}\n`;
-  });
-
-  blocks.push({
-    object: 'block',
-    type: 'callout',
-    callout: {
-      rich_text: [
-        {
-          type: 'text',
-          text: { content: guideContent.trim() }
-        }
-      ],
-      icon: { type: 'emoji', emoji: '🏢' },
-      color: 'yellow_background'
-    }
-  });
-
-  // 2. [Fix: 시야 확보를 위한 에이전트 3.0 상세 지침 토글화] - 대시보드 표가 한눈에 들어오도록 완벽히 접어둠
-  const agentSummary = blueprint 
-    ? `🤖 [노션 커스텀 에이전트 3.0 가동 관제탑]\n` +
-      `• 페르소나: ${blueprint.persona.role || '총괄 업무 PM'} (${blueprint.persona.objective || '업무 자동화'})\n` +
-      `• 복합 트리거: ${blueprint.multiTriggers.schedule || '매일 09:00'} 점검 | 상태 '불량/지연' 즉시 보고 | 슬랙/이메일 알림\n` +
-      `• 워크슬롭 방지: [Done 3대 완료 기준] 통과 및 [자체 검수표] 검증 필수`
-    : `🤖 [노션 커스텀 에이전트 3.0 관제 시스템 가동 중]\n` +
-      `• 다중 관계형 실시간 통합 대시보드가 성공적으로 구축되었습니다.\n` +
-      `• 첫 화면에 펼쳐진 인라인(Inline) 표를 통해 데이터를 실시간 조회 및 편집하세요.`;
-
-  const agentToggleChildren: any[] = [
-    {
-      object: 'block',
-      type: 'callout',
-      callout: {
-        rich_text: [
-          {
-            type: 'text',
-            text: { content: agentSummary }
-          }
-        ],
-        icon: { type: 'emoji', emoji: '🤖' },
-        color: 'purple_background'
-      }
-    }
-  ];
-
-  if (blueprint && blueprint.setupPromptMarkdown) {
-    agentToggleChildren.push({
-      object: 'block',
-      type: 'paragraph',
-      paragraph: {
-        rich_text: [
-          {
-            type: 'text',
-            text: { content: (blueprint.setupPromptMarkdown || '').slice(0, 1950) }
-          }
-        ]
-      }
-    });
-  }
-
-  blocks.push({
-    object: 'block',
-    type: 'toggle',
-    toggle: {
-      rich_text: [
-        {
-          type: 'text',
-          text: { content: '🤖 [노션 커스텀 에이전트 3.0 가동 지침 및 공식 프롬프트 (클릭하여 열기)]' },
-          annotations: { bold: true, color: 'purple' }
-        }
-      ],
-      children: agentToggleChildren
     }
   });
 

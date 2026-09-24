@@ -162,91 +162,91 @@ export const NotionDatabaseView: React.FC<NotionDatabaseViewProps> = ({
           </div>
         </div>
 
-        {/* View Tabs (6대 다각화 뷰 스위처) */}
-        <div className="flex items-center space-x-1 -mb-2 border-b border-transparent overflow-x-auto no-scrollbar">
-          <button
-            type="button"
-            onClick={() => setActiveView('dashboard')}
-            className={`flex items-center space-x-1.5 px-2.5 py-1.5 text-xs font-semibold border-b-2 transition cursor-pointer shrink-0 ${
-              activeView === 'dashboard'
-                ? 'border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400'
-                : 'border-transparent text-neutral-500 hover:text-neutral-700 dark:text-neutral-400'
-            }`}
-          >
-            <LayoutDashboard className="w-3.5 h-3.5" />
-            <span>대시보드</span>
-          </button>
+        {/* View Tabs (6대 다각화 뷰 인터랙티브 스위처 - Google AI Studio 감성 모노톤) */}
+        <div className="flex items-center space-x-1.5 -mb-2 border-b border-transparent overflow-x-auto no-scrollbar py-0.5">
           <button
             type="button"
             onClick={() => setActiveView('table')}
-            className={`flex items-center space-x-1.5 px-2.5 py-1.5 text-xs font-semibold border-b-2 transition cursor-pointer shrink-0 ${
+            className={`flex items-center space-x-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer shrink-0 border ${
               activeView === 'table'
-                ? 'border-neutral-900 text-neutral-900 dark:border-neutral-100 dark:text-neutral-100'
-                : 'border-transparent text-neutral-500 hover:text-neutral-700 dark:text-neutral-400'
+                ? 'bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 border-neutral-900 dark:border-white shadow-xs'
+                : 'bg-transparent text-neutral-600 dark:text-neutral-400 border-transparent hover:bg-neutral-200/50 dark:hover:bg-neutral-800/60'
             }`}
           >
             <TableIcon className="w-3.5 h-3.5" />
-            <span>표</span>
+            <span>▦ 표</span>
           </button>
           <button
             type="button"
             onClick={() => setActiveView('board')}
-            className={`flex items-center space-x-1.5 px-2.5 py-1.5 text-xs font-semibold border-b-2 transition cursor-pointer shrink-0 ${
+            className={`flex items-center space-x-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer shrink-0 border ${
               activeView === 'board'
-                ? 'border-neutral-900 text-neutral-900 dark:border-neutral-100 dark:text-neutral-100'
-                : 'border-transparent text-neutral-500 hover:text-neutral-700 dark:text-neutral-400'
+                ? 'bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 border-neutral-900 dark:border-white shadow-xs'
+                : 'bg-transparent text-neutral-600 dark:text-neutral-400 border-transparent hover:bg-neutral-200/50 dark:hover:bg-neutral-800/60'
             }`}
           >
             <Kanban className="w-3.5 h-3.5" />
-            <span>보드</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveView('calendar')}
-            className={`flex items-center space-x-1.5 px-2.5 py-1.5 text-xs font-semibold border-b-2 transition cursor-pointer shrink-0 ${
-              activeView === 'calendar'
-                ? 'border-neutral-900 text-neutral-900 dark:border-neutral-100 dark:text-neutral-100'
-                : 'border-transparent text-neutral-500 hover:text-neutral-700 dark:text-neutral-400'
-            }`}
-          >
-            <CalendarIcon className="w-3.5 h-3.5" />
-            <span>캘린더</span>
+            <span>📋 보드</span>
           </button>
           <button
             type="button"
             onClick={() => setActiveView('timeline')}
-            className={`flex items-center space-x-1.5 px-2.5 py-1.5 text-xs font-semibold border-b-2 transition cursor-pointer shrink-0 ${
+            className={`flex items-center space-x-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer shrink-0 border ${
               activeView === 'timeline'
-                ? 'border-cyan-600 text-cyan-600 dark:border-cyan-400 dark:text-cyan-400'
-                : 'border-transparent text-neutral-500 hover:text-neutral-700 dark:text-neutral-400'
+                ? 'bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 border-neutral-900 dark:border-white shadow-xs'
+                : 'bg-transparent text-neutral-600 dark:text-neutral-400 border-transparent hover:bg-neutral-200/50 dark:hover:bg-neutral-800/60'
             }`}
           >
             <Clock className="w-3.5 h-3.5" />
-            <span>타임라인</span>
+            <span>⏱️ 타임라인</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveView('calendar')}
+            className={`flex items-center space-x-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer shrink-0 border ${
+              activeView === 'calendar'
+                ? 'bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 border-neutral-900 dark:border-white shadow-xs'
+                : 'bg-transparent text-neutral-600 dark:text-neutral-400 border-transparent hover:bg-neutral-200/50 dark:hover:bg-neutral-800/60'
+            }`}
+          >
+            <CalendarIcon className="w-3.5 h-3.5" />
+            <span>📅 캘린더</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveView('dashboard')}
+            className={`flex items-center space-x-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer shrink-0 border ${
+              activeView === 'dashboard'
+                ? 'bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 border-neutral-900 dark:border-white shadow-xs'
+                : 'bg-transparent text-neutral-600 dark:text-neutral-400 border-transparent hover:bg-neutral-200/50 dark:hover:bg-neutral-800/60'
+            }`}
+          >
+            <LayoutDashboard className="w-3.5 h-3.5" />
+            <span>📊 대시보드</span>
           </button>
           <button
             type="button"
             onClick={() => setActiveView('gallery')}
-            className={`flex items-center space-x-1.5 px-2.5 py-1.5 text-xs font-semibold border-b-2 transition cursor-pointer shrink-0 ${
+            className={`flex items-center space-x-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer shrink-0 border ${
               activeView === 'gallery'
-                ? 'border-neutral-900 text-neutral-900 dark:border-neutral-100 dark:text-neutral-100'
-                : 'border-transparent text-neutral-500 hover:text-neutral-700 dark:text-neutral-400'
+                ? 'bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 border-neutral-900 dark:border-white shadow-xs'
+                : 'bg-transparent text-neutral-600 dark:text-neutral-400 border-transparent hover:bg-neutral-200/50 dark:hover:bg-neutral-800/60'
             }`}
           >
             <LayoutGrid className="w-3.5 h-3.5" />
-            <span>갤러리</span>
+            <span>🖼️ 갤러리</span>
           </button>
           <button
             type="button"
             onClick={() => setActiveView('list')}
-            className={`flex items-center space-x-1.5 px-2.5 py-1.5 text-xs font-semibold border-b-2 transition cursor-pointer shrink-0 ${
+            className={`flex items-center space-x-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer shrink-0 border ${
               activeView === 'list'
-                ? 'border-neutral-900 text-neutral-900 dark:border-neutral-100 dark:text-neutral-100'
-                : 'border-transparent text-neutral-500 hover:text-neutral-700 dark:text-neutral-400'
+                ? 'bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 border-neutral-900 dark:border-white shadow-xs'
+                : 'bg-transparent text-neutral-600 dark:text-neutral-400 border-transparent hover:bg-neutral-200/50 dark:hover:bg-neutral-800/60'
             }`}
           >
             <List className="w-3.5 h-3.5" />
-            <span>리스트</span>
+            <span>📑 리스트</span>
           </button>
         </div>
       </div>
