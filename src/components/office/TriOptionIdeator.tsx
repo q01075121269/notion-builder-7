@@ -34,8 +34,8 @@ export const TriOptionIdeator: React.FC<TriOptionIdeatorProps> = ({
   // 소크라테스식 핀포인트 질문 2문항 모달 상태
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedKey, setSelectedKey] = useState<'A' | 'B' | 'C'>('A');
-  const [q1Target, setQ1Target] = useState('사내 C-레벨 및 보안/예산 심의 위원회');
-  const [q2Channel, setQ2Channel] = useState('사내 인트라넷 공식 공지 및 노션 통합 포털');
+  const [q1Target, setQ1Target] = useState('2026 하반기 전사 배포');
+  const [q2Channel, setQ2Channel] = useState('문서 작성 시간 70% 단축');
 
   // 키워드 기반 동적 3-Way 생성 로직 (Zero-Hardcoding 준수: 키워드를 조합하여 3가지 독창적 플랜 빌드)
   const handleGenerateTriad = () => {
@@ -332,19 +332,20 @@ export const TriOptionIdeator: React.FC<TriOptionIdeatorProps> = ({
             </div>
 
             <p className="text-xs text-slate-600 dark:text-zinc-400 leading-relaxed">
-              선택하신 <strong className="text-indigo-600 dark:text-indigo-400 font-extrabold">[{selectedKey}안]</strong>의 기획 뼈대를 공문서와 슬라이드에 반영하기 전, 2가지 필수 핵심 요소를 점검합니다.
+              선택하신 <strong className="text-indigo-600 dark:text-indigo-400 font-extrabold">[{selectedKey}안]</strong>의 기획 뼈대를 공문서·시트·슬라이드에 반영하기 전, 2가지 필수 핵심 지표를 점검합니다.
             </p>
 
             <div className="space-y-4">
               <div className="space-y-1.5">
                 <label className="text-xs font-black text-slate-800 dark:text-zinc-200 flex items-center gap-1.5">
                   <span className="w-4 h-4 rounded-full bg-indigo-600 text-white text-[10px] flex items-center justify-center font-bold">1</span>
-                  <span>타깃 및 예산/과금 방식은 어떻게 설정할까요?</span>
+                  <span>Q1: 목표 런칭 일정 및 타깃 범위</span>
                 </label>
                 <input
                   type="text"
                   value={q1Target}
                   onChange={(e) => setQ1Target(e.target.value)}
+                  placeholder="예: 2026 하반기 전사 배포"
                   className="w-full p-3 text-xs rounded-xl bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 outline-none focus:border-indigo-500 text-slate-800 dark:text-white font-medium"
                 />
               </div>
@@ -352,12 +353,13 @@ export const TriOptionIdeator: React.FC<TriOptionIdeatorProps> = ({
               <div className="space-y-1.5">
                 <label className="text-xs font-black text-slate-800 dark:text-zinc-200 flex items-center gap-1.5">
                   <span className="w-4 h-4 rounded-full bg-indigo-600 text-white text-[10px] flex items-center justify-center font-bold">2</span>
-                  <span>주요 실행 및 배포 채널은 어디인가요?</span>
+                  <span>Q2: 1단계 필수 검증 지표</span>
                 </label>
                 <input
                   type="text"
                   value={q2Channel}
                   onChange={(e) => setQ2Channel(e.target.value)}
+                  placeholder="예: 문서 작성 시간 70% 단축"
                   className="w-full p-3 text-xs rounded-xl bg-slate-50 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 outline-none focus:border-indigo-500 text-slate-800 dark:text-white font-medium"
                 />
               </div>
@@ -365,17 +367,19 @@ export const TriOptionIdeator: React.FC<TriOptionIdeatorProps> = ({
 
             <div className="pt-2 flex items-center justify-end space-x-2">
               <button
+                type="button"
                 onClick={() => setIsModalOpen(false)}
                 className="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-zinc-700 text-xs font-bold text-slate-600 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-800 transition cursor-pointer"
               >
                 취소
               </button>
               <button
+                type="button"
                 onClick={handleFinalConfirm}
-                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white text-xs font-extrabold flex items-center space-x-2 transition cursor-pointer shadow-md active:scale-95"
+                className="px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-zinc-100 dark:hover:bg-zinc-200 text-white dark:text-zinc-900 text-xs font-extrabold flex items-center space-x-2 transition cursor-pointer shadow-md active:scale-95"
               >
-                <span>확인 및 캔버스에 주입</span>
-                <ArrowRight className="w-4 h-4" />
+                <span>캔버스에 즉시 반영 및 작성 시작</span>
+                <ArrowRight className="w-4 h-4 ml-1" />
               </button>
             </div>
 

@@ -12,6 +12,8 @@ import { SEED_PROJECTS } from '../../services/officeSeedData';
 import { KnowledgeDock } from './KnowledgeDock';
 import { UniversalSmartCanvas } from './UniversalSmartCanvas';
 import { InPlaceCopilot } from './InPlaceCopilot';
+import { CompanyTemplateInjector } from './CompanyTemplateInjector';
+import { AudioOverviewPlayer } from './AudioOverviewPlayer';
 import { useApp } from '../../context/AppContext';
 import { 
   Folder, 
@@ -23,7 +25,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Undo2,
-  CheckCircle2
+  CheckCircle2,
+  Headphones
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
@@ -42,6 +45,13 @@ export const OfficeStudioContainer: React.FC = () => {
 
   // 3. Undo 히스토리 스택
   const [historyStack, setHistoryStack] = useState<Array<{ action: string; docSnapshot: OfficeDocument }>>([]);
+
+  // 4. 사내 고유 양식 복제기 모달 상태
+  const [isTemplateInjectorOpen, setIsTemplateInjectorOpen] = useState<boolean>(false);
+  const [targetTemplateSource, setTargetTemplateSource] = useState<OfficeSource | undefined>(undefined);
+
+  // 5. 2분 오디오 브리핑 플레이어 상태
+  const [isAudioBriefingOpen, setIsAudioBriefingOpen] = useState<boolean>(false);
 
   // =========================================================================
   // 4. 반응형 사이드바 리사이저 & 접기/펼치기 상태
@@ -219,7 +229,19 @@ export const OfficeStudioContainer: React.FC = () => {
     showToast('3-Way 기획안 발산이 완료되었습니다.', 'success');
   };
 
-  // 3-Way 질문 답변 완료 후 문서에 뼈대 즉시 주입
+  // 사내 서식 복제기 열기 핸들러
+  const handleOpenTemplateInjector = (source?: OfficeSource) => {
+    setTargetTemplateSource(source);
+    setIsTemplateInjectorOpen(true);
+  };
+
+  // 사내 서식 적용 완료 핸들러
+  const handleApplyCompanyTemplate = (updatedDoc: OfficeDocument, templateName: string) => {
+    updateDocument(updatedDoc, `'${templateName}' 사내 서식 캔버스 복제 적용`);
+    showToast(`'${templateName}' 서식이 캔버스에 1:1 복제 적용되었습니다.`, 'success');
+  };
+
+  // 3-Way 질문 답변 완료 후 문서·시트·슬라이드에 뼈대 완벽 자동 파이핑
   const handleApplyPlanToDoc = (
     selectedKey: 'A' | 'B' | 'C', 
     qaAnswers: { targetDetail: string; channelDetail: string },
@@ -242,7 +264,7 @@ export const OfficeStudioContainer: React.FC = () => {
       { id: 'sec-3', level: 3 as const, marker: '○', text: `핵심 컨셉: ${chosen.concept}` },
       { id: 'sec-4', level: 1 as const, marker: '2.', text: '세부 실행 방안 및 타깃 채널' },
       { id: 'sec-5', level: 2 as const, marker: '□', text: `목표 타깃 & 과금: ${qaAnswers.targetDetail} (${chosen.pricing})` },
-      { id: 'sec-6', level: 3 as const, marker: '○', text: `최우선 도입 채널: ${qaAnswers.channelDetail}` },
+      { id: 'sec-6', level: 3 as const, marker: '○', text: `1단계 필수 검증 지표: ${qaAnswers.channelDetail}` },
       { id: 'sec-7', level: 4 as const, marker: '―', text: `주요 장점 및 고려 사항: ${chosen.pros} (주의: ${chosen.cons})` },
       { id: 'sec-8', level: 1 as const, marker: '3.', text: '단계별 실행 로드맵' },
       ...chosen.roadmap.map((step, idx) => ({
@@ -261,7 +283,7 @@ export const OfficeStudioContainer: React.FC = () => {
         subtitle: chosen.concept,
         bullets: [
           `핵심 타깃: ${qaAnswers.targetDetail}`,
-          `실행 채널: ${qaAnswers.channelDetail}`,
+          `1단계 지표: ${qaAnswers.channelDetail}`,
           `예산 및 모델: ${chosen.pricing}`
         ],
         badge: `${selectedKey}안 KEYNOTE`
@@ -275,19 +297,32 @@ export const OfficeStudioContainer: React.FC = () => {
       }
     ];
 
+    // 3. 스프레드시트 예산 내역에 동적 파이핑 주입
+    const updatedSheetRows = [
+      { id: 'row-plan-1', cells: [1, `${chosen.title} 핵심 구축`, `${qaAnswers.targetDetail} 인프라 셋업`, 32000000, '초기 1회'] },
+      { id: 'row-plan-2', cells: [2, '연간 라이선스 및 운영비', chosen.pricing, 18000000, '분기 정산'] },
+      { id: 'row-plan-3', cells: [3, '지표 검증 및 파일럿', qaAnswers.channelDetail, 5000000, '성과 연동'] }
+    ];
+
     const updatedDoc: OfficeDocument = {
       ...currentDoc,
       title: `${chosen.title} 추진 기안서`,
       content: {
         ...currentDoc.content,
         docsContent: { sections: updatedSections },
-        slidesContent: { slides: updatedSlides }
+        slidesContent: { slides: updatedSlides },
+        sheetsContent: {
+          headers: ['번호', '예산 비목', '산출 내역', '소요 금액', '비고'],
+          rows: updatedSheetRows,
+          hasTotalRow: true,
+          totalFormula: '=SUM(D2:D4)'
+        }
       }
     };
 
     updateDocument(updatedDoc, `[${selectedKey}안] 기획 뼈대 문서 주입 완료`);
     setViewMode('canvas');
-    showToast(`[${selectedKey}안] 기획이 공문서와 슬라이드에 주입되었습니다.`, 'success');
+    showToast('선택하신 기획안 뼈대가 공문서/시트 캔버스에 주입되었습니다.', 'success');
   };
 
   // 옴니 출하 액션들 (미니멀 텍스트 칩)
@@ -494,6 +529,16 @@ export const OfficeStudioContainer: React.FC = () => {
 
           <div className="h-4 w-px bg-slate-200 dark:border-zinc-700 mx-0.5" />
 
+          {/* 🎧 2분 오디오 브리핑 버튼 */}
+          <button
+            onClick={() => setIsAudioBriefingOpen(true)}
+            className="flex items-center px-2.5 py-1 rounded-md bg-indigo-50 dark:bg-indigo-950/80 hover:bg-indigo-100 dark:hover:bg-indigo-900 border border-indigo-200 dark:border-indigo-800 text-xs font-bold text-indigo-700 dark:text-indigo-300 transition cursor-pointer whitespace-nowrap shadow-2xs"
+            title="2인 대화형 팟캐스트 2분 오디오 브리핑 재생"
+          >
+            <Headphones className="w-3.5 h-3.5 mr-1 text-indigo-600 dark:text-indigo-400" />
+            <span>2분 오디오 브리핑</span>
+          </button>
+
           <button
             onClick={handleSendToNotion}
             className="px-2.5 py-1 rounded-md bg-slate-900 text-white dark:bg-zinc-100 dark:text-zinc-900 text-xs font-semibold hover:opacity-90 transition cursor-pointer whitespace-nowrap shadow-2xs"
@@ -529,6 +574,7 @@ export const OfficeStudioContainer: React.FC = () => {
               onToggleSelectSource={handleToggleSelectSource}
               onAddSource={handleAddSource}
               onDeleteSource={handleDeleteSource}
+              onOpenTemplateInjector={handleOpenTemplateInjector}
             />
           </div>
         )}
@@ -574,6 +620,26 @@ export const OfficeStudioContainer: React.FC = () => {
         onUndo={handleUndo}
         canUndo={historyStack.length > 0}
         lastActionName={historyStack[historyStack.length - 1]?.action}
+      />
+
+      {/* ========================================================================= */}
+      {/* 4. 사내 고유 서식 복제기 모달 (CompanyTemplateInjector) */}
+      {/* ========================================================================= */}
+      <CompanyTemplateInjector
+        isOpen={isTemplateInjectorOpen}
+        onClose={() => setIsTemplateInjectorOpen(false)}
+        currentDocument={currentDoc}
+        onApplyTemplate={handleApplyCompanyTemplate}
+        sourceFileName={targetTemplateSource?.title}
+      />
+
+      {/* ========================================================================= */}
+      {/* 5. 2분 오디오 브리핑 플레이어 (AudioOverviewPlayer) */}
+      {/* ========================================================================= */}
+      <AudioOverviewPlayer
+        isOpen={isAudioBriefingOpen}
+        onClose={() => setIsAudioBriefingOpen(false)}
+        documentTitle={currentDoc.title}
       />
 
     </div>

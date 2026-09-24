@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import type { OfficeSource, OfficeSourceType } from '../../types/office';
 import { 
   FileUp, 
@@ -12,7 +12,8 @@ import {
   Loader2,
   Database,
   Eye,
-  X
+  X,
+  Building2
 } from 'lucide-react';
 
 interface KnowledgeDockProps {
@@ -21,6 +22,7 @@ interface KnowledgeDockProps {
   onAddSource: (source: OfficeSource) => void;
   onDeleteSource: (sourceId: string) => void;
   onSelectSourcePreview?: (source: OfficeSource) => void;
+  onOpenTemplateInjector?: (source?: OfficeSource) => void;
 }
 
 export const KnowledgeDock: React.FC<KnowledgeDockProps> = ({
@@ -28,10 +30,12 @@ export const KnowledgeDock: React.FC<KnowledgeDockProps> = ({
   onToggleSelectSource,
   onAddSource,
   onDeleteSource,
-  onSelectSourcePreview: _onSelectSourcePreview
+  onSelectSourcePreview: _onSelectSourcePreview,
+  onOpenTemplateInjector
 }) => {
   // 모달 및 입력창 상태
   const [activeInputTab, setActiveInputTab] = useState<'none' | 'url' | 'voice' | 'deep_research'>('none');
+  const [highlightedSourceId, setHighlightedSourceId] = useState<string | null>(null);
   const [urlInput, setUrlInput] = useState('');
   const [researchKeyword, setResearchKeyword] = useState('');
   const [isResearching, setIsResearching] = useState(false);
@@ -41,6 +45,29 @@ export const KnowledgeDock: React.FC<KnowledgeDockProps> = ({
   const [previewSource, setPreviewSource] = useState<OfficeSource | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // 팩트 출처 클릭 시 해당 소스 카드로 스크롤 포커스 & 하이라이트 애니메이션
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const customEvent = e as CustomEvent<{ sourceId: string; sourceTitle: string }>;
+      const { sourceId, sourceTitle } = customEvent.detail || {};
+      const target = sources.find(s => 
+        s.id === sourceId || 
+        (sourceTitle && s.title.includes(sourceTitle.replace(/\s*\(.*\)/, ''))) ||
+        (sourceTitle && sourceTitle.includes(s.title))
+      );
+      if (target) {
+        setHighlightedSourceId(target.id);
+        const el = document.getElementById(`source-item-${target.id}`);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+        setTimeout(() => setHighlightedSourceId(null), 3500);
+      }
+    };
+    window.addEventListener('focus-office-source', handler);
+    return () => window.removeEventListener('focus-office-source', handler);
+  }, [sources]);
 
   // 총 소스 통계
   const selectedSources = sources.filter(s => s.isSelected);
@@ -290,6 +317,17 @@ export const KnowledgeDock: React.FC<KnowledgeDockProps> = ({
               <p className="text-[10px] text-purple-600 dark:text-purple-300 pl-5">{researchStep}</p>
             </div>
           )}
+
+          {/* 사내 서식 스캔 & 캔버스 복제 주입 퀵 버튼 */}
+          <button
+            type="button"
+            onClick={() => onOpenTemplateInjector && onOpenTemplateInjector()}
+            className="w-full mt-2 py-1.5 px-2.5 rounded-xl border border-dashed border-slate-300 dark:border-zinc-700 hover:border-slate-400 dark:hover:border-zinc-600 bg-white/60 dark:bg-zinc-850/60 hover:bg-slate-50 dark:hover:bg-zinc-800 text-[11px] font-bold text-slate-700 dark:text-zinc-300 flex items-center justify-center space-x-1.5 transition cursor-pointer shadow-2xs"
+            title="사내 결재선·문서번호·표 그리드 서식 스캔 및 캔버스 주입"
+          >
+            <Building2 className="w-3.5 h-3.5 text-slate-500" />
+            <span>사내 고유 서식 스캔 & 캔버스 복제 주입</span>
+          </button>
         </div>
 
         {/* URL 인라인 입력창 */}
@@ -349,76 +387,95 @@ export const KnowledgeDock: React.FC<KnowledgeDockProps> = ({
             등록된 소스가 없습니다. 상단에서 소스를 추가해 주세요.
           </div>
         ) : (
-          sources.map((src) => (
-            <div
-              key={src.id}
-              className={`
-                group p-3 rounded-2xl border transition-all relative flex flex-col justify-between
-                ${src.isSelected 
-                  ? 'bg-white dark:bg-zinc-850 border-slate-300 dark:border-zinc-700 shadow-xs' 
-                  : 'bg-slate-100/50 dark:bg-zinc-900/60 border-slate-200 dark:border-zinc-800 opacity-60'
-                }
-              `}
-            >
-              <div>
-                <div className="flex items-start justify-between gap-2 mb-1.5">
-                  <div className="flex items-center space-x-2 min-w-0">
-                    <span className="p-1 rounded-lg bg-slate-100 dark:bg-zinc-800 shrink-0">
-                      {getSourceIcon(src.type)}
-                    </span>
-                    <h4 className="text-xs font-bold text-slate-800 dark:text-zinc-200 truncate" title={src.title}>
-                      {src.title}
-                    </h4>
+          sources.map((src) => {
+            const isHighlighted = highlightedSourceId === src.id;
+            return (
+              <div
+                key={src.id}
+                id={`source-item-${src.id}`}
+                className={`
+                  group p-3 rounded-2xl border transition-all duration-300 relative flex flex-col justify-between
+                  ${isHighlighted 
+                    ? 'ring-2 ring-indigo-500 bg-indigo-50/80 dark:bg-indigo-950/80 border-indigo-400 dark:border-indigo-600 shadow-md scale-[1.01]' 
+                    : src.isSelected 
+                      ? 'bg-white dark:bg-zinc-850 border-slate-300 dark:border-zinc-700 shadow-xs' 
+                      : 'bg-slate-100/50 dark:bg-zinc-900/60 border-slate-200 dark:border-zinc-800 opacity-60'
+                  }
+                `}
+              >
+                <div>
+                  <div className="flex items-start justify-between gap-2 mb-1.5">
+                    <div className="flex items-center space-x-2 min-w-0">
+                      <span className="p-1 rounded-lg bg-slate-100 dark:bg-zinc-800 shrink-0">
+                        {getSourceIcon(src.type)}
+                      </span>
+                      <h4 className="text-xs font-bold text-slate-800 dark:text-zinc-200 truncate" title={src.title}>
+                        {src.title}
+                      </h4>
+                    </div>
+
+                    {/* 기획/문서 반영 체크박스 */}
+                    <button
+                      onClick={() => onToggleSelectSource(src.id)}
+                      className="text-indigo-600 dark:text-indigo-400 hover:scale-110 transition cursor-pointer shrink-0"
+                      title={src.isSelected ? '문서 반영 해제' : '문서 반영 포함'}
+                    >
+                      {src.isSelected ? (
+                        <CheckSquare className="w-4 h-4 fill-indigo-500 text-white" />
+                      ) : (
+                        <Square className="w-4 h-4 text-slate-400" />
+                      )}
+                    </button>
                   </div>
 
-                  {/* 기획/문서 반영 체크박스 */}
+                  {/* 요약문 */}
+                  {src.summary && (
+                    <p className="text-[11px] text-slate-600 dark:text-zinc-400 leading-snug line-clamp-2 mb-2">
+                      {src.summary}
+                    </p>
+                  )}
+                </div>
+
+                {/* 하단 메타 & 사내 양식 적용 & 원문보기/삭제 버튼 */}
+                <div className="space-y-1.5 pt-2 border-t border-slate-100 dark:border-zinc-800">
+                  <div className="flex items-center justify-between text-[10px] text-slate-400 dark:text-zinc-500">
+                    <span className="font-mono">
+                      {src.tokenCount.toLocaleString()} tkn {src.fileSize ? `• ${src.fileSize}` : ''}
+                    </span>
+
+                    <div className="flex items-center space-x-1.5">
+                      <button
+                        onClick={() => setPreviewSource(src)}
+                        className="p-1 hover:text-indigo-600 dark:hover:text-indigo-400 transition cursor-pointer"
+                        title="원문 및 요약 내용 보기"
+                      >
+                        <Eye className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => onDeleteSource(src.id)}
+                        className="p-1 hover:text-red-600 dark:hover:text-red-400 transition cursor-pointer"
+                        title="소스 삭제"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* 사내 양식으로 적용 버튼 */}
                   <button
-                    onClick={() => onToggleSelectSource(src.id)}
-                    className="text-indigo-600 dark:text-indigo-400 hover:scale-110 transition cursor-pointer shrink-0"
-                    title={src.isSelected ? '문서 반영 해제' : '문서 반영 포함'}
+                    type="button"
+                    onClick={() => onOpenTemplateInjector && onOpenTemplateInjector(src)}
+                    className="w-full py-1 px-2 rounded-lg bg-slate-50 hover:bg-slate-100 dark:bg-zinc-800 dark:hover:bg-zinc-750 text-slate-700 dark:text-zinc-200 border border-slate-200 dark:border-zinc-700 text-[10px] font-bold flex items-center justify-center space-x-1 transition cursor-pointer"
+                    title="이 소스의 서식/표 구조를 사내 표준 양식으로 캔버스에 복제 적용"
                   >
-                    {src.isSelected ? (
-                      <CheckSquare className="w-4 h-4 fill-indigo-500 text-white" />
-                    ) : (
-                      <Square className="w-4 h-4 text-slate-400" />
-                    )}
+                    <Building2 className="w-3 h-3 text-slate-500" />
+                    <span>사내 양식으로 적용</span>
                   </button>
                 </div>
 
-                {/* 요약문 */}
-                {src.summary && (
-                  <p className="text-[11px] text-slate-600 dark:text-zinc-400 leading-snug line-clamp-2 mb-2">
-                    {src.summary}
-                  </p>
-                )}
               </div>
-
-              {/* 하단 메타 & 원문보기/삭제 버튼 */}
-              <div className="flex items-center justify-between text-[10px] text-slate-400 dark:text-zinc-500 pt-2 border-t border-slate-100 dark:border-zinc-800">
-                <span className="font-mono">
-                  {src.tokenCount.toLocaleString()} tkn {src.fileSize ? `• ${src.fileSize}` : ''}
-                </span>
-
-                <div className="flex items-center space-x-1.5">
-                  <button
-                    onClick={() => setPreviewSource(src)}
-                    className="p-1 hover:text-indigo-600 dark:hover:text-indigo-400 transition"
-                    title="원문 및 요약 내용 보기"
-                  >
-                    <Eye className="w-3.5 h-3.5" />
-                  </button>
-                  <button
-                    onClick={() => onDeleteSource(src.id)}
-                    className="p-1 hover:text-red-600 dark:hover:text-red-400 transition"
-                    title="소스 삭제"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
-
-            </div>
-          ))
+            );
+          })
         )}
       </div>
 

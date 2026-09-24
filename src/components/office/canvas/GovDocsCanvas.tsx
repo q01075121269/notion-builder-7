@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import type { OfficeDocument, DocSection, OfficeCitation } from '../../../types/office';
 import { Plus, Trash2, Info, Sparkles, Building2 } from 'lucide-react';
+import { FactCitationPopover } from '../FactCitationPopover';
 
 interface GovDocsCanvasProps {
   document: OfficeDocument;
@@ -14,12 +15,14 @@ export const GovDocsCanvas: React.FC<GovDocsCanvasProps> = ({
   onSelectCitation
 }) => {
   const [activeTooltip, setActiveTooltip] = useState<string | null>(null);
-  const [approverStatus, setApproverStatus] = useState<boolean[]>([true, true, false]); // [기안, 검토, 결재]
+  const [popoverCitation, setPopoverCitation] = useState<OfficeCitation | null>(null);
+  const [approverStatus, setApproverStatus] = useState<Record<number, boolean>>({ 0: true, 1: true, 2: true, 3: false }); // [기안, 팀장, 본부장, 대표이사]
 
   const toggleApproval = (index: number) => {
-    const updated = [...approverStatus];
-    updated[index] = !updated[index];
-    setApproverStatus(updated);
+    setApproverStatus(prev => ({
+      ...prev,
+      [index]: !prev[index]
+    }));
   };
 
   const handleSectionTextChange = (id: string, newText: string) => {
@@ -94,12 +97,15 @@ export const GovDocsCanvas: React.FC<GovDocsCanvasProps> = ({
                 <button
                   type="button"
                   onClick={() => {
-                    if (citation && onSelectCitation) onSelectCitation(citation);
+                    if (citation) {
+                      setPopoverCitation(citation);
+                      if (onSelectCitation) onSelectCitation(citation);
+                    }
                   }}
                   onMouseEnter={() => setActiveTooltip(`cit-${section.id}-${pIdx}`)}
                   onMouseLeave={() => setActiveTooltip(null)}
                   className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-indigo-50 dark:bg-indigo-950/80 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 dark:hover:bg-indigo-900 transition cursor-pointer"
-                  title="원천 출처 확인"
+                  title="원천 출처 확인 및 팩트 팝오버 열기"
                 >
                   <Sparkles className="w-2.5 h-2.5 text-indigo-500" />
                   <span>출처: {citNum}</span>
@@ -253,6 +259,15 @@ export const GovDocsCanvas: React.FC<GovDocsCanvasProps> = ({
         </div>
 
       </div>
+
+      {/* NotebookLM급 팩트 출처 각주 팝오버 */}
+      <FactCitationPopover
+        citation={popoverCitation}
+        onClose={() => setPopoverCitation(null)}
+        onFocusSource={(_sourceId, _sourceTitle) => {
+          if (onSelectCitation && popoverCitation) onSelectCitation(popoverCitation);
+        }}
+      />
     </div>
   );
 };
