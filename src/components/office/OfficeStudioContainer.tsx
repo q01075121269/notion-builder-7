@@ -11,7 +11,9 @@ import type {
 import { SEED_PROJECTS } from '../../services/officeSeedData';
 import { KnowledgeDock } from './KnowledgeDock';
 import { UniversalSmartCanvas } from './UniversalSmartCanvas';
-import { InPlaceCopilot } from './InPlaceCopilot';
+import { OfficeCopilotDock } from './OfficeCopilotDock';
+import { InfographicStudioModal } from './InfographicStudioModal';
+import { OmniExportDrawer } from './OmniExportDrawer';
 import { CompanyTemplateInjector } from './CompanyTemplateInjector';
 import { AudioOverviewPlayer } from './AudioOverviewPlayer';
 import { VersionExportModal } from './VersionExportModal';
@@ -29,8 +31,9 @@ import {
   ChevronRight,
   Undo2,
   CheckCircle2,
-  Headphones,
-  Download
+  Sparkles,
+  Share2,
+  Bot
 } from 'lucide-react';
 
 export const OfficeStudioContainer: React.FC = () => {
@@ -58,13 +61,22 @@ export const OfficeStudioContainer: React.FC = () => {
 
   // 6. 버전 호환 파일 컴파일러 & 사전 비행 검수 모달 상태
   const [isVersionExportModalOpen, setIsVersionExportModalOpen] = useState<boolean>(false);
-  const [exportInitialTab, setExportInitialTab] = useState<'hwpx' | 'xlsx' | 'pptx' | 'pdf'>('hwpx');
+  const [exportInitialTab] = useState<'hwpx' | 'xlsx' | 'pptx' | 'pdf'>('hwpx');
 
   // 7. 라이프 Hub [Tasks DB] 실행 과제 직결 브리지 모달 상태
   const [isLifeHubBridgeOpen, setIsLifeHubBridgeOpen] = useState<boolean>(false);
 
   // 8. 노션 워크스페이스 Wiki 배포 모달 상태
   const [isNotionDeployModalOpen, setIsNotionDeployModalOpen] = useState<boolean>(false);
+
+  // 9. 실시간 대화형 AI 코파일럿 우측 독 상태 (상시 열림/토글)
+  const [isCopilotDockOpen, setIsCopilotDockOpen] = useState<boolean>(true);
+
+  // 10. 인포그래픽 스튜디오 모달 상태
+  const [isInfographicModalOpen, setIsInfographicModalOpen] = useState<boolean>(false);
+
+  // 11. 우측 옴니 출하 서랍 상태
+  const [isExportDrawerOpen, setIsExportDrawerOpen] = useState<boolean>(false);
 
   // =========================================================================
   // 4. 반응형 사이드바 리사이저 & 접기/펼치기 상태
@@ -338,21 +350,6 @@ export const OfficeStudioContainer: React.FC = () => {
     showToast('선택하신 기획안 뼈대가 공문서/시트 캔버스에 주입되었습니다.', 'success');
   };
 
-  // 옴니 출하 액션들 (버전 호환 컴파일러 & 직결 파이프라인 연동)
-  const handleOpenExportModal = (tab: 'hwpx' | 'xlsx' | 'pptx' | 'pdf' = 'hwpx') => {
-    setExportInitialTab(tab);
-    setIsVersionExportModalOpen(true);
-  };
-
-  const handleExportHwpx = () => handleOpenExportModal('hwpx');
-  const handleExportPptx = () => handleOpenExportModal('pptx');
-  const handleExportXlsx = () => handleOpenExportModal('xlsx');
-  const handleExportPdf = () => handleOpenExportModal('pdf');
-
-  const handleSendToNotion = () => {
-    setIsNotionDeployModalOpen(true);
-  };
-
   const handleSyncToLifeHub = () => {
     setIsLifeHubBridgeOpen(true);
   };
@@ -434,126 +431,91 @@ export const OfficeStudioContainer: React.FC = () => {
       {/* ========================================================================= */}
       <div className="h-11 border-b border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-3 sm:px-4 flex items-center justify-between shrink-0 z-10 shadow-2xs gap-3 no-print">
         
-        {/* 좌측: 4대 문서 포맷 스위처 버튼 그룹 (단일 Lucide SVG 아이콘 규격화) */}
+        {/* 좌측: 4대 문서 포맷 스위처 세그먼트 */}
         <div className="flex items-center bg-slate-100 dark:bg-zinc-800 p-0.5 rounded-lg border border-slate-200 dark:border-zinc-700 shrink-0">
           <button
             onClick={() => handleFormatChange('docs')}
-            className={`flex items-center space-x-1.5 px-2.5 py-1 rounded-md text-xs font-semibold transition cursor-pointer whitespace-nowrap ${
+            className={`flex items-center px-2.5 py-1 rounded-md text-xs font-semibold transition cursor-pointer whitespace-nowrap ${
               currentDoc.format === 'docs'
                 ? 'bg-white dark:bg-zinc-900 text-slate-900 dark:text-white shadow-2xs font-bold'
                 : 'text-slate-500 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-zinc-200'
             }`}
           >
-            <FileText className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+            <FileText className="w-4 h-4 mr-1.5 text-slate-500 shrink-0" />
             <span>공문서/기안서</span>
           </button>
 
           <button
             onClick={() => handleFormatChange('slides')}
-            className={`flex items-center space-x-1.5 px-2.5 py-1 rounded-md text-xs font-semibold transition cursor-pointer whitespace-nowrap ${
+            className={`flex items-center px-2.5 py-1 rounded-md text-xs font-semibold transition cursor-pointer whitespace-nowrap ${
               currentDoc.format === 'slides'
                 ? 'bg-white dark:bg-zinc-900 text-slate-900 dark:text-white shadow-2xs font-bold'
                 : 'text-slate-500 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-zinc-200'
             }`}
           >
-            <Presentation className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+            <Presentation className="w-4 h-4 mr-1.5 text-slate-500 shrink-0" />
             <span>발표 슬라이드</span>
           </button>
 
           <button
             onClick={() => handleFormatChange('sheets')}
-            className={`flex items-center space-x-1.5 px-2.5 py-1 rounded-md text-xs font-semibold transition cursor-pointer whitespace-nowrap ${
+            className={`flex items-center px-2.5 py-1 rounded-md text-xs font-semibold transition cursor-pointer whitespace-nowrap ${
               currentDoc.format === 'sheets'
                 ? 'bg-white dark:bg-zinc-900 text-slate-900 dark:text-white shadow-2xs font-bold'
                 : 'text-slate-500 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-zinc-200'
             }`}
           >
-            <Table className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+            <Table className="w-4 h-4 mr-1.5 text-slate-500 shrink-0" />
             <span>스프레드시트</span>
           </button>
 
           <button
             onClick={() => handleFormatChange('minutes')}
-            className={`flex items-center space-x-1.5 px-2.5 py-1 rounded-md text-xs font-semibold transition cursor-pointer whitespace-nowrap ${
+            className={`flex items-center px-2.5 py-1 rounded-md text-xs font-semibold transition cursor-pointer whitespace-nowrap ${
               currentDoc.format === 'minutes'
                 ? 'bg-white dark:bg-zinc-900 text-slate-900 dark:text-white shadow-2xs font-bold'
                 : 'text-slate-500 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-zinc-200'
             }`}
           >
-            <Mic className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+            <Mic className="w-4 h-4 mr-1.5 text-slate-500 shrink-0" />
             <span>회의록·할일</span>
           </button>
         </div>
 
-        {/* 우측: 옴니 출하 액션 바 (단정한 텍스트 칩 스타일) */}
-        <div className="flex items-center space-x-1 shrink-0 overflow-x-auto">
+        {/* 우측: 아웃풋 & 출하 액션 (인포그래픽 스튜디오 + 우측 옴니 출하 서랍) */}
+        <div className="flex items-center space-x-2 shrink-0">
+          {/* AI 코파일럿 독 토글 */}
           <button
-            onClick={() => handleOpenExportModal('hwpx')}
-            className="flex items-center space-x-1 px-2.5 py-1 rounded-md bg-emerald-50 dark:bg-emerald-950/70 hover:bg-emerald-100 dark:hover:bg-emerald-900 border border-emerald-200 dark:border-emerald-800 text-xs font-bold text-emerald-800 dark:text-emerald-300 transition cursor-pointer whitespace-nowrap shadow-2xs"
-            title="버전 호환 다운로드 모달 & 사전 비행 검수 열기"
+            onClick={() => setIsCopilotDockOpen(!isCopilotDockOpen)}
+            className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer whitespace-nowrap border ${
+              isCopilotDockOpen
+                ? 'bg-indigo-50 dark:bg-indigo-950/70 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800 shadow-2xs'
+                : 'bg-white dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-700 border-slate-200 dark:border-zinc-700'
+            }`}
+            title="실시간 문서 편집 AI 코파일럿 독 열기/닫기"
           >
-            <Download className="w-3.5 h-3.5 text-emerald-700 dark:text-emerald-400" />
-            <span>버전 다운로드</span>
+            <Bot className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
+            <span className="hidden sm:inline">AI 코파일럿</span>
           </button>
 
+          {/* 1. 인포그래픽 스튜디오 (보라색 강조 버튼) */}
           <button
-            onClick={handleExportHwpx}
-            className="px-2 py-1 rounded-md bg-slate-50 dark:bg-zinc-800 hover:bg-slate-100 dark:hover:bg-zinc-700 border border-slate-200 dark:border-zinc-700 text-xs font-medium text-slate-700 dark:text-zinc-300 transition cursor-pointer whitespace-nowrap"
-            title="한글 HWPX 다운로드"
+            onClick={() => setIsInfographicModalOpen(true)}
+            className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-950/80 hover:bg-indigo-100 dark:hover:bg-indigo-900 border border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 text-xs font-bold transition cursor-pointer whitespace-nowrap shadow-2xs"
+            title="고해상도 비주얼 인포그래픽 스튜디오"
           >
-            .hwpx
+            <Sparkles className="w-4 h-4 mr-1.5 text-indigo-600 dark:text-indigo-400 shrink-0" />
+            <span>인포그래픽 스튜디오</span>
           </button>
 
+          {/* 2. 최종 저장 및 출하 (우측 옴니 출하 서랍 토글) */}
           <button
-            onClick={handleExportPptx}
-            className="px-2 py-1 rounded-md bg-slate-50 dark:bg-zinc-800 hover:bg-slate-100 dark:hover:bg-zinc-700 border border-slate-200 dark:border-zinc-700 text-xs font-medium text-slate-700 dark:text-zinc-300 transition cursor-pointer whitespace-nowrap"
-            title="파워포인트 PPTX 다운로드"
+            onClick={() => setIsExportDrawerOpen(true)}
+            className="flex items-center space-x-1.5 px-3.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200 text-xs font-bold transition cursor-pointer whitespace-nowrap shadow-xs"
+            title="우측 옴니 출하 서랍 열기"
           >
-            .pptx
-          </button>
-
-          <button
-            onClick={handleExportXlsx}
-            className="px-2 py-1 rounded-md bg-slate-50 dark:bg-zinc-800 hover:bg-slate-100 dark:hover:bg-zinc-700 border border-slate-200 dark:border-zinc-700 text-xs font-medium text-slate-700 dark:text-zinc-300 transition cursor-pointer whitespace-nowrap"
-            title="엑셀 XLSX 다운로드"
-          >
-            .xlsx
-          </button>
-
-          <button
-            onClick={handleExportPdf}
-            className="px-2 py-1 rounded-md bg-slate-50 dark:bg-zinc-800 hover:bg-slate-100 dark:hover:bg-zinc-700 border border-slate-200 dark:border-zinc-700 text-xs font-medium text-slate-700 dark:text-zinc-300 transition cursor-pointer whitespace-nowrap"
-            title="PDF 인쇄 및 저장"
-          >
-            PDF 인쇄
-          </button>
-
-          <div className="h-4 w-px bg-slate-200 dark:border-zinc-700 mx-0.5" />
-
-          {/* 🎧 2분 오디오 브리핑 버튼 */}
-          <button
-            onClick={() => setIsAudioBriefingOpen(true)}
-            className="flex items-center px-2.5 py-1 rounded-md bg-indigo-50 dark:bg-indigo-950/80 hover:bg-indigo-100 dark:hover:bg-indigo-900 border border-indigo-200 dark:border-indigo-800 text-xs font-bold text-indigo-700 dark:text-indigo-300 transition cursor-pointer whitespace-nowrap shadow-2xs"
-            title="2인 대화형 팟캐스트 2분 오디오 브리핑 재생"
-          >
-            <Headphones className="w-3.5 h-3.5 mr-1 text-indigo-600 dark:text-indigo-400" />
-            <span>2분 오디오 브리핑</span>
-          </button>
-
-          <button
-            onClick={handleSendToNotion}
-            className="px-2.5 py-1 rounded-md bg-slate-900 text-white dark:bg-zinc-100 dark:text-zinc-900 text-xs font-semibold hover:opacity-90 transition cursor-pointer whitespace-nowrap shadow-2xs"
-            title="노션 Wiki 마스터 DB로 전송"
-          >
-            노션 Wiki
-          </button>
-
-          <button
-            onClick={handleSyncToLifeHub}
-            className="px-2.5 py-1 rounded-md bg-slate-800 text-white dark:bg-zinc-200 dark:text-zinc-900 text-xs font-semibold hover:opacity-90 transition cursor-pointer whitespace-nowrap shadow-2xs"
-            title="할 일 목록을 라이프 Hub로 연동"
-          >
-            라이프 Hub
+            <Share2 className="w-4 h-4 mr-1.5 text-slate-200 dark:text-slate-800 shrink-0" />
+            <span>최종 저장 및 출하</span>
           </button>
         </div>
 
@@ -596,7 +558,7 @@ export const OfficeStudioContainer: React.FC = () => {
           </div>
         )}
 
-        {/* (3) 우측 메인 영역: Universal Smart Canvas (사이드바 접힘 시 100% 전폭) */}
+        {/* (3) 중앙 메인 영역: Universal Smart Canvas */}
         <div className="flex-1 h-full flex flex-col min-w-0">
           <UniversalSmartCanvas
             document={currentDoc}
@@ -610,18 +572,18 @@ export const OfficeStudioContainer: React.FC = () => {
           />
         </div>
 
-      </div>
+        {/* (4) 우측 독: 실시간 대화형 AI 코파일럿 (OfficeCopilotDock) */}
+        <OfficeCopilotDock
+          isOpen={isCopilotDockOpen}
+          onClose={() => setIsCopilotDockOpen(false)}
+          document={currentDoc}
+          onChangeDocument={updateDocument}
+          onUndo={handleUndo}
+          canUndo={historyStack.length > 0}
+          lastActionName={historyStack[historyStack.length - 1]?.action}
+        />
 
-      {/* ========================================================================= */}
-      {/* 3. 대화형 인플레이스 실시간 변이 코파일럿 (InPlaceCopilot 2.0) */}
-      {/* ========================================================================= */}
-      <InPlaceCopilot
-        document={currentDoc}
-        onChangeDocument={updateDocument}
-        onUndo={handleUndo}
-        canUndo={historyStack.length > 0}
-        lastActionName={historyStack[historyStack.length - 1]?.action}
-      />
+      </div>
 
       {/* ========================================================================= */}
       {/* 4. 사내 고유 서식 복제기 모달 (CompanyTemplateInjector) */}
@@ -672,6 +634,30 @@ export const OfficeStudioContainer: React.FC = () => {
         isOpen={isNotionDeployModalOpen}
         onClose={() => setIsNotionDeployModalOpen(false)}
         document={currentDoc}
+        onShowToast={showToast}
+      />
+
+      {/* ========================================================================= */}
+      {/* 9. 우측 옴니 출하 서랍 (OmniExportDrawer) */}
+      {/* ========================================================================= */}
+      <OmniExportDrawer
+        isOpen={isExportDrawerOpen}
+        onClose={() => setIsExportDrawerOpen(false)}
+        document={currentDoc}
+        onOpenLifeHubBridge={() => setIsLifeHubBridgeOpen(true)}
+        onOpenNotionWikiModal={() => setIsNotionDeployModalOpen(true)}
+        onOpenAudioBriefing={() => setIsAudioBriefingOpen(true)}
+        onShowToast={showToast}
+      />
+
+      {/* ========================================================================= */}
+      {/* 10. 인포그래픽 스튜디오 모달 (InfographicStudioModal) */}
+      {/* ========================================================================= */}
+      <InfographicStudioModal
+        isOpen={isInfographicModalOpen}
+        onClose={() => setIsInfographicModalOpen(false)}
+        document={currentDoc}
+        planTriad={activeProject.planTriad}
         onShowToast={showToast}
       />
 
