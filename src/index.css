@@ -68,3 +68,41 @@ details summary::-webkit-details-marker {
 .mb-safe {
   margin-bottom: env(safe-area-inset-bottom, 16px);
 }
+
+/* Print Styles for A4 Document Direct Print */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 20mm;
+  }
+
+  body {
+    background: white !important;
+    color: black !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* 글로벌 헤더, 내비게이션, 사이드바, 플로팅 코파일럿, 모달 등 숨기기 */
+  header,
+  nav,
+  aside,
+  .no-print,
+  [data-print-hide="true"] {
+    display: none !important;
+  }
+
+  /* 스크롤바 및 그림자 제거, 본문 인쇄 최적화 */
+  #root,
+  main {
+    overflow: visible !important;
+    height: auto !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+    border: none !important;
+    background: transparent !important;
+  }
+}
