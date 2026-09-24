@@ -30,7 +30,7 @@ export interface PlanTriad {
   selectedOption?: 'A' | 'B' | 'C';
 }
 
-export type OfficeDocumentFormat = 'docs' | 'slides' | 'sheets' | 'minutes';
+export type OfficeDocumentFormat = 'docs' | 'slides' | 'sheets' | 'minutes' | 'mindmap' | 'infographic' | 'briefing';
 
 export interface DocSection {
   id: string;

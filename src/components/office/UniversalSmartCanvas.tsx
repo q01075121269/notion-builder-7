@@ -11,6 +11,9 @@ import { GovDocsCanvas } from './canvas/GovDocsCanvas';
 import { SlidesCanvas } from './canvas/SlidesCanvas';
 import { SheetsCanvas } from './canvas/SheetsCanvas';
 import { MinutesCanvas } from './canvas/MinutesCanvas';
+import { MindMapCanvas } from './canvas/MindMapCanvas';
+import { InfographicCanvas } from './canvas/InfographicCanvas';
+import { BriefingReportCanvas } from './canvas/BriefingReportCanvas';
 import { Sparkles, Edit3 } from 'lucide-react';
 
 interface UniversalSmartCanvasProps {
@@ -23,6 +26,7 @@ interface UniversalSmartCanvasProps {
   onApplyPlanToDoc: (selectedKey: 'A' | 'B' | 'C', qaAnswers: { targetDetail: string; channelDetail: string }, chosenOption?: PlanOption) => void;
   onSelectCitation?: (citation: OfficeCitation) => void;
   onSyncToLifeHub?: () => void;
+  onShowToast?: (message: string, type: 'info' | 'success' | 'error') => void;
 }
 
 export const UniversalSmartCanvas: React.FC<UniversalSmartCanvasProps> = ({
@@ -34,7 +38,8 @@ export const UniversalSmartCanvas: React.FC<UniversalSmartCanvasProps> = ({
   onUpdatePlanTriad,
   onApplyPlanToDoc,
   onSelectCitation,
-  onSyncToLifeHub
+  onSyncToLifeHub,
+  onShowToast
 }) => {
   return (
     <div className="w-full h-full flex flex-col bg-slate-100/70 dark:bg-zinc-950 overflow-hidden select-none relative">
@@ -91,7 +96,7 @@ export const UniversalSmartCanvas: React.FC<UniversalSmartCanvasProps> = ({
             onApplyPlanToDoc={onApplyPlanToDoc}
           />
         ) : (
-          <div className="w-full min-h-full">
+          <div className="w-full h-full min-h-full">
             {document.format === 'docs' && (
               <GovDocsCanvas
                 document={document}
@@ -119,6 +124,31 @@ export const UniversalSmartCanvas: React.FC<UniversalSmartCanvasProps> = ({
                 document={document}
                 onChangeDocument={onChangeDocument}
                 onSyncToLifeHub={onSyncToLifeHub}
+              />
+            )}
+
+            {document.format === 'mindmap' && (
+              <MindMapCanvas
+                document={document}
+                onChangeDocument={onChangeDocument}
+                onShowToast={onShowToast}
+              />
+            )}
+
+            {document.format === 'infographic' && (
+              <InfographicCanvas
+                document={document}
+                planTriad={planTriad}
+                onChangeDocument={onChangeDocument}
+                onShowToast={onShowToast}
+              />
+            )}
+
+            {document.format === 'briefing' && (
+              <BriefingReportCanvas
+                document={document}
+                planTriad={planTriad}
+                onShowToast={onShowToast}
               />
             )}
           </div>

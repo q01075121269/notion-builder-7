@@ -11,7 +11,7 @@ import type {
 import { SEED_PROJECTS } from '../../services/officeSeedData';
 import { KnowledgeDock } from './KnowledgeDock';
 import { UniversalSmartCanvas } from './UniversalSmartCanvas';
-import { OfficeCopilotDock } from './OfficeCopilotDock';
+import { NotebookStudioPanel } from './NotebookStudioPanel';
 import { InfographicStudioModal } from './InfographicStudioModal';
 import { OmniExportDrawer } from './OmniExportDrawer';
 import { CompanyTemplateInjector } from './CompanyTemplateInjector';
@@ -23,17 +23,12 @@ import { useApp } from '../../context/AppContext';
 import { 
   Folder, 
   Plus, 
-  FileText, 
-  Presentation, 
-  Table, 
-  Mic, 
   ChevronLeft,
   ChevronRight,
   Undo2,
   CheckCircle2,
   Sparkles,
-  Share2,
-  Bot
+  Share2
 } from 'lucide-react';
 
 export const OfficeStudioContainer: React.FC = () => {
@@ -69,8 +64,8 @@ export const OfficeStudioContainer: React.FC = () => {
   // 8. 노션 워크스페이스 Wiki 배포 모달 상태
   const [isNotionDeployModalOpen, setIsNotionDeployModalOpen] = useState<boolean>(false);
 
-  // 9. 실시간 대화형 AI 코파일럿 우측 독 상태 (상시 열림/토글)
-  const [isCopilotDockOpen, setIsCopilotDockOpen] = useState<boolean>(true);
+  // 9. Gemini NotebookLM형 우측 [스튜디오(Studio)] 패널 상태 (상시 열림/접기)
+  const [isStudioOpen, setIsStudioOpen] = useState<boolean>(true);
 
   // 10. 인포그래픽 스튜디오 모달 상태
   const [isInfographicModalOpen, setIsInfographicModalOpen] = useState<boolean>(false);
@@ -361,9 +356,9 @@ export const OfficeStudioContainer: React.FC = () => {
     >
       
       {/* ========================================================================= */}
-      {/* 상단 1단: 프로젝트 워크스페이스 바 (h-11 border-b bg-slate-50/60) */}
+      {/* 상단 1단 미니멀 바: 프로젝트 네비게이션 & [ 🚀 최종 저장 및 출하 ] */}
       {/* ========================================================================= */}
-      <div className="h-11 border-b border-slate-200 dark:border-zinc-800 bg-slate-50/80 dark:bg-zinc-900/80 px-3 sm:px-4 flex items-center justify-between shrink-0 z-20 gap-3 no-print">
+      <div className="h-12 border-b border-slate-200 dark:border-zinc-800 bg-white/95 dark:bg-zinc-900/95 backdrop-blur px-3 sm:px-5 flex items-center justify-between shrink-0 z-20 gap-3 no-print shadow-2xs">
         
         {/* 좌측: 사이드바 접기/펼치기 화살표 + 프로젝트 탭 목록 + 새 프로젝트 버튼 */}
         <div className="flex items-center space-x-1.5 overflow-x-auto whitespace-nowrap scrollbar-none flex-1 min-w-0 py-0.5">
@@ -384,8 +379,8 @@ export const OfficeStudioContainer: React.FC = () => {
               className={`
                 flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition whitespace-nowrap cursor-pointer shrink-0 border
                 ${activeProjectId === proj.id
-                  ? 'bg-white dark:bg-zinc-800 text-slate-900 dark:text-white border-slate-300 dark:border-zinc-600 shadow-2xs font-bold'
-                  : 'bg-transparent text-slate-500 hover:text-slate-800 dark:text-zinc-400 dark:hover:text-zinc-200 border-transparent hover:bg-white/60 dark:hover:bg-zinc-800/60'
+                  ? 'bg-slate-100 dark:bg-zinc-800 text-slate-900 dark:text-white border-slate-300 dark:border-zinc-600 shadow-2xs font-bold'
+                  : 'bg-transparent text-slate-500 hover:text-slate-800 dark:text-zinc-400 dark:hover:text-zinc-200 border-transparent hover:bg-slate-100/60 dark:hover:bg-zinc-800/60'
                 }
               `}
               title={proj.title}
@@ -398,7 +393,7 @@ export const OfficeStudioContainer: React.FC = () => {
           {/* 새 프로젝트 생성 버튼 */}
           <button
             onClick={handleCreateNewProject}
-            className="flex items-center space-x-1 px-2.5 py-1.5 rounded-lg bg-transparent hover:bg-white dark:hover:bg-zinc-800 text-slate-600 dark:text-zinc-400 text-xs font-medium transition cursor-pointer shrink-0 border border-dashed border-slate-300 dark:border-zinc-700"
+            className="flex items-center space-x-1 px-2.5 py-1.5 rounded-lg bg-transparent hover:bg-slate-100 dark:hover:bg-zinc-800 text-slate-600 dark:text-zinc-400 text-xs font-medium transition cursor-pointer shrink-0 border border-dashed border-slate-300 dark:border-zinc-700"
             title="새 프로젝트 생성"
           >
             <Plus className="w-3.5 h-3.5 text-slate-400" />
@@ -406,123 +401,49 @@ export const OfficeStudioContainer: React.FC = () => {
           </button>
         </div>
 
-        {/* 우측: 저장 상태 뱃지 & 되돌리기 버튼 */}
+        {/* 우측: 자동 저장 상태 + 되돌리기 + 스튜디오 토글 + [ 🚀 최종 저장 및 출하 ] */}
         <div className="flex items-center space-x-2 shrink-0">
-          <div className="hidden md:flex items-center space-x-1 text-[11px] text-slate-400 dark:text-zinc-500">
-            <CheckCircle2 className="w-3 h-3 text-slate-400" />
+          <div className="hidden lg:flex items-center space-x-1 text-[11px] text-slate-400 dark:text-zinc-500">
+            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
             <span>자동 저장됨</span>
           </div>
 
           <button
             onClick={handleUndo}
             disabled={historyStack.length === 0}
-            className="flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-white dark:bg-zinc-800 hover:bg-slate-100 dark:hover:bg-zinc-700 disabled:opacity-30 border border-slate-200 dark:border-zinc-700 text-xs font-semibold text-slate-700 dark:text-zinc-300 transition cursor-pointer shadow-2xs"
+            className="flex items-center space-x-1 px-2.5 py-1.5 rounded-lg bg-white dark:bg-zinc-800 hover:bg-slate-100 dark:hover:bg-zinc-700 disabled:opacity-30 border border-slate-200 dark:border-zinc-700 text-xs font-semibold text-slate-700 dark:text-zinc-300 transition cursor-pointer shadow-2xs"
             title={historyStack.length > 0 ? `되돌리기: ${historyStack[historyStack.length - 1].action}` : '되돌릴 작업 없음'}
           >
             <Undo2 className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-            <span>되돌리기</span>
-          </button>
-        </div>
-
-      </div>
-
-      {/* ========================================================================= */}
-      {/* 하단 2단: 캔버스 포맷 & 옴니 출하 툴바 (h-11 border-b bg-white) */}
-      {/* ========================================================================= */}
-      <div className="h-11 border-b border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-3 sm:px-4 flex items-center justify-between shrink-0 z-10 shadow-2xs gap-3 no-print">
-        
-        {/* 좌측: 4대 문서 포맷 스위처 세그먼트 */}
-        <div className="flex items-center bg-slate-100 dark:bg-zinc-800 p-0.5 rounded-lg border border-slate-200 dark:border-zinc-700 shrink-0">
-          <button
-            onClick={() => handleFormatChange('docs')}
-            className={`flex items-center px-2.5 py-1 rounded-md text-xs font-semibold transition cursor-pointer whitespace-nowrap ${
-              currentDoc.format === 'docs'
-                ? 'bg-white dark:bg-zinc-900 text-slate-900 dark:text-white shadow-2xs font-bold'
-                : 'text-slate-500 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-zinc-200'
-            }`}
-          >
-            <FileText className="w-4 h-4 mr-1.5 text-slate-500 shrink-0" />
-            <span>공문서/기안서</span>
+            <span className="hidden sm:inline">되돌리기</span>
           </button>
 
-          <button
-            onClick={() => handleFormatChange('slides')}
-            className={`flex items-center px-2.5 py-1 rounded-md text-xs font-semibold transition cursor-pointer whitespace-nowrap ${
-              currentDoc.format === 'slides'
-                ? 'bg-white dark:bg-zinc-900 text-slate-900 dark:text-white shadow-2xs font-bold'
-                : 'text-slate-500 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-zinc-200'
-            }`}
-          >
-            <Presentation className="w-4 h-4 mr-1.5 text-slate-500 shrink-0" />
-            <span>발표 슬라이드</span>
-          </button>
+          {!isStudioOpen && (
+            <button
+              onClick={() => setIsStudioOpen(true)}
+              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 dark:hover:bg-indigo-900 text-xs font-bold transition cursor-pointer shadow-2xs"
+              title="스튜디오 패널 펼치기"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-indigo-500" />
+              <span>스튜디오 열기</span>
+            </button>
+          )}
 
-          <button
-            onClick={() => handleFormatChange('sheets')}
-            className={`flex items-center px-2.5 py-1 rounded-md text-xs font-semibold transition cursor-pointer whitespace-nowrap ${
-              currentDoc.format === 'sheets'
-                ? 'bg-white dark:bg-zinc-900 text-slate-900 dark:text-white shadow-2xs font-bold'
-                : 'text-slate-500 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-zinc-200'
-            }`}
-          >
-            <Table className="w-4 h-4 mr-1.5 text-slate-500 shrink-0" />
-            <span>스프레드시트</span>
-          </button>
-
-          <button
-            onClick={() => handleFormatChange('minutes')}
-            className={`flex items-center px-2.5 py-1 rounded-md text-xs font-semibold transition cursor-pointer whitespace-nowrap ${
-              currentDoc.format === 'minutes'
-                ? 'bg-white dark:bg-zinc-900 text-slate-900 dark:text-white shadow-2xs font-bold'
-                : 'text-slate-500 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-zinc-200'
-            }`}
-          >
-            <Mic className="w-4 h-4 mr-1.5 text-slate-500 shrink-0" />
-            <span>회의록·할일</span>
-          </button>
-        </div>
-
-        {/* 우측: 아웃풋 & 출하 액션 (인포그래픽 스튜디오 + 우측 옴니 출하 서랍) */}
-        <div className="flex items-center space-x-2 shrink-0">
-          {/* AI 코파일럿 독 토글 */}
-          <button
-            onClick={() => setIsCopilotDockOpen(!isCopilotDockOpen)}
-            className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer whitespace-nowrap border ${
-              isCopilotDockOpen
-                ? 'bg-indigo-50 dark:bg-indigo-950/70 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800 shadow-2xs'
-                : 'bg-white dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-700 border-slate-200 dark:border-zinc-700'
-            }`}
-            title="실시간 문서 편집 AI 코파일럿 독 열기/닫기"
-          >
-            <Bot className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
-            <span className="hidden sm:inline">AI 코파일럿</span>
-          </button>
-
-          {/* 1. 인포그래픽 스튜디오 (보라색 강조 버튼) */}
-          <button
-            onClick={() => setIsInfographicModalOpen(true)}
-            className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-950/80 hover:bg-indigo-100 dark:hover:bg-indigo-900 border border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 text-xs font-bold transition cursor-pointer whitespace-nowrap shadow-2xs"
-            title="고해상도 비주얼 인포그래픽 스튜디오"
-          >
-            <Sparkles className="w-4 h-4 mr-1.5 text-indigo-600 dark:text-indigo-400 shrink-0" />
-            <span>인포그래픽 스튜디오</span>
-          </button>
-
-          {/* 2. 최종 저장 및 출하 (우측 옴니 출하 서랍 토글) */}
+          {/* [ 🚀 최종 저장 및 출하 ] 버튼 */}
           <button
             onClick={() => setIsExportDrawerOpen(true)}
-            className="flex items-center space-x-1.5 px-3.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200 text-xs font-bold transition cursor-pointer whitespace-nowrap shadow-xs"
+            className="flex items-center space-x-2 px-4 py-1.5 rounded-xl bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 hover:from-slate-800 hover:to-indigo-900 text-white dark:from-zinc-100 dark:to-zinc-200 dark:text-zinc-900 text-xs font-extrabold transition cursor-pointer whitespace-nowrap shadow-md"
             title="우측 옴니 출하 서랍 열기"
           >
-            <Share2 className="w-4 h-4 mr-1.5 text-slate-200 dark:text-slate-800 shrink-0" />
-            <span>최종 저장 및 출하</span>
+            <Share2 className="w-4 h-4 text-indigo-300 dark:text-indigo-600 shrink-0" />
+            <span>🚀 최종 저장 및 출하</span>
           </button>
         </div>
 
       </div>
 
       {/* ========================================================================= */}
-      {/* 2. 본문 리사이저블 레이아웃 (Knowledge Dock vs Universal Smart Canvas) */}
+      {/* 2. 본문 3단 레이아웃 (Knowledge Dock vs Universal Smart Canvas vs Studio Panel) */}
       {/* ========================================================================= */}
       <div className="flex-1 flex overflow-hidden w-full relative">
         
@@ -559,7 +480,7 @@ export const OfficeStudioContainer: React.FC = () => {
         )}
 
         {/* (3) 중앙 메인 영역: Universal Smart Canvas */}
-        <div className="flex-1 h-full flex flex-col min-w-0">
+        <div className="flex-1 h-full flex flex-col min-w-0 relative">
           <UniversalSmartCanvas
             document={currentDoc}
             planTriad={activeProject.planTriad}
@@ -569,18 +490,35 @@ export const OfficeStudioContainer: React.FC = () => {
             onUpdatePlanTriad={handleUpdatePlanTriad}
             onApplyPlanToDoc={handleApplyPlanToDoc}
             onSyncToLifeHub={handleSyncToLifeHub}
+            onShowToast={showToast}
           />
+
+          {/* 스튜디오가 닫혀있을 때 우측 플로팅 열기 탭 */}
+          {!isStudioOpen && (
+            <button
+              onClick={() => setIsStudioOpen(true)}
+              className="absolute right-0 top-16 z-30 py-3 px-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-l-xl shadow-lg flex flex-col items-center space-y-1.5 cursor-pointer text-[10px] font-bold tracking-tighter"
+              title="스튜디오 펼치기"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              <span className="[writing-mode:vertical-lr]">스튜디오</span>
+            </button>
+          )}
         </div>
 
-        {/* (4) 우측 독: 실시간 대화형 AI 코파일럿 (OfficeCopilotDock) */}
-        <OfficeCopilotDock
-          isOpen={isCopilotDockOpen}
-          onClose={() => setIsCopilotDockOpen(false)}
+        {/* (4) 우측 독: Gemini NotebookLM형 스튜디오 패널 (NotebookStudioPanel) */}
+        <NotebookStudioPanel
+          isOpen={isStudioOpen}
+          onClose={() => setIsStudioOpen(false)}
+          currentFormat={currentDoc.format}
+          onChangeFormat={handleFormatChange}
           document={currentDoc}
           onChangeDocument={updateDocument}
+          onOpenAudioBriefing={() => setIsAudioBriefingOpen(true)}
           onUndo={handleUndo}
           canUndo={historyStack.length > 0}
           lastActionName={historyStack[historyStack.length - 1]?.action}
+          onShowToast={showToast}
         />
 
       </div>
