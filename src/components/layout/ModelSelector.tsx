@@ -90,7 +90,7 @@ export const ModelSelector: React.FC = () => {
   };
 
   return (
-    <div className="relative shrink-0" ref={containerRef}>
+    <div className="relative shrink-0 z-50 overflow-visible" ref={containerRef}>
       {/* 헤더 모델 셀렉터 토글 버튼 */}
       <button
         type="button"
@@ -104,9 +104,9 @@ export const ModelSelector: React.FC = () => {
         <ChevronDown className={`w-3 h-3 text-neutral-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
       </button>
 
-      {/* 모델 선택 드롭다운 팝오버 */}
+      {/* 모델 선택 드롭다운 팝오버 (z-[9999] 최상위 배치) */}
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-72 sm:w-80 bg-white dark:bg-notion-dark-card rounded-2xl shadow-2xl border border-neutral-200 dark:border-neutral-700 p-2 z-50 animate-fadeIn space-y-1">
+        <div className="absolute right-0 top-full mt-2 w-80 bg-white dark:bg-notion-dark-card border border-slate-200 dark:border-neutral-700 rounded-xl shadow-2xl p-2 z-[9999] flex flex-col gap-1 animate-fadeIn">
           <div className="px-2.5 py-1.5 border-b border-neutral-100 dark:border-neutral-800 flex items-center justify-between">
             <span className="text-[11px] font-black text-neutral-400 dark:text-neutral-500 uppercase tracking-wider">
               2026 Gemini AI 모델 셀렉터

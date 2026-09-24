@@ -62,8 +62,8 @@ export const Navbar: React.FC = () => {
 
   return (
     <>
-      <header className="sticky top-0 z-40 w-full h-14 bg-white/95 dark:bg-notion-dark-bg/95 backdrop-blur-md border-b border-neutral-200/90 dark:border-notion-dark-border transition-colors select-none">
-        <div className="w-full max-w-[1600px] mx-auto px-2 sm:px-4 h-full flex items-center justify-between gap-1.5 sm:gap-3 flex-nowrap overflow-x-auto no-scrollbar">
+      <header className="sticky top-0 z-50 w-full h-14 bg-white/95 dark:bg-notion-dark-bg/95 backdrop-blur-md border-b border-neutral-200/90 dark:border-notion-dark-border transition-colors select-none overflow-visible">
+        <div className="w-full max-w-[1600px] mx-auto px-2 sm:px-4 h-full flex items-center justify-between gap-1.5 sm:gap-3 flex-nowrap overflow-visible relative z-50">
           
           {/* [좌측]: Notion Architect 심플 로고 (클릭 시 홈 대시보드로 이동) */}
           <div className="flex items-center space-x-2 shrink-0">
@@ -147,7 +147,7 @@ export const Navbar: React.FC = () => {
           </div>
 
           {/* [우측]: [👑 통합 허브] + [⏰ 루틴 브리핑], Gemini 모델 셀렉터, [⚙️ 설정] 버튼, 프로필 아바타 */}
-          <div className="flex items-center space-x-1 sm:space-x-1.5 shrink-0 whitespace-nowrap pr-1">
+          <div className="flex items-center space-x-1 sm:space-x-1.5 shrink-0 whitespace-nowrap pr-1 relative z-50 overflow-visible">
             {/* 👑 통합 허브 (사용자 요청: 루틴 브리핑 옆으로 이동) */}
             <button
               onClick={handleOpenMasterHub}
