@@ -1,234 +1,462 @@
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../context/AppContext';
-import { DailyRoutineCockpit } from '../components/routine/DailyRoutineCockpit';
+import { ChatMessageItem } from '../components/chat/ChatMessageItem';
+import { ChatHistoryDrawer } from '../components/chat/ChatHistoryDrawer';
+import { 
+  getSavedSessions, 
+  getActiveSessionId, 
+  setActiveSessionId, 
+  createNewSession, 
+  deleteSession,
+  updateSessionMessages
+} from '../services/chatStorage';
+import type { ChatSession } from '../services/chatStorage';
 import { 
   Sparkles, 
-  ArrowRight, 
-  Leaf, 
-  FileText, 
-  Palette, 
+  Clock, 
+  Send, 
+  Mic, 
+  MicOff, 
+  Paperclip, 
+  Bot, 
+  Database, 
   Cpu, 
-  Database,
-  CheckCircle2,
-  ShieldCheck,
-  Zap
+  Lightbulb, 
+  Building2, 
+  CalendarDays, 
+  Wallet,
+  X,
+  Loader2
 } from 'lucide-react';
+import { parseUploadedFile } from '../services/fileParserService';
+import type { AttachedFile } from '../types/fileAttachment';
 
 export const HomePage: React.FC = () => {
   const { 
-    setCurrentView, 
     selectedModel, 
     notionApiKey, 
     notionParentPageId,
     createdNotionResource,
-    setIsNotionSettingsModalOpen
+    setIsNotionSettingsModalOpen,
+    messages,
+    sendMessage,
+    isGenerating,
+    showToast
   } = useApp();
 
   const isNotionConnected = Boolean(notionApiKey && (createdNotionResource || notionParentPageId));
 
-  const chapters = [
+  // 1. 좌측 히스토리 서랍 및 세션 상태
+  const [isDrawerOpen, setIsDrawerOpen] = useState<boolean>(false);
+  const [sessions, setSessions] = useState<ChatSession[]>(() => getSavedSessions());
+  const [activeSessionId, setActiveSessionIdState] = useState<string | null>(() => getActiveSessionId());
+
+  // 2. 대화 입력창 관련 상태
+  const [inputPrompt, setInputPrompt] = useState<string>('');
+  const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
+  const [isListening, setIsListening] = useState<boolean>(false);
+  const [isParsingFile, setIsParsingFile] = useState<boolean>(false);
+
+  const chatScrollRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // 세션 불러오기 & 실시간 자동 동기화
+  useEffect(() => {
+    const loadedSessions = getSavedSessions();
+    setSessions(loadedSessions);
+    const activeId = getActiveSessionId();
+    if (activeId) {
+      setActiveSessionIdState(activeId);
+    } else if (loadedSessions.length > 0) {
+      setActiveSessionIdState(loadedSessions[0].id);
+      setActiveSessionId(loadedSessions[0].id);
+    }
+  }, []);
+
+  // 메시지 변동 시 자동으로 현재 세션 업데이트 및 스크롤 하단 이동
+  useEffect(() => {
+    if (activeSessionId && messages.length > 0) {
+      updateSessionMessages(activeSessionId, messages);
+      setSessions(getSavedSessions());
+    }
+    if (chatScrollRef.current) {
+      chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
+    }
+  }, [messages, activeSessionId]);
+
+  // 새로운 대화 생성
+  const handleNewChat = () => {
+    const newSession = createNewSession();
+    setSessions(getSavedSessions());
+    setActiveSessionIdState(newSession.id);
+    showToast('✨ 새 Co-Thinking 대화가 시작되었습니다.', 'info');
+  };
+
+  // 특정 세션 선택
+  const handleSelectSession = (sessionId: string) => {
+    setActiveSessionId(sessionId);
+    setActiveSessionIdState(sessionId);
+    const session = sessions.find(s => s.id === sessionId);
+    if (session) {
+      // AppContext의 messages가 자동으로 sync되거나 새로 로드될 수 있도록 조치
+      window.location.reload(); // 세션 전환 시 안전한 상태 동기화
+    }
+  };
+
+  // 세션 삭제
+  const handleDeleteSession = (sessionId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const updated = deleteSession(sessionId);
+    setSessions(updated);
+    const newActiveId = getActiveSessionId();
+    setActiveSessionIdState(newActiveId);
+    showToast('대화 기록이 삭제되었습니다.', 'info');
+  };
+
+  // Quick Starters 유도 칩 클릭 핸들러
+  const handleQuickStarter = (promptText: string) => {
+    setInputPrompt(promptText);
+    sendMessage(promptText);
+    setInputPrompt('');
+  };
+
+  // 입력 전송 핸들러
+  const handleSend = () => {
+    if ((!inputPrompt.trim() && attachedFiles.length === 0) || isGenerating) return;
+    sendMessage(inputPrompt, attachedFiles);
+    setInputPrompt('');
+    setAttachedFiles([]);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
+  };
+
+  // 파일 업로드 처리
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    setIsParsingFile(true);
+    try {
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const parsed = await parseUploadedFile(file);
+        setAttachedFiles(prev => [...prev, parsed]);
+        showToast(`📎 [${file.name}] 파일 분석 완료`, 'success');
+      }
+    } catch (err: any) {
+      showToast(err?.message || '파일 업로드 실패', 'error');
+    } finally {
+      setIsParsingFile(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  // 음성 인식 (STT) 토글
+  const toggleListening = () => {
+    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+      showToast('이 브라우저는 음성 인식을 지원하지 않습니다.', 'warning');
+      return;
+    }
+
+    if (isListening) {
+      setIsListening(false);
+      return;
+    }
+
+    try {
+      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      const recognition = new SpeechRecognition();
+      recognition.lang = 'ko-KR';
+      recognition.continuous = false;
+      recognition.interimResults = true;
+
+      recognition.onstart = () => {
+        setIsListening(true);
+        showToast('🎙️ 음성을 듣고 있습니다...', 'info');
+      };
+
+      recognition.onresult = (event: any) => {
+        const transcript = Array.from(event.results)
+          .map((res: any) => res[0].transcript)
+          .join('');
+        setInputPrompt(transcript);
+      };
+
+      recognition.onerror = () => {
+        setIsListening(false);
+        showToast('음성 인식 중 오류가 발생했습니다.', 'error');
+      };
+
+      recognition.onend = () => {
+        setIsListening(false);
+      };
+
+      recognition.start();
+    } catch {
+      setIsListening(false);
+    }
+  };
+
+  // 시작 유도 칩 목록 (Quick Starters)
+  const quickStarters = [
     {
-      id: 'builder',
-      title: '🏗️ 템플릿 마스터',
-      subtitle: '노션 템플릿 빌더 & 보관함',
-      icon: Sparkles,
+      id: 'worklog',
+      icon: Lightbulb,
       iconColor: 'text-amber-500',
-      badgeBg: 'bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-800',
-      borderColor: 'hover:border-amber-400 dark:hover:border-amber-500',
-      description: 'AI 자연어로 맞춤형 노션 템플릿을 신속 생성하고, 실시간 반응형 프리뷰와 보관함을 원스톱으로 관리합니다.',
-      features: [
-        'AI 실시간 2분할(Split) 프리뷰',
-        'Formula 2.0 수식 & DB 자동 설계',
-        '템플릿 보관함 통합 서브 스위처'
-      ],
-      btnColor: 'group-hover:bg-amber-600 dark:group-hover:bg-amber-400 dark:group-hover:text-neutral-900'
+      badge: '기획',
+      title: '업무일지 기획하기',
+      prompt: '오늘 진행할 대표 업무일지 노션 템플릿과 데이터베이스 구조를 함께 기획해 줘.'
     },
     {
-      id: 'life',
-      title: '👔 라이프 비서',
-      subtitle: '일정 · 가계부 · 이메일 · 할 일',
-      icon: Leaf,
-      iconColor: 'text-emerald-500',
-      badgeBg: 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800',
-      borderColor: 'hover:border-emerald-400 dark:hover:border-emerald-500',
-      description: 'Google/노션 캘린더 동기화, 이메일 브리핑, 지출 가계부 분석 및 스마트 데일리 할 일을 통합 제공합니다.',
-      features: [
-        '노션 캘린더 즉시 자동 전송',
-        '스마트 이메일 요약 & 긴급 액션',
-        '소비 패턴 이상 지출 AI 감지'
-      ],
-      btnColor: 'group-hover:bg-emerald-600 dark:group-hover:bg-emerald-400 dark:group-hover:text-neutral-900'
-    },
-    {
-      id: 'devlab',
-      title: '📄 오피스 스튜디오',
-      subtitle: 'Docs · Sheets · Slides 라이브',
-      icon: FileText,
+      id: 'facility',
+      icon: Building2,
       iconColor: 'text-blue-500',
-      badgeBg: 'bg-blue-100 dark:bg-blue-950/60 text-blue-800 dark:text-blue-300 border-blue-200 dark:border-blue-800',
-      borderColor: 'hover:border-blue-400 dark:hover:border-blue-500',
-      description: '3대 비즈니스 문서 라이브 렌더러와 사내 표준 규격 양식, NotebookLM형 RAG 지식 소스를 탑재했습니다.',
-      features: [
-        'Docs, Sheets, Slides 전문 렌더러',
-        '자유 기획 ↔ 사내 표준 양식 듀얼 모드',
-        'NotebookLM 지식 서랍 & 팩트 각주'
-      ],
-      btnColor: 'group-hover:bg-blue-600 dark:group-hover:bg-blue-400 dark:group-hover:text-neutral-900'
+      badge: '설계',
+      title: '시설관리 DB 설계',
+      prompt: '건물 시설 관리, 정기 점검, 하자 보수 이력을 효율적으로 추적하는 노션 DB 구조를 설계해 줘.'
     },
     {
-      id: 'media_lab',
-      title: '🎨 AI 미디어 랩',
-      subtitle: '이미지 · 비디오 · 오디오 믹서',
-      icon: Palette,
+      id: 'schedule',
+      icon: CalendarDays,
+      iconColor: 'text-emerald-500',
+      badge: '일정',
+      title: '프로젝트 일정 브레인스토밍',
+      prompt: '신규 프로젝트의 단계별 마일스톤과 담당자 할 일 관리를 위한 타임라인 템플릿 아이디어를 짚어줘.'
+    },
+    {
+      id: 'asset',
+      icon: Wallet,
       iconColor: 'text-purple-500',
-      badgeBg: 'bg-purple-100 dark:bg-purple-950/60 text-purple-800 dark:text-purple-300 border-purple-200 dark:border-purple-800',
-      borderColor: 'hover:border-purple-400 dark:hover:border-purple-500',
-      description: '멀티 스타일 멀티엔진 이미지 생성, 씬 타임라인 영상 스튜디오, 4대 프리셋 오디오 믹서를 통합 제공합니다.',
-      features: [
-        'Image-to-Video 씬 시퀀서 타임라인',
-        '4대 목적별 오디오 파형 믹서',
-        '슬라이드 서랍 보관함 & 에셋 전송'
-      ],
-      btnColor: 'group-hover:bg-purple-600 dark:group-hover:bg-purple-400 dark:group-hover:text-neutral-900'
+      badge: '자산',
+      title: '개인 가계부 & 자산 관리',
+      prompt: '수입/지출 내역과 월별 예산 잔액을 자동 계산하는 스마트 가계부 노션 템플릿 구조를 추천해 줘.'
     }
   ];
 
   return (
-    <div className="flex-1 flex flex-col h-full w-full overflow-y-auto bg-neutral-50 dark:bg-notion-dark-bg text-neutral-900 dark:text-white select-none">
+    <div className="flex-1 flex flex-col h-full w-full overflow-hidden bg-neutral-50 dark:bg-notion-dark-bg text-neutral-900 dark:text-white select-none relative">
       
-      {/* 1. 글로벌 메인 히어로 바 */}
-      <div className="relative overflow-hidden border-b border-neutral-200/80 dark:border-neutral-800 bg-white dark:bg-notion-dark-card py-6 sm:py-8 px-4 sm:px-8">
-        <div className="absolute inset-0 bg-gradient-to-r from-amber-500/5 via-emerald-500/5 to-blue-500/5 dark:from-amber-500/10 dark:via-emerald-500/10 dark:to-blue-500/10 pointer-events-none" />
+      {/* 1. 상단 절제된 타이포그래피 헤더 & 좌측 서랍 토글 바 */}
+      <header className="shrink-0 border-b border-neutral-200/80 dark:border-neutral-800 bg-white/80 dark:bg-notion-dark-card/80 backdrop-blur px-4 py-3 sm:px-6 flex items-center justify-between z-10">
         
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-10">
-          <div className="space-y-2">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full text-xs font-bold bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 shadow-xs">
-                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                <span>Notion Architect v2.0</span>
-              </span>
+        {/* 좌측 서랍 토글 버튼 & 메인 제목 */}
+        <div className="flex items-center space-x-3">
+          <button
+            onClick={() => setIsDrawerOpen(true)}
+            className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-200 hover:bg-slate-200 dark:hover:bg-neutral-700 transition font-bold text-xs cursor-pointer shadow-2xs"
+            title="대화 기록 서랍 열기"
+          >
+            <Clock className="w-4 h-4 text-amber-500" />
+            <span>대화 기록</span>
+          </button>
 
-              <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300 border border-emerald-200/60 dark:border-emerald-800/60">
-                <Cpu className="w-3.5 h-3.5" />
-                <span>엔진: {selectedModel}</span>
-              </span>
+          <div className="h-4 w-px bg-neutral-200 dark:bg-neutral-800 hidden sm:block" />
 
-              <button
-                onClick={() => setIsNotionSettingsModalOpen(true)}
-                className={`inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-xs font-semibold border transition cursor-pointer ${
-                  isNotionConnected
-                    ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300 border-blue-200/60 dark:border-blue-800/60'
-                    : 'bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300 border-amber-200/60 dark:border-amber-800/60 animate-pulse'
-                }`}
-              >
-                <Database className="w-3.5 h-3.5" />
-                <span>{isNotionConnected ? '노션 워크스페이스 연결됨' : '노션 연결 필요 (클릭)'}</span>
-              </button>
-            </div>
-
-            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-neutral-900 dark:text-white">
-              Notion AI Master Workspace <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-500 via-emerald-500 to-blue-600">v2.0</span>
+          <div className="hidden sm:flex items-center space-x-2">
+            <Bot className="w-5 h-5 text-amber-500" />
+            <h1 className="text-sm font-extrabold text-neutral-900 dark:text-white tracking-tight">
+              노아(NOA) Co-Thinking Canvas
             </h1>
-            <p className="text-xs sm:text-sm text-neutral-600 dark:text-neutral-400 max-w-3xl leading-relaxed">
-              최하단 중앙 노아(NOA) 챗을 통해 어떤 지시든 음성/텍스트로 입력하면 4대 전문 챕터 작업실로 자동 분류 처리됩니다.
+          </div>
+        </div>
+
+        {/* 우측 노션 연결 및 엔진 칩 */}
+        <div className="flex items-center space-x-2">
+          <span className="hidden md:inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300 border border-amber-200/60 dark:border-amber-800/60">
+            <Cpu className="w-3.5 h-3.5" />
+            <span>엔진: {selectedModel}</span>
+          </span>
+
+          <button
+            onClick={() => setIsNotionSettingsModalOpen(true)}
+            className={`inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-[11px] font-semibold border transition cursor-pointer ${
+              isNotionConnected
+                ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300 border-emerald-200/60 dark:border-emerald-800/60'
+                : 'bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300 border-amber-200/60 dark:border-amber-800/60 animate-pulse'
+            }`}
+          >
+            <Database className="w-3.5 h-3.5" />
+            <span>{isNotionConnected ? '노션 연결됨' : '노션 연결 (클릭)'}</span>
+          </button>
+        </div>
+      </header>
+
+      {/* 2. 중앙 대형 대화·기획 캔버스 메인 영역 (max-w-4xl mx-auto) */}
+      <main className="flex-1 flex flex-col w-full max-w-4xl mx-auto overflow-hidden px-4 py-4 sm:px-6">
+        
+        {/* 대화 스크롤 본문 */}
+        <div 
+          ref={chatScrollRef}
+          className="flex-1 overflow-y-auto space-y-6 pr-1 sm:pr-2 scrollbar-thin scrollbar-thumb-neutral-300 dark:scrollbar-thumb-neutral-700"
+        >
+          {/* 타이포그래피 안내 헤더 */}
+          <div className="text-center py-6 space-y-2 border-b border-neutral-200/60 dark:border-neutral-800/60">
+            <div className="w-12 h-12 mx-auto rounded-2xl bg-gradient-to-tr from-amber-500 to-indigo-600 flex items-center justify-center text-white shadow-lg shadow-amber-500/10">
+              <Sparkles className="w-6 h-6" />
+            </div>
+            <h2 className="text-xl sm:text-2xl font-black text-neutral-900 dark:text-white tracking-tight">
+              노아(NOA)와 함께 생각을 정리하고 기획해 보세요
+            </h2>
+            <p className="text-xs sm:text-sm text-neutral-500 dark:text-neutral-400 max-w-lg mx-auto leading-relaxed">
+              명시적인 템플릿 생성 명령 전까지, 노아(NOA)는 아이디어를 경청하고 구조화하는 대화형 Co-Thinking 파트너로 동작합니다.
             </p>
           </div>
 
-          <div className="shrink-0 flex items-center space-x-2">
-            <span className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-neutral-800 text-slate-700 dark:text-slate-300 text-xs font-medium border border-slate-200 dark:border-neutral-700">
-              <Zap className="w-4 h-4 text-amber-500" />
-              <span>하단 노아(NOA) 챗 활성화됨</span>
-            </span>
-          </div>
-        </div>
-      </div>
+          {/* Quick Starters (초기 유도 칩 4개 배치 - 메시지가 환영메시지만 있거나 적을 때 안내) */}
+          {messages.length <= 1 && (
+            <div className="space-y-3 py-4">
+              <div className="flex items-center justify-between px-1">
+                <span className="text-xs font-bold text-neutral-500 dark:text-neutral-400 flex items-center space-x-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                  <span>💡 시작을 돕는 가벼운 기획 프롬프트 (Quick Starters)</span>
+                </span>
+              </div>
 
-      {/* 2. 4대 핵심 챕터 퀵 런처 그리드 (Slate-50 배경, Slate-200 테두리, hover:shadow-md) */}
-      <div className="max-w-7xl mx-auto w-full p-4 sm:p-8 space-y-6">
-        <div>
-          <div className="flex items-center justify-between mb-5">
-            <div>
-              <h2 className="text-lg sm:text-xl font-extrabold tracking-tight text-neutral-900 dark:text-white flex items-center space-x-2">
-                <span>🚀 4대 핵심 챕터 퀵 런처</span>
-              </h2>
-              <p className="text-xs text-neutral-500 dark:text-neutral-400">
-                필요한 전문 작업실을 바로 선택하여 자유롭게 작업에 몰입하세요.
-              </p>
-            </div>
-          </div>
-
-          {/* 4대 챕터 카드 그리드 */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
-            {chapters.map((chap) => {
-              const IconComp = chap.icon;
-              return (
-                <div
-                  key={chap.id}
-                  onClick={() => setCurrentView(chap.id as any)}
-                  className={`group relative bg-slate-50 dark:bg-neutral-900 rounded-2xl p-5 border border-slate-200 dark:border-neutral-800 ${chap.borderColor} hover:shadow-md transition-all duration-300 flex flex-col justify-between cursor-pointer overflow-hidden hover:-translate-y-1`}
-                >
-                  <div className="space-y-4 relative z-10">
-                    <div className="flex items-center justify-between">
-                      <div className="w-11 h-11 rounded-xl bg-white dark:bg-neutral-800 shadow-xs border border-slate-200/80 dark:border-neutral-700 flex items-center justify-center">
-                        <IconComp className={`w-5 h-5 ${chap.iconColor}`} />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {quickStarters.map((qs) => {
+                  const IconComponent = qs.icon;
+                  return (
+                    <div
+                      key={qs.id}
+                      onClick={() => handleQuickStarter(qs.prompt)}
+                      className="group p-4 rounded-2xl bg-white dark:bg-notion-dark-card border border-neutral-200/80 dark:border-neutral-800 hover:border-amber-400 dark:hover:border-amber-500 hover:shadow-md transition cursor-pointer flex flex-col justify-between space-y-3"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="w-9 h-9 rounded-xl bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center">
+                          <IconComponent className={`w-4 h-4 ${qs.iconColor}`} />
+                        </div>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 dark:bg-neutral-800 dark:text-neutral-300">
+                          {qs.badge}
+                        </span>
                       </div>
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border ${chap.badgeBg}`}>
-                        {chap.subtitle}
-                      </span>
-                    </div>
 
-                    <div className="space-y-1">
-                      <h3 className="text-base font-bold text-neutral-900 dark:text-white group-hover:text-amber-600 dark:group-hover:text-amber-400 transition">
-                        {chap.title}
-                      </h3>
-                      <p className="text-xs text-neutral-600 dark:text-neutral-400 leading-relaxed min-h-[3rem]">
-                        {chap.description}
-                      </p>
+                      <div>
+                        <h4 className="text-sm font-bold text-neutral-900 dark:text-white group-hover:text-amber-600 dark:group-hover:text-amber-400 transition">
+                          {qs.title}
+                        </h4>
+                        <p className="text-xs text-neutral-500 dark:text-neutral-400 line-clamp-2 mt-1 leading-relaxed">
+                          {qs.prompt}
+                        </p>
+                      </div>
                     </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
-                    <ul className="space-y-1 text-[11px] text-neutral-500 dark:text-neutral-400 pt-3 border-t border-slate-200/80 dark:border-neutral-800">
-                      {chap.features.map((feat, fIdx) => (
-                        <li key={fIdx} className="flex items-center space-x-1.5">
-                          <CheckCircle2 className={`w-3.5 h-3.5 ${chap.iconColor} shrink-0`} />
-                          <span className="truncate">{feat}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-
-                  <div className="pt-5 relative z-10">
-                    <div className={`w-full py-2 px-3 rounded-xl bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 text-xs font-bold flex items-center justify-between ${chap.btnColor} transition`}>
-                      <span>작업실 바로가기</span>
-                      <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition" />
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
+          {/* 스크롤 대화 메시지 스트림 */}
+          <div className="space-y-4 pt-2">
+            {messages.map((msg) => (
+              <ChatMessageItem key={msg.id} message={msg} />
+            ))}
           </div>
         </div>
 
-        {/* 3. 24시간 데일리 루틴 관제 콕핏 (자정 자동 롤백 엔진 탑재) */}
-        <DailyRoutineCockpit />
+        {/* 3. 하단 중앙 대화 입력 영역 (ChatGPT / NotebookLM 스타일) */}
+        <div className="pt-3 pb-2 shrink-0">
+          <div className="relative rounded-2xl bg-white dark:bg-notion-dark-card border border-neutral-300 dark:border-neutral-700 shadow-xl focus-within:border-amber-500 dark:focus-within:border-amber-400 transition-all p-3 space-y-2">
+            
+            {/* 첨부된 파일 바 렌더링 */}
+            {attachedFiles.length > 0 && (
+              <div className="flex flex-wrap gap-2 pb-2 border-b border-neutral-100 dark:border-neutral-800">
+                {attachedFiles.map((att, idx) => (
+                  <div 
+                    key={idx}
+                    className="flex items-center space-x-1.5 px-2.5 py-1 rounded-xl text-xs bg-neutral-100 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 border border-neutral-200 dark:border-neutral-700"
+                  >
+                    <span>📎</span>
+                    <span className="font-semibold max-w-[120px] truncate">{att.name}</span>
+                    <button 
+                      onClick={() => setAttachedFiles(prev => prev.filter((_, i) => i !== idx))}
+                      className="text-neutral-400 hover:text-red-500 transition"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
 
-        {/* 안내 카드 */}
-        <div className="p-5 rounded-2xl bg-white dark:bg-notion-dark-card border border-neutral-200/80 dark:border-neutral-800 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center space-x-3.5">
-            <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-600 dark:text-amber-400 shrink-0">
-              <ShieldCheck className="w-5 h-5" />
+            {/* 입력 텍스트 에어리어 */}
+            <textarea
+              rows={2}
+              value={inputPrompt}
+              onChange={(e) => setInputPrompt(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="노아(NOA)에게 어떤 업무를 도와드릴지 편하게 말씀해 주세요..."
+              className="w-full bg-transparent text-sm text-neutral-900 dark:text-white placeholder-neutral-400 focus:outline-none resize-none leading-relaxed"
+            />
+
+            {/* 하단 버튼 툴바 */}
+            <div className="flex items-center justify-between pt-1 border-t border-neutral-100 dark:border-neutral-800/60">
+              
+              {/* 좌측 첨부 & 음성 버튼 */}
+              <div className="flex items-center space-x-2">
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleFileUpload}
+                  multiple
+                  className="hidden"
+                />
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isParsingFile}
+                  className="p-2 rounded-xl text-neutral-500 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 transition cursor-pointer"
+                  title="파일 첨부 (엑셀, 워드, PDF, 이미지)"
+                >
+                  {isParsingFile ? <Loader2 className="w-4 h-4 animate-spin text-amber-500" /> : <Paperclip className="w-4 h-4" />}
+                </button>
+
+                <button
+                  onClick={toggleListening}
+                  className={`p-2 rounded-xl transition cursor-pointer ${
+                    isListening
+                      ? 'bg-red-500 text-white animate-pulse'
+                      : 'text-neutral-500 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800'
+                  }`}
+                  title={isListening ? '음성 인식 중지' : '음성 입력'}
+                >
+                  {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                </button>
+              </div>
+
+              {/* 우측 전송 버튼 */}
+              <button
+                onClick={handleSend}
+                disabled={(!inputPrompt.trim() && attachedFiles.length === 0) || isGenerating}
+                className={`flex items-center space-x-1.5 px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
+                  (inputPrompt.trim() || attachedFiles.length > 0) && !isGenerating
+                    ? 'bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 shadow-md hover:bg-neutral-800 dark:hover:bg-neutral-100'
+                    : 'bg-neutral-200 text-neutral-400 dark:bg-neutral-800 dark:text-neutral-600 cursor-not-allowed'
+                }`}
+              >
+                <span>전송</span>
+                {isGenerating ? <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-500" /> : <Send className="w-3.5 h-3.5" />}
+              </button>
             </div>
-            <div>
-              <h4 className="text-sm font-bold text-neutral-900 dark:text-white">
-                💡 언제든 최하단 노아(NOA) 챗으로 통합 지시 가능
-              </h4>
-              <p className="text-xs text-neutral-500 dark:text-neutral-400">
-                어느 페이지에서나 화면 최하단 노아(NOA) 챗에 음성이나 텍스트를 입력하면 AI 오케스트레이터가 자동으로 알맞은 챕터 작업실을 업데이트합니다.
-              </p>
-            </div>
+
           </div>
         </div>
 
-      </div>
+      </main>
+
+      {/* 4. 좌측 슬라이드 대화 기록 서랍 */}
+      <ChatHistoryDrawer
+        isOpen={isDrawerOpen}
+        onClose={() => setIsDrawerOpen(false)}
+        sessions={sessions}
+        activeSessionId={activeSessionId}
+        onSelectSession={handleSelectSession}
+        onNewChat={handleNewChat}
+        onDeleteSession={handleDeleteSession}
+      />
     </div>
   );
 };
