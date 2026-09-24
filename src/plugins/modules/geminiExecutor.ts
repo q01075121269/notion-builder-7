@@ -11,8 +11,11 @@ export async function executeGeminiCall(req: AIPluginRequest): Promise<GeminiCon
     throw new Error("노아(NOA)를 구동하기 위한 Gemini API 키가 없습니다. 우측 상단 [설정]에서 API 키를 먼저 등록해 주세요.");
   }
 
-  const modelParam = req.options?.model || (typeof window !== 'undefined' ? localStorage.getItem('selected_gemini_model') : null) || 'gemini-3.8-flash';
-  const targetModel = modelParam.replace(/^models\//, '').trim() || 'gemini-3.8-flash';
+  const modelParam = req.options?.model || (typeof window !== 'undefined' ? localStorage.getItem('selected_gemini_model') : null) || 'gemini-2.5-flash';
+  let targetModel = modelParam.replace(/^models\//, '').trim() || 'gemini-2.5-flash';
+  if (targetModel.includes('1.5') || targetModel.includes('1.0')) {
+    targetModel = 'gemini-2.5-flash';
+  }
 
   let promptText = `[사용자 요청]: "${req.prompt}"`;
   if (req.currentTemplate) {

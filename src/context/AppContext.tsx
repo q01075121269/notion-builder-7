@@ -169,17 +169,23 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     return window.matchMedia('(prefers-color-scheme: dark)').matches;
   });
 
-  // Gemini Model & API Key
+  // Gemini Model & API Key (구형 1.5 계열 강제 마이그레이션 적용)
   const [selectedModel, setSelectedModelState] = useState<GeminiModelType>(() => {
-    const saved = (localStorage.getItem('selected_gemini_model') || localStorage.getItem('gemini_selected_model')) as GeminiModelType;
-    if (saved && (saved === 'gemini-3.5-flash-lite' || saved === 'gemini-3.8-flash' || saved === 'gemini-3.1-pro')) return saved;
-    return 'gemini-3.8-flash';
+    const saved = (localStorage.getItem('selected_gemini_model') || localStorage.getItem('gemini_selected_model')) as string;
+    if (saved && (saved.includes('1.5') || saved.includes('1.0'))) {
+      localStorage.setItem('selected_gemini_model', 'gemini-2.5-flash');
+      localStorage.setItem('gemini_selected_model', 'gemini-2.5-flash');
+      return 'gemini-2.5-flash';
+    }
+    if (saved && (saved === 'gemini-3.5-flash-lite' || saved === 'gemini-3.8-flash' || saved === 'gemini-3.1-pro' || saved === 'gemini-2.5-flash')) return saved as GeminiModelType;
+    return 'gemini-2.5-flash';
   });
 
   const setSelectedModel = (model: GeminiModelType) => {
-    setSelectedModelState(model);
-    localStorage.setItem('selected_gemini_model', model);
-    localStorage.setItem('gemini_selected_model', model);
+    const safeModel = (model && (model.includes('1.5') || model.includes('1.0'))) ? 'gemini-2.5-flash' : model;
+    setSelectedModelState(safeModel);
+    localStorage.setItem('selected_gemini_model', safeModel);
+    localStorage.setItem('gemini_selected_model', safeModel);
   };
 
   // 2026 확장된 사고 모델 (Thinking Switch) 상태

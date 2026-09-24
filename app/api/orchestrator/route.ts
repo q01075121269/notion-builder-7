@@ -408,9 +408,12 @@ async function callGeminiWithFunctions(
   apiKey: string,
   requestedModel: string = 'gemini-3.8-flash'
 ): Promise<OrchestratorResponse> {
-  const cleanRequested = (requestedModel || 'gemini-3.8-flash').replace(/^models\//, '').trim();
+  let cleanRequested = (requestedModel || 'gemini-2.5-flash').replace(/^models\//, '').trim();
+  if (cleanRequested.includes('1.5') || cleanRequested.includes('1.0')) {
+    cleanRequested = 'gemini-2.5-flash';
+  }
   const candidateModels = Array.from(
-    new Set([cleanRequested, 'gemini-3.8-flash', 'gemini-3.5-flash-lite', 'gemini-3.1-pro', 'gemini-2.5-flash', 'gemini-2.0-flash'])
+    new Set([cleanRequested, 'gemini-2.5-flash', 'gemini-3.8-flash', 'gemini-3.5-flash-lite', 'gemini-3.1-pro'])
   );
   const contents: unknown[] = [];
 

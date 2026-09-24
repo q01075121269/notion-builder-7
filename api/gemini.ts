@@ -10,8 +10,11 @@ export default async function handler(req: any, res: any) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const rawModel = typeof req.query.model === 'string' ? req.query.model : 'gemini-3.6-flash';
-  const requestedModel = rawModel.replace(/^models\//, '').trim() || 'gemini-3.6-flash';
+  const rawModel = typeof req.query.model === 'string' ? req.query.model : 'gemini-2.5-flash';
+  let requestedModel = rawModel.replace(/^models\//, '').trim() || 'gemini-2.5-flash';
+  if (requestedModel.includes('1.5') || requestedModel.includes('1.0')) {
+    requestedModel = 'gemini-2.5-flash';
+  }
   const apiKey = req.headers['x-gemini-api-key'] || process.env.GEMINI_API_KEY || '';
 
   if (!apiKey) {
