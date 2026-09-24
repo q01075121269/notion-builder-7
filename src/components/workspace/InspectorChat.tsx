@@ -421,11 +421,11 @@ export const InspectorChat: React.FC<InspectorChatProps> = ({
 
       if (isNewTemplateMode) {
         templatePayload = null;
-        promptText = `[NEW_TEMPLATE_MODE: 기존 템플릿과 무관하게 완전히 새로운 노션 워크스페이스 템플릿을 신규 생성해줘.]\n${text || '새로운 맞춤형 노션 워크스페이스를 기획하고 생성해줘.'}`;
+        promptText = `[NEW_TEMPLATE_MODE: 새로운 노션 템플릿 신규 기획 및 생성 지시]\n${text || '새로운 맞춤형 노션 워크스페이스를 기획하고 생성해줘.'}`;
       } else if (currentDb) {
-        promptText = `[TARGET_DB_CONTEXT: 현재 포커스된 DB는 "${currentDb.name}"입니다.]\n${text || '화면 캡처 이미지의 표/데이터를 분석하여 캔버스 스키마에 반영해줘.'}`;
-      } else if (!promptText) {
-        promptText = '첨부된 화면 캡처 이미지의 표/컬럼/데이터를 정밀 판독하고 현재 노션 템플릿 스키마에 즉시 반영해줘.';
+        promptText = `[TARGET_DB_CONTEXT: 현재 포커스된 DB="${currentDb.name}", 전체DB수=${template?.databases?.length || 0}]\n[SYSTEM_DIRECTIVE: 사용자가 노션 템플릿/DB의 아이콘, 속성, 뷰, 명칭 수정을 지시했습니다. 반드시 "intent": "BUILDER"로 지정하고 payload.db_schema에 수정된 전체 DB 목록을 포함하여 반환하십시오.]\n${text || '화면 캡처 이미지의 표/데이터를 분석하여 캔버스 스키마에 반영해줘.'}`;
+      } else {
+        promptText = `[CANVAS_SCHEMA_UPDATE: 현재 템플릿="${template?.title}"]\n[SYSTEM_DIRECTIVE: 사용자가 노션 템플릿/DB의 아이콘, 속성, 뷰, 명칭 수정을 지시했습니다. 반드시 "intent": "BUILDER"로 지정하고 payload.db_schema에 수정된 전체 DB 목록을 포함하여 반환하십시오.]\n${text || '현재 노션 템플릿 스키마를 정밀 분석하여 즉시 반영해줘.'}`;
       }
 
       const response = await sendToOrchestrator(
@@ -448,24 +448,38 @@ export const InspectorChat: React.FC<InspectorChatProps> = ({
 
       const actionResult = response.reply_message || `[${targetDbTitle}] 스키마 수정 작업이 완료되었습니다.`;
 
-      // Gemini가 갱신한 db_schema가 있거나 builder payload가 유입된 경우 캔버스 템플릿에 즉시 반영
-      if (response.payload?.db_schema || response.intent === 'BUILDER') {
-        const rawTopic = (response.payload?.template_topic as string) || template?.title || '수정된 맞춤형 워크스페이스';
-        const rawTitle = (response.payload?.suggested_title as string) || template?.title || '수정된 맞춤형 워크스페이스';
-        const sanitizedTopic = sanitizeTemplateTitle(rawTopic, rawTopic);
-        const sanitizedTitle = sanitizeTemplateTitle(rawTitle, rawTitle);
+      // Gemini가 갱신한 db_schema가 있거나 builder payload가 유입된 경우 캔버스 템플릿에 실시간 0.1초 즉각 반영
+      const incomingDbs = (response.payload?.db_schema as any[]) || (response.payload as any)?.databases || null;
+      
+      if (incomingDbs || response.intent === 'BUILDER') {
+        let updatedTemplate: NotionTemplate;
 
-        const newTemplate = buildDynamicTemplateFromPayload({
-          topic: sanitizedTopic,
-          title: sanitizedTitle,
-          initialPrompt: promptText,
-          dbSchemas: (response.payload?.db_schema as any[]) || template?.databases,
-          formulas: response.payload?.formulas as any[],
-          valueAdd: response.payload?.value_add as string[],
-          complexity: response.payload?.complexity as string,
-        });
+        if (template && !isNewTemplateMode && incomingDbs) {
+          // 기존 템플릿의 메타데이터(커버, 레이아웃 등)를 보존하고 DB 목록 정밀 갱신
+          updatedTemplate = {
+            ...template,
+            databases: incomingDbs,
+            title: (response.payload?.suggested_title as string) || template.title
+          };
+        } else {
+          // 신규 모드이거나 전체 재생성인 경우
+          const rawTopic = (response.payload?.template_topic as string) || template?.title || '수정된 맞춤형 워크스페이스';
+          const rawTitle = (response.payload?.suggested_title as string) || template?.title || '수정된 맞춤형 워크스페이스';
+          const sanitizedTopic = sanitizeTemplateTitle(rawTopic, rawTopic);
+          const sanitizedTitle = sanitizeTemplateTitle(rawTitle, rawTitle);
 
-        const normalized = normalizeTemplatePayload(newTemplate);
+          updatedTemplate = buildDynamicTemplateFromPayload({
+            topic: sanitizedTopic,
+            title: sanitizedTitle,
+            initialPrompt: promptText,
+            dbSchemas: incomingDbs || template?.databases || [],
+            formulas: response.payload?.formulas as any[],
+            valueAdd: response.payload?.value_add as string[],
+            complexity: response.payload?.complexity as string,
+          });
+        }
+
+        const normalized = normalizeTemplatePayload(updatedTemplate);
         if (normalized) {
           if (onApplyTemplateUpdate) {
             onApplyTemplateUpdate(normalized);
@@ -473,6 +487,52 @@ export const InspectorChat: React.FC<InspectorChatProps> = ({
           setCurrentTemplate(normalized);
           if (isNewTemplateMode) {
             setIsNewTemplateMode(false);
+          }
+        }
+      } else if (template) {
+        // [Fast Local Heuristic Fallback] 혹시 Gemini가 intent: CHAT이나 텍스트로만 응답했더라도
+        // 사용자의 명시적 아이콘/뷰 변경 지시를 즉시 로컬 감지하여 캔버스 0.1초 반응 보장
+        const lower = text.toLowerCase();
+        let locallyModified = false;
+        const clonedDbs = JSON.parse(JSON.stringify(template.databases || []));
+        const targetIdx = currentDb ? clonedDbs.findIndex((d: any) => d.name === currentDb.name) : 0;
+
+        if (targetIdx >= 0 && clonedDbs[targetIdx]) {
+          const tDb = clonedDbs[targetIdx];
+          // 아이콘 제거
+          if (lower.includes('아이콘') && (lower.includes('제거') || lower.includes('삭제') || lower.includes('없애') || lower.includes('빼'))) {
+            tDb.icon = '';
+            tDb.name = tDb.name.replace(/^[\p{Emoji}\u25A0\u25A1\u25AA\u25AB\s]+/u, '').trim();
+            locallyModified = true;
+          }
+          // 아이콘 변경
+          const iconMatch = text.match(/아이콘(?:을)?\s*([^\s]{1,4})\s*(?:으?로|에)?/);
+          if (iconMatch && iconMatch[1] && !['제거', '삭제', '변경', '수정'].includes(iconMatch[1])) {
+            tDb.icon = iconMatch[1].trim();
+            locallyModified = true;
+          }
+          // 타임라인 뷰 추가
+          if (lower.includes('타임라인')) {
+            tDb.view_type = 'timeline';
+            if (!tDb.views) tDb.views = [];
+            if (!tDb.views.some((v: any) => v.id === 'timeline' || v.type === 'timeline')) {
+              tDb.views.push({ id: 'timeline', type: 'timeline', name: '타임라인' });
+            }
+            locallyModified = true;
+          }
+        }
+
+        if (locallyModified) {
+          const localUpdated = {
+            ...template,
+            databases: clonedDbs
+          };
+          const normalized = normalizeTemplatePayload(localUpdated);
+          if (normalized) {
+            if (onApplyTemplateUpdate) {
+              onApplyTemplateUpdate(normalized);
+            }
+            setCurrentTemplate(normalized);
           }
         }
       }

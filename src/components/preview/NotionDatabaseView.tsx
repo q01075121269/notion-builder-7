@@ -174,7 +174,7 @@ export const NotionDatabaseView: React.FC<NotionDatabaseViewProps> = ({
             }`}
           >
             <LayoutDashboard className="w-3.5 h-3.5" />
-            <span>📊 대시보드</span>
+            <span>대시보드</span>
           </button>
           <button
             type="button"
@@ -186,7 +186,7 @@ export const NotionDatabaseView: React.FC<NotionDatabaseViewProps> = ({
             }`}
           >
             <TableIcon className="w-3.5 h-3.5" />
-            <span>📄 표(Table)</span>
+            <span>표</span>
           </button>
           <button
             type="button"
@@ -198,7 +198,7 @@ export const NotionDatabaseView: React.FC<NotionDatabaseViewProps> = ({
             }`}
           >
             <Kanban className="w-3.5 h-3.5" />
-            <span>📋 보드(Kanban)</span>
+            <span>보드</span>
           </button>
           <button
             type="button"
@@ -210,7 +210,7 @@ export const NotionDatabaseView: React.FC<NotionDatabaseViewProps> = ({
             }`}
           >
             <CalendarIcon className="w-3.5 h-3.5" />
-            <span>🗓️ 캘린더</span>
+            <span>캘린더</span>
           </button>
           <button
             type="button"
@@ -222,7 +222,7 @@ export const NotionDatabaseView: React.FC<NotionDatabaseViewProps> = ({
             }`}
           >
             <Clock className="w-3.5 h-3.5" />
-            <span>⏱️ 타임라인(Timeline)</span>
+            <span>타임라인</span>
           </button>
           <button
             type="button"
@@ -234,7 +234,7 @@ export const NotionDatabaseView: React.FC<NotionDatabaseViewProps> = ({
             }`}
           >
             <LayoutGrid className="w-3.5 h-3.5" />
-            <span>🖼️ 갤러리(Cards)</span>
+            <span>갤러리</span>
           </button>
           <button
             type="button"
@@ -246,7 +246,7 @@ export const NotionDatabaseView: React.FC<NotionDatabaseViewProps> = ({
             }`}
           >
             <List className="w-3.5 h-3.5" />
-            <span>📑 리스트(Compact)</span>
+            <span>리스트</span>
           </button>
         </div>
       </div>

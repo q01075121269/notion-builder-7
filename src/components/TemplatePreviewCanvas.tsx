@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import type { NotionTemplate, NotionDatabase, NotionProperty, NotionPropertyType } from '../types/notion';
 import { ResizableSplitLayout } from './ui/ResizableSplitLayout';
 import { NotionCover } from './preview/NotionCover';
@@ -32,7 +32,9 @@ import {
   Undo2,
   Save,
   History,
-  Clock
+  ChevronDown,
+  Copy,
+  X
 } from 'lucide-react';
 
 export interface TemplatePreviewCanvasProps {
@@ -61,6 +63,7 @@ export const TemplatePreviewCanvas: React.FC<TemplatePreviewCanvasProps> = ({ te
     setPreviewMode,
     setIsRawJsonModalOpen,
     isGenerating,
+    setCurrentTemplate,
   } = useApp();
 
   // [Step 1: DB properties 스키마 어댑터 정규화 - 런타임 타입 충돌 원천 차단]
@@ -90,10 +93,30 @@ export const TemplatePreviewCanvas: React.FC<TemplatePreviewCanvasProps> = ({ te
   const [templateHistory, setTemplateHistory] = useState<TemplateHistoryEntry[]>([]);
   const [historyIndex, setHistoryIndex] = useState<number>(-1);
   const [lastSavedTime, setLastSavedTime] = useState<string | null>(null);
-  const [isVersionDropdownOpen, setIsVersionDropdownOpen] = useState<boolean>(false);
+
+  // ─── [통합 저장 및 관리 드롭다운 & 다른 이름으로 저장 모달 상태] ───────────────
+  const [isSaveManageOpen, setIsSaveManageOpen] = useState<boolean>(false);
+  const [isSaveAsModalOpen, setIsSaveAsModalOpen] = useState<boolean>(false);
+  const [saveAsTitle, setSaveAsTitle] = useState<string>('');
+  const saveManageDropdownRef = useRef<HTMLDivElement>(null);
 
   const isInternalActionRef = React.useRef<boolean>(false);
   const lastTemplateIdRef = React.useRef<string | null>(null);
+
+  // 드롭다운 외부 클릭 시 자동 닫힘 감지
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (saveManageDropdownRef.current && !saveManageDropdownRef.current.contains(e.target as Node)) {
+        setIsSaveManageOpen(false);
+      }
+    };
+    if (isSaveManageOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isSaveManageOpen]);
 
   // [Clean Wipe & Canvas Reset Listener]
   useEffect(() => {
@@ -261,8 +284,72 @@ export const TemplatePreviewCanvas: React.FC<TemplatePreviewCanvasProps> = ({ te
       setHistoryIndex(index);
       const snapshotCopy = JSON.parse(JSON.stringify(target.template));
       setEditableTemplate(snapshotCopy);
-      setIsVersionDropdownOpen(false);
+      setIsSaveManageOpen(false);
       showToast(`⏱️ '${target.label}' (v${target.version}) 시점으로 복원되었습니다.`, 'success');
+    }
+  };
+
+  // [💾 저장 및 관리: 1) 현재 상태 저장]
+  const handleSaveCurrentState = () => {
+    handleSaveAll();
+    setIsSaveManageOpen(false);
+  };
+
+  // [💾 저장 및 관리: 2) 다른 이름으로 저장 열기 & 확인]
+  const handleOpenSaveAsModal = () => {
+    setSaveAsTitle(editableTemplate?.title ? `${editableTemplate.title} (사본)` : '새 템플릿 사본');
+    setIsSaveAsModalOpen(true);
+    setIsSaveManageOpen(false);
+  };
+
+  const handleSaveAsConfirm = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!editableTemplate || !saveAsTitle.trim()) return;
+
+    const newId = `tpl-copy-${Date.now()}`;
+    const newTitle = saveAsTitle.trim();
+    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    const duplicatedTemplate: NotionTemplate = {
+      ...editableTemplate,
+      id: newId,
+      title: newTitle
+    };
+
+    try {
+      saveArchivedTemplate({
+        id: newId,
+        title: newTitle,
+        description: duplicatedTemplate.description || '복제된 사용자 템플릿',
+        icon: duplicatedTemplate.icon || '📑',
+        cover_url: duplicatedTemplate.cover_url || 'https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=1600&q=80',
+        tags: ['#내가만든템플릿', '#복제저장', '#NOA인스펙터'],
+        templateData: duplicatedTemplate,
+        source: 'created',
+        createdAt: Date.now(),
+        updatedAt: Date.now()
+      });
+
+      setEditableTemplate(duplicatedTemplate);
+      setCurrentTemplate(duplicatedTemplate);
+      setLastSavedTime(timeStr);
+      pushHistoryEntry(duplicatedTemplate, `다른 이름으로 저장: ${newTitle}`);
+      setIsSaveAsModalOpen(false);
+      showToast(`📑 "${newTitle}" 템플릿으로 보관함에 새롭게 복제 저장되었습니다!`, 'success');
+    } catch (err) {
+      console.error('Save As error:', err);
+      showToast('다른 이름으로 저장에 실패했습니다.', 'error');
+    }
+  };
+
+  // [💾 저장 및 관리: 4) 최초 원본(v1)으로 복구]
+  const handleResetToV1 = () => {
+    setIsSaveManageOpen(false);
+    if (templateHistory.length > 0 && templateHistory[0]) {
+      handleRestoreVersion(0);
+      showToast('🔄 최초 원본(v1) 상태로 1초 만에 복구되었습니다.', 'info');
+    } else {
+      handleResetToOriginal();
     }
   };
 
@@ -495,30 +582,27 @@ export const TemplatePreviewCanvas: React.FC<TemplatePreviewCanvasProps> = ({ te
         storageKey="template_builder_inspector_split_v1"
         className="h-full min-h-0"
         mainContent={({ isCollapsed, toggleCollapse }) => {
-          const currentVersion = historyIndex >= 0 && templateHistory[historyIndex] ? templateHistory[historyIndex].version : (templateHistory.length || 1);
-
           return (
             <div className="flex flex-col h-full min-h-0 w-full overflow-hidden bg-white dark:bg-zinc-950">
               {/* 1. 상단 툴바: 표준 클린 모노톤 & 메탈릭 미니멀 룩 */}
               <div className="h-11 px-3 sm:px-6 bg-gradient-to-r from-zinc-100 via-slate-100 to-zinc-200 dark:from-zinc-900 dark:via-zinc-850 dark:to-zinc-800 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between gap-2 shrink-0 select-none z-20">
-                {/* [좌측]: [ 노션 페이지 뷰 ] [ 구조 트리 ] | [ ↩️ 되돌리기 ] [ ⏱️ 버전 v1 ] */}
+                {/* [좌측]: [ 📄 노션 페이지 뷰 ] [ 🌳 구조 트리 ] */}
                 <div className="flex items-center space-x-2 shrink-0">
-                  {/* 뷰 모드 전환 토글 */}
                   <div className="flex items-center bg-white/80 dark:bg-zinc-800/80 p-0.5 rounded-lg border border-zinc-300 dark:border-zinc-700 text-xs font-medium">
                     <button
                       onClick={() => setPreviewMode('notion')}
-                      className={`flex items-center space-x-1 px-2.5 py-1 rounded-md transition whitespace-nowrap cursor-pointer ${
+                      className={`flex items-center space-x-1.5 px-3 py-1 rounded-md transition whitespace-nowrap cursor-pointer text-xs ${
                         previewMode === 'notion'
                           ? 'bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 font-bold shadow-xs'
                           : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200'
                       }`}
                     >
                       <FileText className="w-3.5 h-3.5" />
-                      <span>노션 페이지</span>
+                      <span>노션 페이지 뷰</span>
                     </button>
                     <button
                       onClick={() => setPreviewMode('tree')}
-                      className={`flex items-center space-x-1 px-2.5 py-1 rounded-md transition whitespace-nowrap cursor-pointer ${
+                      className={`flex items-center space-x-1.5 px-3 py-1 rounded-md transition whitespace-nowrap cursor-pointer text-xs ${
                         previewMode === 'tree'
                           ? 'bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 font-bold shadow-xs'
                           : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200'
@@ -528,52 +612,126 @@ export const TemplatePreviewCanvas: React.FC<TemplatePreviewCanvasProps> = ({ te
                       <span>구조 트리</span>
                     </button>
                   </div>
+                </div>
 
-                  {/* 세로 구분선 */}
-                  <div className="h-4 w-[1px] bg-zinc-300 dark:bg-zinc-700 mx-0.5" />
-
-                  {/* 되돌리기 & 버전 이력 그룹 */}
-                  <div className="flex items-center space-x-1.5">
-                    {/* [ ↩️ 되돌리기 (Undo) ] */}
+                {/* [우측]: [ 💾 저장 및 관리 ▼ ] | [ </> JSON ] [ ⚡ 노션에 바로 배포 ] */}
+                <div className="flex items-center space-x-1.5 sm:space-x-2 shrink-0">
+                  {/* 단 하나의 [ 💾 저장 및 관리 ▼ ] 통합 드롭다운 */}
+                  <div className="relative" ref={saveManageDropdownRef}>
                     <button
                       type="button"
-                      onClick={handleUndo}
-                      disabled={historyIndex <= 0}
-                      className={`flex items-center space-x-1 px-2.5 py-1 rounded-lg text-xs transition cursor-pointer border ${
-                        historyIndex > 0
-                          ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-bold border-zinc-400 dark:border-zinc-500 shadow-xs hover:bg-zinc-100 dark:hover:bg-zinc-700'
-                          : 'bg-zinc-100/50 dark:bg-zinc-900/30 text-zinc-400 dark:text-zinc-600 border-zinc-200 dark:border-zinc-800 opacity-40 cursor-not-allowed'
-                      }`}
-                      title={historyIndex > 0 ? "직전 템플릿 스냅샷으로 즉시 롤백합니다" : "되돌릴 변경 이력이 없습니다"}
+                      onClick={() => setIsSaveManageOpen((prev) => !prev)}
+                      className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-zinc-900 dark:text-zinc-100 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700/80 border border-zinc-300 dark:border-zinc-700 shadow-2xs transition cursor-pointer select-none active:scale-98"
+                      title="저장, 사본 복제, Undo 되돌리기, 원본 리셋 및 버전 관리"
                     >
-                      <Undo2 className="w-3.5 h-3.5" />
-                      <span>되돌리기</span>
+                      <Save className="w-3.5 h-3.5 text-zinc-700 dark:text-zinc-300" />
+                      <span>저장 및 관리</span>
+                      <ChevronDown className={`w-3.5 h-3.5 text-zinc-500 transition-transform duration-150 ${isSaveManageOpen ? 'rotate-180' : ''}`} />
                     </button>
 
-                    {/* [ ⏱️ 버전 v1 ] 드롭다운 */}
-                    <div className="relative">
-                      <button
-                        type="button"
-                        onClick={() => setIsVersionDropdownOpen(prev => !prev)}
-                        className="flex items-center space-x-1 px-2.5 py-1 rounded-lg text-xs font-semibold text-zinc-700 dark:text-zinc-200 bg-white/90 dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700 border border-zinc-300 dark:border-zinc-700 shadow-2xs transition cursor-pointer"
-                        title="버전 이력 확인 및 특정 시점 복원"
-                      >
-                        <History className="w-3.5 h-3.5 text-zinc-600 dark:text-zinc-300" />
-                        <span>버전 v{currentVersion}</span>
-                      </button>
+                    {/* Google AI Studio 스타일 세련된 모노톤 드롭다운 팝업 */}
+                    {isSaveManageOpen && (
+                      <div className="absolute right-0 top-full mt-1.5 w-72 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-xl z-50 p-1.5 text-xs text-zinc-800 dark:text-zinc-200 divide-y divide-zinc-100 dark:divide-zinc-800 animate-in fade-in zoom-in-95 duration-100">
+                        {/* 섹션 1: 저장 & 사본 */}
+                        <div className="py-1 space-y-0.5">
+                          {/* 1) [ 💾 현재 상태 저장 ] */}
+                          <button
+                            type="button"
+                            onClick={handleSaveCurrentState}
+                            className="w-full text-left px-2.5 py-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 flex items-center justify-between transition cursor-pointer group"
+                          >
+                            <div className="flex items-center space-x-2">
+                              <Save className="w-4 h-4 text-zinc-700 dark:text-zinc-300 group-hover:text-zinc-950 dark:group-hover:text-white shrink-0" />
+                              <div>
+                                <div className="font-bold text-xs text-zinc-900 dark:text-zinc-100">현재 상태 저장</div>
+                                <div className="text-[10px] text-zinc-500 dark:text-zinc-400">
+                                  {lastSavedTime ? `최근 저장: ${lastSavedTime}` : '로컬 초안에 즉시 덮어쓰기'}
+                                </div>
+                              </div>
+                            </div>
+                            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700 shrink-0">
+                              Ctrl+S
+                            </span>
+                          </button>
 
-                      {isVersionDropdownOpen && (
-                        <div className="absolute left-0 top-full mt-1.5 w-72 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl shadow-xl z-50 p-2 text-xs divide-y divide-zinc-100 dark:divide-zinc-800">
-                          <div className="p-2 font-bold text-zinc-700 dark:text-zinc-200 flex items-center justify-between">
+                          {/* 2) [ 📑 다른 이름으로 저장 ] */}
+                          <button
+                            type="button"
+                            onClick={handleOpenSaveAsModal}
+                            className="w-full text-left px-2.5 py-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 flex items-center justify-between transition cursor-pointer group"
+                          >
+                            <div className="flex items-center space-x-2">
+                              <Copy className="w-4 h-4 text-zinc-700 dark:text-zinc-300 group-hover:text-zinc-950 dark:group-hover:text-white shrink-0" />
+                              <div>
+                                <div className="font-bold text-xs text-zinc-900 dark:text-zinc-100">다른 이름으로 저장</div>
+                                <div className="text-[10px] text-zinc-500 dark:text-zinc-400">새 템플릿으로 복제 보관</div>
+                              </div>
+                            </div>
+                            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700 shrink-0">
+                              복제
+                            </span>
+                          </button>
+                        </div>
+
+                        {/* 섹션 2: 롤백 & 복구 */}
+                        <div className="py-1 space-y-0.5">
+                          {/* 3) [ ↩️ 직전 작업 되돌리기 (Undo) ] */}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              handleUndo();
+                              setIsSaveManageOpen(false);
+                            }}
+                            disabled={historyIndex <= 0}
+                            className={`w-full text-left px-2.5 py-2 rounded-lg flex items-center justify-between transition ${
+                              historyIndex > 0
+                                ? 'hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer group'
+                                : 'opacity-40 cursor-not-allowed text-zinc-400 dark:text-zinc-600'
+                            }`}
+                          >
+                            <div className="flex items-center space-x-2">
+                              <Undo2 className="w-4 h-4 text-zinc-700 dark:text-zinc-300 shrink-0" />
+                              <div>
+                                <div className="font-bold text-xs text-zinc-900 dark:text-zinc-100">직전 작업 되돌리기 (Undo)</div>
+                                <div className="text-[10px] text-zinc-500 dark:text-zinc-400">AI 수정 직전 스냅샷으로 롤백</div>
+                              </div>
+                            </div>
+                            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700 shrink-0">
+                              v{historyIndex >= 1 ? historyIndex : 1}
+                            </span>
+                          </button>
+
+                          {/* 4) [ 🔄 최초 원본(v1)으로 복구 ] */}
+                          <button
+                            type="button"
+                            onClick={handleResetToV1}
+                            className="w-full text-left px-2.5 py-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 flex items-center justify-between transition cursor-pointer group"
+                          >
+                            <div className="flex items-center space-x-2">
+                              <RotateCcw className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                              <div>
+                                <div className="font-bold text-xs text-zinc-900 dark:text-zinc-100">최초 원본(v1)으로 복구</div>
+                                <div className="text-[10px] text-zinc-500 dark:text-zinc-400">템플릿 로드 초기 상태로 1초 리셋</div>
+                              </div>
+                            </div>
+                            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 shrink-0">
+                              초기화
+                            </span>
+                          </button>
+                        </div>
+
+                        {/* 섹션 3: 5) [ ⏱️ 버전 히스토리 ] */}
+                        <div className="pt-1.5 pb-1">
+                          <div className="px-2 py-1 flex items-center justify-between font-bold text-zinc-600 dark:text-zinc-400 text-[11px]">
                             <span className="flex items-center space-x-1.5">
-                              <Clock className="w-3.5 h-3.5 text-zinc-500" />
+                              <History className="w-3.5 h-3.5" />
                               <span>버전 히스토리 ({templateHistory.length})</span>
                             </span>
-                            <span className="text-[10px] text-zinc-400 font-normal">선택 시 즉각 복원</span>
+                            <span className="text-[10px] font-normal text-zinc-400">선택 복원</span>
                           </div>
-                          <div className="max-h-60 overflow-y-auto py-1 space-y-1">
+                          <div className="max-h-44 overflow-y-auto py-1 space-y-1">
                             {templateHistory.length === 0 ? (
-                              <div className="p-3 text-center text-zinc-400">기록된 버전이 없습니다.</div>
+                              <div className="p-2 text-center text-zinc-400 text-[11px]">기록된 버전이 없습니다.</div>
                             ) : (
                               templateHistory.map((item, idx) => {
                                 const isCurrent = idx === historyIndex;
@@ -582,19 +740,19 @@ export const TemplatePreviewCanvas: React.FC<TemplatePreviewCanvasProps> = ({ te
                                     key={item.id}
                                     type="button"
                                     onClick={() => handleRestoreVersion(idx)}
-                                    className={`w-full text-left px-2.5 py-1.5 rounded-lg flex items-center justify-between transition cursor-pointer ${
+                                    className={`w-full text-left px-2 py-1.5 rounded-md flex items-center justify-between transition cursor-pointer text-xs ${
                                       isCurrent
-                                        ? 'bg-zinc-100 dark:bg-zinc-800 font-bold text-zinc-900 dark:text-white ring-1 ring-zinc-300 dark:ring-zinc-600'
+                                        ? 'bg-zinc-100 dark:bg-zinc-800 font-bold text-zinc-900 dark:text-white border border-zinc-300 dark:border-zinc-700'
                                         : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800/60'
                                     }`}
                                   >
                                     <div className="flex items-center space-x-1.5 truncate">
-                                      <span className="px-1.5 py-0.5 rounded bg-zinc-200 dark:bg-zinc-700 text-[10px] font-mono shrink-0">
+                                      <span className="px-1 py-0.2 rounded bg-zinc-200 dark:bg-zinc-700 text-[9px] font-mono shrink-0">
                                         v{item.version}
                                       </span>
                                       <span className="truncate">{item.label}</span>
                                     </div>
-                                    <div className="flex items-center space-x-1.5 shrink-0 text-[10px] text-zinc-400">
+                                    <div className="flex items-center space-x-1 shrink-0 text-[10px] text-zinc-400">
                                       <span>{item.timestamp}</span>
                                       {isCurrent && <span className="text-emerald-500 font-bold text-xs">●</span>}
                                     </div>
@@ -604,33 +762,17 @@ export const TemplatePreviewCanvas: React.FC<TemplatePreviewCanvasProps> = ({ te
                             )}
                           </div>
                         </div>
-                      )}
-                    </div>
+                      </div>
+                    )}
                   </div>
-                </div>
 
-                {/* [우측]: [최근 저장: 19:05] [ 💾 저장하기 ] [ </> JSON ] [ ⚡ 노션에 배포 ] */}
-                <div className="flex items-center space-x-1.5 sm:space-x-2 shrink-0">
-                  {/* 최근 저장: HH:mm */}
-                  <span className="text-[11px] text-zinc-500 dark:text-zinc-400 font-mono hidden md:inline px-1">
-                    최근 저장: {lastSavedTime || '미저장'}
-                  </span>
-
-                  {/* [ 💾 저장하기 ] 단일 통합 버튼 */}
-                  <button
-                    type="button"
-                    onClick={handleSaveAll}
-                    className="flex items-center space-x-1.5 px-3 py-1 rounded-lg text-xs font-bold text-zinc-800 dark:text-zinc-100 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700 border border-zinc-300 dark:border-zinc-700 shadow-2xs transition cursor-pointer whitespace-nowrap"
-                    title="현재 템플릿을 로컬 초안 및 내 보관함에 즉시 동시 저장합니다"
-                  >
-                    <Save className="w-3.5 h-3.5 text-zinc-700 dark:text-zinc-200" />
-                    <span>저장하기</span>
-                  </button>
+                  {/* 세로 구분선 */}
+                  <div className="h-4 w-[1px] bg-zinc-300 dark:bg-zinc-700 mx-0.5" />
 
                   {/* [ </> JSON ] 버튼 */}
                   <button
                     onClick={() => setIsRawJsonModalOpen(true)}
-                    className="flex items-center space-x-1 px-2.5 py-1 rounded-lg text-xs font-medium text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200/60 dark:hover:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 transition cursor-pointer whitespace-nowrap"
+                    className="flex items-center space-x-1 px-2.5 py-1.5 rounded-lg text-xs font-medium text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200/60 dark:hover:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 transition cursor-pointer whitespace-nowrap"
                     title="템플릿 JSON 원본 코드 확인"
                   >
                     <Code2 className="w-3.5 h-3.5" />
@@ -641,7 +783,7 @@ export const TemplatePreviewCanvas: React.FC<TemplatePreviewCanvasProps> = ({ te
                   <button
                     onClick={publishToNotion}
                     disabled={isPublishing || !editableTemplate}
-                    className="flex items-center space-x-1.5 px-3 py-1 rounded-lg text-xs font-bold text-white bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white shadow-xs transition disabled:opacity-50 cursor-pointer whitespace-nowrap"
+                    className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white shadow-xs transition disabled:opacity-50 cursor-pointer whitespace-nowrap"
                   >
                     {isPublishing ? (
                       <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -698,13 +840,13 @@ export const TemplatePreviewCanvas: React.FC<TemplatePreviewCanvasProps> = ({ te
                   {/* KPI 3: 속성 수 */}
                   <div className="flex items-center space-x-1 text-[11px] whitespace-nowrap">
                     <Tag className="w-3.5 h-3.5 text-zinc-500" />
-                    <span className="text-zinc-500 dark:text-zinc-400">총 속성</span>
+                    <span className="text-zinc-500 dark:text-zinc-400">전체 속성</span>
                     <span className="font-bold text-zinc-900 dark:text-zinc-100 font-mono">{totalProperties}개</span>
                   </div>
 
                   <div className="h-3 w-[1px] bg-zinc-300 dark:bg-zinc-700 shrink-0" />
 
-                  {/* KPI 4: Formulas 2.0 수식 */}
+                  {/* KPI 4: 수식 수 */}
                   <div className="flex items-center space-x-1 text-[11px] whitespace-nowrap">
                     <Calculator className="w-3.5 h-3.5 text-zinc-600 dark:text-zinc-300" />
                     <span className="text-zinc-500 dark:text-zinc-400">Formulas 2.0</span>
@@ -712,30 +854,12 @@ export const TemplatePreviewCanvas: React.FC<TemplatePreviewCanvasProps> = ({ te
                   </div>
                 </div>
 
-                {/* KPI 5: 무손실 검증 상태 뱃지 & Memory Vault 상태 */}
+                {/* KPI 5: 무손실 검증 상태 뱃지 (Memory Vault 뱃지 및 초기화 버튼 UI 제거, 자동 캐시는 백그라운드 동작) */}
                 <div className="flex items-center space-x-2 shrink-0">
                   <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-zinc-200 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 border border-zinc-300 dark:border-zinc-700 whitespace-nowrap">
                     <ShieldCheck className="w-3 h-3 mr-1 text-zinc-600 dark:text-zinc-300" />
                     무손실 검증: PASS
                   </span>
-
-                  <span 
-                    title="모든 인라인 스키마 수정 내역이 브라우저 로컬스토리지에 실시간 자동 보존됩니다"
-                    className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-zinc-200/90 dark:bg-zinc-800/90 text-zinc-800 dark:text-zinc-200 border border-zinc-300 dark:border-zinc-700 whitespace-nowrap"
-                  >
-                    <Database className="w-3 h-3 mr-1 text-zinc-600 dark:text-zinc-300" />
-                    Memory Vault 💾
-                  </span>
-
-                  <button
-                    type="button"
-                    onClick={handleResetToOriginal}
-                    className="flex items-center space-x-1 px-1.5 py-0.5 rounded text-[10px] font-medium text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200 hover:bg-zinc-200/60 dark:hover:bg-zinc-800 transition cursor-pointer"
-                    title="인라인 편집된 스키마를 원래 템플릿 상태로 복원합니다"
-                  >
-                    <RotateCcw className="w-2.5 h-2.5" />
-                    <span>초기화</span>
-                  </button>
                 </div>
               </div>
 
@@ -950,6 +1074,56 @@ export const TemplatePreviewCanvas: React.FC<TemplatePreviewCanvasProps> = ({ te
           />
         )}
       />
+
+      {/* 다른 이름으로 저장 (사본 복제) 모달 */}
+      {isSaveAsModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in duration-150">
+          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 w-full max-w-md shadow-2xl space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="font-bold text-base text-zinc-900 dark:text-zinc-100 flex items-center space-x-2">
+                <Copy className="w-4 h-4 text-zinc-600 dark:text-zinc-300" />
+                <span>다른 이름으로 저장</span>
+              </h3>
+              <button
+                type="button"
+                onClick={() => setIsSaveAsModalOpen(false)}
+                className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 p-1 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">
+              현재 작업 중인 템플릿의 사본을 새 명칭으로 내 보관함에 별도 복제 생성합니다.
+            </p>
+            <form onSubmit={handleSaveAsConfirm} className="space-y-4">
+              <input
+                type="text"
+                value={saveAsTitle}
+                onChange={(e) => setSaveAsTitle(e.target.value)}
+                placeholder="새 템플릿 명칭 입력"
+                autoFocus
+                className="w-full px-3.5 py-2.5 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-sm font-semibold text-zinc-900 dark:text-zinc-100 focus:outline-hidden focus:ring-2 focus:ring-zinc-500"
+              />
+              <div className="flex items-center justify-end space-x-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setIsSaveAsModalOpen(false)}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition cursor-pointer"
+                >
+                  취소
+                </button>
+                <button
+                  type="submit"
+                  disabled={!saveAsTitle.trim()}
+                  className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white shadow-xs transition disabled:opacity-40 cursor-pointer"
+                >
+                  복제 저장
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
