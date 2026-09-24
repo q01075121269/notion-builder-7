@@ -187,7 +187,7 @@ export const generateGuideWithGemini = async (
   template: NotionTemplate,
   apiKey: string,
   audience: GuideAudience = 'general',
-  model: GeminiModelType = 'gemini-1.5-flash'
+  model: GeminiModelType = 'gemini-3.8-flash'
 ): Promise<BeginnerGuide> => {
   // API 키가 없으면 기본 템플릿 프리셋 또는 동적 기본 가이드 반환
   if (!apiKey) {

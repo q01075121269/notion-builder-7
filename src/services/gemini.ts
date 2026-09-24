@@ -10,7 +10,7 @@ export async function processConversationWithGemini(
   prompt: string,
   apiKey: string,
   currentTemplate: NotionTemplate | null,
-  model: GeminiModelType = 'gemini-1.5-flash',
+  model: GeminiModelType = 'gemini-3.8-flash',
   attachedFiles: AttachedFile[] = [],
   chatHistory: ChatMessage[] = [],
   targetPluginId = 'gemini'
@@ -35,7 +35,7 @@ export async function processConversationWithGemini(
 export async function generateNotionTemplate(
   prompt: string,
   apiKey: string,
-  model: GeminiModelType = 'gemini-1.5-flash'
+  model: GeminiModelType = 'gemini-3.8-flash'
 ): Promise<NotionTemplate> {
   const result = await processConversationWithGemini(prompt, apiKey, null, model);
   if (result.mode === 'CREATE_NEW') return result.template;

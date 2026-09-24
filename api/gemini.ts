@@ -21,11 +21,11 @@ export default async function handler(req: any, res: any) {
   // 2026년 기준 공식 권장 gemini-3.6-flash 최우선 배치 및 안전 Fallback 체인
   const candidateModels = Array.from(
     new Set([
-      'gemini-3.6-flash',
-      requestedModel,
       'gemini-3.8-flash',
-      'gemini-2.5-flash',
-      'gemini-1.5-flash'
+      requestedModel,
+      'gemini-3.5-flash-lite',
+      'gemini-3.1-pro',
+      'gemini-2.5-flash'
     ])
   );
 

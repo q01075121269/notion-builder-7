@@ -11,8 +11,8 @@ export async function executeGeminiCall(req: AIPluginRequest): Promise<GeminiCon
     throw new Error("노아(NOA)를 구동하기 위한 Gemini API 키가 없습니다. 우측 상단 [설정]에서 API 키를 먼저 등록해 주세요.");
   }
 
-  const model = req.options?.model || 'gemini-2.5-flash';
-  const targetModel = model.replace(/^models\//, '').trim();
+  const modelParam = req.options?.model || (typeof window !== 'undefined' ? localStorage.getItem('selected_gemini_model') : null) || 'gemini-3.8-flash';
+  const targetModel = modelParam.replace(/^models\//, '').trim() || 'gemini-3.8-flash';
 
   let promptText = `[사용자 요청]: "${req.prompt}"`;
   if (req.currentTemplate) {
@@ -25,6 +25,7 @@ export async function executeGeminiCall(req: AIPluginRequest): Promise<GeminiCon
   });
 
   const body = {
+    model: targetModel,
     contents: [{ role: 'user', parts }],
     systemInstruction: { parts: [{ text: MASTER_SYSTEM_PROMPT }] },
     generationConfig: { temperature: 0.7, topP: 0.95 }
@@ -44,9 +45,9 @@ export async function executeGeminiCall(req: AIPluginRequest): Promise<GeminiCon
     ...(userEmail ? { 'x-user-email': userEmail } : {})
   };
 
-  // 실존하는 안정적인 공식 모델 우선순위 체인 (요청모델 -> 2.5-flash -> 2.0-flash -> 1.5-flash -> 1.5-pro)
+  // 실존하는 최신 공식 모델 우선순위 체인 (요청모델 -> 3.8-flash -> 3.5-flash-lite -> 3.1-pro -> 2.5-flash)
   const candidateModels = Array.from(
-    new Set([targetModel, 'gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'])
+    new Set([targetModel, 'gemini-3.8-flash', 'gemini-3.5-flash-lite', 'gemini-3.1-pro', 'gemini-2.5-flash', 'gemini-2.0-flash'])
   );
 
   let lastErrMessage = '';

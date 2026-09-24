@@ -402,17 +402,16 @@ ${GEMINI_SYSTEM_DIRECTIVES.templateMasterDirective}
 // Gemini Function Calling API 호출
 // ─────────────────────────────────────────────────────────────────────────────
 
-const CANDIDATE_MODELS = [
-  'gemini-3.6-flash',
-  'gemini-2.5-flash',
-  'gemini-1.5-flash',
-];
-
 async function callGeminiWithFunctions(
   userText: string,
   history: Array<{ role: string; content: string }>,
-  apiKey: string
+  apiKey: string,
+  requestedModel: string = 'gemini-3.8-flash'
 ): Promise<OrchestratorResponse> {
+  const cleanRequested = (requestedModel || 'gemini-3.8-flash').replace(/^models\//, '').trim();
+  const candidateModels = Array.from(
+    new Set([cleanRequested, 'gemini-3.8-flash', 'gemini-3.5-flash-lite', 'gemini-3.1-pro', 'gemini-2.5-flash', 'gemini-2.0-flash'])
+  );
   const contents: unknown[] = [];
 
   // 멀티턴 대화 기록 (최근 6턴)
@@ -436,7 +435,7 @@ async function callGeminiWithFunctions(
 
   let lastError: string = 'Unknown error';
 
-  for (const model of CANDIDATE_MODELS) {
+  for (const model of candidateModels) {
     try {
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
       const res = await fetch(url, {
@@ -934,7 +933,8 @@ export async function POST(req: Request): Promise<Response> {
       );
     }
 
-    const result = await callGeminiWithFunctions(userText, history, apiKey);
+    const reqModel = String(body.model || body.selectedModel || 'gemini-3.8-flash');
+    const result = await callGeminiWithFunctions(userText, history, apiKey, reqModel);
 
     return new Response(JSON.stringify(result), { status: 200, headers: CORS_HEADERS });
   } catch (err: unknown) {
@@ -986,7 +986,8 @@ export default async function handler(req: {
       return res.status(401).json({ error: '노아(NOA)를 구동하기 위한 Gemini API 키가 없습니다. 우측 상단 [설정]에서 API 키를 먼저 등록해 주세요.' });
     }
 
-    const result = await callGeminiWithFunctions(userText, history, apiKey);
+    const reqModel = String(body.model || body.selectedModel || 'gemini-3.8-flash');
+    const result = await callGeminiWithFunctions(userText, history, apiKey, reqModel);
 
     return res.status(200).json(result);
   } catch (err: unknown) {

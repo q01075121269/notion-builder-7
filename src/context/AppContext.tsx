@@ -655,7 +655,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               : msg
           )
         );
-        showToast(`✨ "${template.title}" 템플릿이 생성되고 작업실로 즉시 이동하였습니다!`, 'success');
+        showToast("기획안을 바탕으로 템플릿이 성공적으로 설계되었습니다.", 'success');
       }
 
     } catch (err: any) {

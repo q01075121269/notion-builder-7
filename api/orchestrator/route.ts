@@ -119,14 +119,13 @@ const ORCHESTRATOR_SYSTEM_PROMPT = `
 async function callGeminiForOrchestrator(
   userText: string,
   history: Array<{ role: string; content: string }> = [],
-  apiKey: string
+  apiKey: string,
+  requestedModel: string = 'gemini-3.8-flash'
 ): Promise<OrchestratorResponse> {
-  const candidateModels = [
-    'gemini-3.6-flash',
-    'gemini-1.5-flash',
-    'gemini-2.5-flash',
-    'gemini-2.0-flash'
-  ];
+  const cleanRequested = (requestedModel || 'gemini-3.8-flash').replace(/^models\//, '').trim();
+  const candidateModels = Array.from(
+    new Set([cleanRequested, 'gemini-3.8-flash', 'gemini-3.5-flash-lite', 'gemini-3.1-pro', 'gemini-2.5-flash', 'gemini-2.0-flash'])
+  );
 
   // 대화 기록 구성
   const contents: any[] = [];
@@ -313,7 +312,8 @@ export async function POST(req: Request): Promise<Response> {
       );
     }
 
-    const result = await callGeminiForOrchestrator(userText, history, apiKey);
+    const reqModel = body.model || body.selectedModel || 'gemini-3.8-flash';
+    const result = await callGeminiForOrchestrator(userText, history, apiKey, reqModel);
 
     return new Response(JSON.stringify(result), {
       status: 200,
@@ -388,7 +388,8 @@ export default async function handler(req: any, res: any) {
       return res.status(401).json({ error: '노아(NOA)를 구동하기 위한 Gemini API 키가 없습니다. 우측 상단 [설정]에서 API 키를 먼저 등록해 주세요.' });
     }
 
-    const result = await callGeminiForOrchestrator(userText, history, apiKey);
+    const reqModel = body.model || body.selectedModel || 'gemini-3.8-flash';
+    const result = await callGeminiForOrchestrator(userText, history, apiKey, reqModel);
 
     return res.status(200).json(result);
   } catch (err: any) {

@@ -89,8 +89,8 @@ function geminiApiProxyPlugin(): Plugin {
 
         if (req.url && req.url.startsWith('/api/gemini')) {
           const urlObj = new URL(req.url, 'http://localhost:5173')
-          const rawModel = urlObj.searchParams.get('model') || 'gemini-1.5-flash'
-          const model = rawModel.replace(/^models\//, '').trim() || 'gemini-1.5-flash'
+          const rawModel = urlObj.searchParams.get('model') || 'gemini-2.5-flash'
+          const model = rawModel.replace(/^models\//, '').trim() || 'gemini-2.5-flash'
           
           // 1. 보안 감사: 관리자 화이트리스트 기반 내부 API 호출 차단 검증
           const rawAdminEmails = env.VITE_ADMIN_EMAILS || env.VITE_ADMIN_EMAIL || process.env.VITE_ADMIN_EMAILS || process.env.VITE_ADMIN_EMAIL || ''
@@ -132,7 +132,7 @@ function geminiApiProxyPlugin(): Plugin {
 
           req.on('end', () => {
             const candidateModels = Array.from(
-              new Set(['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash', model, 'gemini-3.6-flash'])
+              new Set([model, 'gemini-3.8-flash', 'gemini-3.5-flash-lite', 'gemini-3.1-pro', 'gemini-2.5-flash', 'gemini-2.0-flash'])
             );
 
             const tryModel = (idx: number) => {
