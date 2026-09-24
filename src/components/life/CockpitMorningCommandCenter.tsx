@@ -9,6 +9,7 @@ import type {
   ResourceType,
   ProjectArea
 } from '../../types/lifeHub';
+import type { TriageResult } from '../../services/lifeHubAutoTriageRouter';
 
 import { QuickCaptureThingsCard } from './QuickCaptureThingsCard';
 import { HabitTrackerCard } from './HabitTrackerCard';
@@ -28,15 +29,20 @@ interface CockpitMorningCommandCenterProps {
     summary: string;
     sourceUrl?: string;
   }) => void;
+  onTriageCapture?: (result: TriageResult) => void;
+  apiKey?: string;
   onAddProject?: () => void;
   onSelectArea?: (area: ProjectArea) => void;
 }
 
 export const CockpitMorningCommandCenter: React.FC<CockpitMorningCommandCenterProps> = ({
   projects,
+  tasks,
   resources,
   onToggleTask,
   onAddResource,
+  onTriageCapture,
+  apiKey,
   onAddProject,
   onSelectArea
 }) => {
@@ -60,10 +66,14 @@ export const CockpitMorningCommandCenter: React.FC<CockpitMorningCommandCenterPr
          ───────────────────────────────────────────────────────────────────────────── */}
       <div className="lg:col-span-4 xl:col-span-4 space-y-4">
         {/* ① [⚡ 1초 퀵 인박스] */}
-        <QuickCaptureThingsCard onCapture={onAddResource} />
+        <QuickCaptureThingsCard 
+          onCapture={onAddResource} 
+          onTriageCapture={onTriageCapture}
+          apiKey={apiKey}
+        />
 
         {/* ② [🎯 오늘의 Top 3 (Next Actions / MITs)] - 한눈에 정면 노출 */}
-        <Top3MITsCard onToggleTask={onToggleTask} />
+        <Top3MITsCard tasks={tasks} onToggleTask={onToggleTask} />
 
         {/* ③ [🔥 모닝 루틴 & 스마트 해빗 트래커] */}
         <HabitTrackerCard />

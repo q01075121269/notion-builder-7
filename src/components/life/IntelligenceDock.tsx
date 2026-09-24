@@ -14,9 +14,13 @@ import {
 
 interface IntelligenceDockProps {
   inboxCount?: number;
+  statusMessage?: string | null;
 }
 
-export const IntelligenceDock: React.FC<IntelligenceDockProps> = ({ inboxCount = 3 }) => {
+export const IntelligenceDock: React.FC<IntelligenceDockProps> = ({ 
+  inboxCount = 3,
+  statusMessage = null
+}) => {
   const [isExpanded, setIsExpanded] = useState(false);
 
   return (
@@ -39,9 +43,13 @@ export const IntelligenceDock: React.FC<IntelligenceDockProps> = ({ inboxCount =
           {/* 중앙 3대 핵심 브리핑 칩 */}
           <div className="flex flex-wrap items-center gap-1.5 text-xs">
             {/* 1. 인박스 자동 분류 */}
-            <div className="flex items-center space-x-1 px-2 py-0.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border border-emerald-200/60 dark:border-emerald-800/60 text-[10px] font-semibold">
+            <div className={`flex items-center space-x-1 px-2 py-0.5 rounded-lg border text-[10px] font-semibold transition-colors ${
+              statusMessage
+                ? 'bg-emerald-100 dark:bg-emerald-900/60 text-emerald-900 dark:text-emerald-200 border-emerald-300 dark:border-emerald-700 animate-pulse'
+                : 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border border-emerald-200/60 dark:border-emerald-800/60'
+            }`}>
               <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" />
-              <span>인박스: {inboxCount}건 분류 완료</span>
+              <span>{statusMessage || `인박스: ${inboxCount}건 분류 완료`}</span>
             </div>
 
             {/* 2. 일정 감시자 경고 */}

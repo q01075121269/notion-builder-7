@@ -51,13 +51,10 @@ export const Navbar: React.FC = () => {
 
   const handleDailyRoutine = () => {
     setCurrentView('life');
-    const omniInput = document.querySelector('textarea') as HTMLTextAreaElement | null;
-    if (omniInput) {
-      omniInput.value = '오늘 데일리 루틴 및 핵심 일정을 한눈에 브리핑해 줘';
-      omniInput.focus();
-      omniInput.dispatchEvent(new Event('input', { bubbles: true }));
-    }
-    showToast('⏰ 오늘의 데일리 루틴과 라이프 비서 스케줄이 준비되었습니다.', 'info');
+    setTimeout(() => {
+      window.dispatchEvent(new CustomEvent('open-morning-briefing'));
+    }, 50);
+    showToast('⏰ 오늘의 데일리 루틴 브리핑 카드를 불러왔습니다.', 'info');
   };
 
   return (

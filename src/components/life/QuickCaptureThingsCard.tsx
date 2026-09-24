@@ -1,5 +1,5 @@
 // src/components/life/QuickCaptureThingsCard.tsx
-// Things 3 스타일 1초 퀵 인박스 카드 (클립보드 붙여넣기, 음성, 첨부, AI 자동분류)
+// Things 3 스타일 1초 퀵 인박스 카드 (노아 AI 멀티모달 자동 분류, 클립보드, 음성, 낙관적 업데이트)
 
 import React, { useState } from 'react';
 import { 
@@ -9,53 +9,85 @@ import {
   Paperclip, 
   ArrowUpRight, 
   Sparkles,
-  Check
+  Check,
+  Loader2
 } from 'lucide-react';
 import type { ResourceType } from '../../types/lifeHub';
+import { 
+  triageQuickCaptureLocally, 
+  triageQuickCaptureWithAI,
+  type TriageResult 
+} from '../../services/lifeHubAutoTriageRouter';
 
 interface QuickCaptureThingsCardProps {
-  onCapture: (item: {
+  onCapture?: (item: {
     title: string;
     type: ResourceType;
     summary: string;
     sourceUrl?: string;
   }) => void;
+  onTriageCapture?: (result: TriageResult) => void;
+  apiKey?: string;
 }
 
 const SEED_INBOX_CHIPS = [
-  { text: '🎙️ 세무 상담 서류 인박스 정리 [미분류]', type: '문서' as ResourceType, summary: '종합소득세 및 법인 증빙 PDF 영수증 취합' },
-  { text: '📎 Q3 성과 지표 엑셀 원본 [미분류]', type: '문서' as ResourceType, summary: 'Vercel 서버리스 지연시간 및 전환율 원시 데이터' },
-  { text: '💡 2026 AI 에이전트 프롬프트 팁 [지식]', type: '빠른메모' as ResourceType, summary: 'Fail-Fast 가드레일 및 JSON 스키마 강제 기법' }
+  { text: '🎙️ 내일 2시 세무사 미팅 서류 준비 [과제]', hint: 'Tasks로 자동 분류' },
+  { text: '🍜 점심 12,000원 김치찌개 식사 [지출]', hint: 'Life Log로 자동 분류' },
+  { text: '💡 2026 AI 에이전트 프롬프트 팁 [지식]', hint: 'Resources로 자동 분류' }
 ];
 
-export const QuickCaptureThingsCard: React.FC<QuickCaptureThingsCardProps> = ({ onCapture }) => {
+export const QuickCaptureThingsCard: React.FC<QuickCaptureThingsCardProps> = ({ 
+  onCapture,
+  onTriageCapture,
+  apiKey
+}) => {
   const [inputText, setInputText] = useState('');
   const [isRecording, setIsRecording] = useState(false);
   const [copiedSuccess, setCopiedSuccess] = useState(false);
+  const [isTriaging, setIsTriaging] = useState(false);
+
+  // 통합 자동 분류 처리기 (낙관적 업데이트)
+  const processTriage = async (textToProcess: string) => {
+    const trimmed = textToProcess.trim();
+    if (!trimmed) return;
+
+    // 1. 낙관적 업데이트 (Optimistic Instant Update): 로컬 지능형 Fast-Path
+    const localResult = triageQuickCaptureLocally(trimmed);
+    
+    if (onTriageCapture) {
+      onTriageCapture(localResult);
+    } else if (onCapture) {
+      // 레거시 호환
+      onCapture({
+        title: localResult.itemTitle,
+        type: localResult.resourceData?.type || '빠른메모',
+        summary: localResult.explanation,
+        sourceUrl: localResult.resourceData?.sourceUrl
+      });
+    }
+
+    setInputText('');
+
+    // 2. 비동기 AI 정밀 분류 (API 키 존재 시 백그라운드 고도화)
+    if (apiKey) {
+      setIsTriaging(true);
+      try {
+        const aiResult = await triageQuickCaptureWithAI(trimmed, apiKey);
+        // AI 판정 결과가 로컬 결과와 다르거나 더 정밀한 경우 추가 콜백
+        if (aiResult.destination !== localResult.destination && onTriageCapture) {
+          onTriageCapture(aiResult);
+        }
+      } catch (err) {
+        console.warn('[QuickCapture] AI refinement skipped:', err);
+      } finally {
+        setIsTriaging(false);
+      }
+    }
+  };
 
   const handleSubmit = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (!inputText.trim()) return;
-
-    // AI 자동 분류 감지 (영수증 / 문서 / 북마크 / 빠른메모)
-    let detectedType: ResourceType = '빠른메모';
-    const lower = inputText.toLowerCase();
-    if (lower.startsWith('http://') || lower.startsWith('https://')) {
-      detectedType = '북마크';
-    } else if (lower.includes('원') || lower.includes('영수증') || lower.includes('결제')) {
-      detectedType = '영수증';
-    } else if (lower.includes('문서') || lower.includes('pdf') || lower.includes('기안')) {
-      detectedType = '문서';
-    }
-
-    onCapture({
-      title: inputText.trim(),
-      type: detectedType,
-      summary: `1초 퀵 인박스 캡처 (${new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })})`,
-      sourceUrl: detectedType === '북마크' ? inputText.trim() : undefined
-    });
-
-    setInputText('');
+    processTriage(inputText);
   };
 
   // 클립보드 붙여넣기 핸들러
@@ -63,7 +95,7 @@ export const QuickCaptureThingsCard: React.FC<QuickCaptureThingsCardProps> = ({ 
     try {
       if (navigator.clipboard && navigator.clipboard.readText) {
         const text = await navigator.clipboard.readText();
-        if (text) {
+        if (text && text.trim()) {
           setInputText(text);
           setCopiedSuccess(true);
           setTimeout(() => setCopiedSuccess(false), 1500);
@@ -74,14 +106,53 @@ export const QuickCaptureThingsCard: React.FC<QuickCaptureThingsCardProps> = ({ 
     }
   };
 
-  // 모의 음성 녹음 핸들러
+  // 음성 녹음 핸들러 (Web Speech API 또는 폴백 샘플)
   const handleToggleVoice = () => {
     if (!isRecording) {
       setIsRecording(true);
-      setTimeout(() => {
-        setIsRecording(false);
-        setInputText('🎙️ 내일 오후 3시 팀 런칭 회의 준비 서류 취합');
-      }, 1800);
+      // 브라우저 Web Speech API 지원 확인
+      const SpeechRecognition = (window as unknown as { SpeechRecognition?: any; webkitSpeechRecognition?: any }).SpeechRecognition || 
+                                (window as unknown as { webkitSpeechRecognition?: any }).webkitSpeechRecognition;
+
+      if (SpeechRecognition) {
+        try {
+          const recognition = new SpeechRecognition();
+          recognition.lang = 'ko-KR';
+          recognition.interimResults = false;
+          recognition.maxAlternatives = 1;
+
+          recognition.onresult = (event: any) => {
+            const speechText = event.results[0][0].transcript;
+            if (speechText) {
+              setInputText(speechText);
+            }
+            setIsRecording(false);
+          };
+
+          recognition.onerror = () => {
+            // 마이크 에러 시 지능형 샘플 텍스트 폴백
+            setInputText('내일 2시 세무사 미팅 서류 준비');
+            setIsRecording(false);
+          };
+
+          recognition.onend = () => {
+            setIsRecording(false);
+          };
+
+          recognition.start();
+        } catch {
+          setTimeout(() => {
+            setIsRecording(false);
+            setInputText('내일 2시 세무사 미팅 서류 준비');
+          }, 1200);
+        }
+      } else {
+        // Speech API 미지원 브라우저 폴백
+        setTimeout(() => {
+          setIsRecording(false);
+          setInputText('내일 2시 세무사 미팅 서류 준비');
+        }, 1200);
+      }
     } else {
       setIsRecording(false);
     }
@@ -89,7 +160,7 @@ export const QuickCaptureThingsCard: React.FC<QuickCaptureThingsCardProps> = ({ 
 
   // 첨부 파일 핸들러 (모의)
   const handleAttachFile = () => {
-    setInputText('📎 Q3_Release_Specification.pdf (자동 첨부)');
+    setInputText('https://notion.so/formulas-v2-guide 노션 공식 수식 문서 스크랩');
   };
 
   return (
@@ -104,6 +175,13 @@ export const QuickCaptureThingsCard: React.FC<QuickCaptureThingsCardProps> = ({ 
             1초 퀵 인박스 (Quick Inbox)
           </h3>
         </div>
+
+        {isTriaging && (
+          <span className="flex items-center space-x-1 text-[10px] font-semibold text-blue-600 dark:text-blue-400 animate-pulse">
+            <Loader2 className="w-2.5 h-2.5 animate-spin" />
+            <span>노아 AI 정밀 분류 중</span>
+          </span>
+        )}
       </div>
 
       {/* 인풋 영역 */}
@@ -120,7 +198,7 @@ export const QuickCaptureThingsCard: React.FC<QuickCaptureThingsCardProps> = ({ 
                 handleSubmit();
               }
             }}
-            placeholder="떠오르는 생각, 영수증, 할 일을 1초 만에 털어놓으세요 (AI 자동분류)"
+            placeholder="할일, 지출, 북마크, 프로젝트를 1초 만에 털어놓으세요 (AI 자동분류)"
             className="w-full resize-none rounded-xl border border-zinc-200/90 dark:border-zinc-800 bg-zinc-50/70 dark:bg-zinc-950/60 px-3 py-2 text-xs text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:border-blue-500 focus:bg-white dark:focus:bg-zinc-900 focus:outline-none focus:ring-1 focus:ring-blue-500/30 font-medium leading-relaxed"
           />
         </div>
@@ -155,7 +233,7 @@ export const QuickCaptureThingsCard: React.FC<QuickCaptureThingsCardProps> = ({ 
             <button
               type="button"
               onClick={handleAttachFile}
-              title="파일/영수증 첨부"
+              title="URL/자료 자동 첨부 샘플"
               className="flex items-center space-x-1 px-2 py-1 rounded-lg text-[10px] font-semibold bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 transition cursor-pointer"
             >
               <Paperclip className="w-3 h-3" />
@@ -189,26 +267,21 @@ export const QuickCaptureThingsCard: React.FC<QuickCaptureThingsCardProps> = ({ 
             <div
               key={idx}
               onClick={() => {
-                onCapture({
-                  title: chip.text.replace(/^[🎙️📎💡]\s*/, ''),
-                  type: chip.type,
-                  summary: chip.summary
-                });
+                processTriage(chip.text.replace(/^[🎙️🍜💡]\s*/, ''));
               }}
               className="group flex items-center justify-between p-1.5 rounded-lg bg-zinc-50/80 dark:bg-zinc-950/40 hover:bg-blue-50/60 dark:hover:bg-blue-950/30 border border-zinc-100 dark:border-zinc-800/60 transition cursor-pointer text-[11px]"
-              title="클릭하여 즉시 보관 처리"
+              title={chip.hint}
             >
               <span className="text-zinc-700 dark:text-zinc-300 truncate font-medium">
                 {chip.text}
               </span>
               <span className="opacity-0 group-hover:opacity-100 text-[10px] text-blue-600 dark:text-blue-400 font-bold shrink-0 ml-1">
-                +보관
+                +분류
               </span>
             </div>
           ))}
         </div>
       </div>
     </div>
-
   );
 };

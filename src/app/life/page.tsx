@@ -50,6 +50,8 @@ import { TasksHabitsMasterView } from '../../components/life/TasksHabitsMasterVi
 import { ResourcesInboxMasterView } from '../../components/life/ResourcesInboxMasterView';
 import { LifeLogMasterView } from '../../components/life/LifeLogMasterView';
 import { IntelligenceDock } from '../../components/life/IntelligenceDock';
+import { MorningBriefingModal } from '../../components/life/MorningBriefingModal';
+import type { TriageResult } from '../../services/lifeHubAutoTriageRouter';
 
 type ViewModeTab = 'morning_command' | 'para_second_brain' | 'smart_finance' | 'health_routine';
 
@@ -60,13 +62,25 @@ export const LifePage: React.FC = () => {
     showToast,
     createdNotionResource,
     selectedNotionDbId,
-    setIsNotionSettingsModalOpen
+    setIsNotionSettingsModalOpen,
+    apiKey
   } = useApp();
 
   // 상단 서브 뷰 모드 탭 (기본 활성: ☀️ 모닝 커맨드 센터)
   const [activeTab, setActiveTab] = useState<ViewModeTab>('morning_command');
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isSaveMenuOpen, setIsSaveMenuOpen] = useState<boolean>(false);
+  const [isBriefingOpen, setIsBriefingOpen] = useState<boolean>(false);
+  const [dockStatusMessage, setDockStatusMessage] = useState<string | null>(null);
+
+  // 글로벌 루틴 브리핑 오픈 이벤트 리스너
+  useEffect(() => {
+    const handleOpenBriefing = () => {
+      setIsBriefingOpen(true);
+    };
+    window.addEventListener('open-morning-briefing', handleOpenBriefing);
+    return () => window.removeEventListener('open-morning-briefing', handleOpenBriefing);
+  }, []);
 
   // 4대 마스터 DB 상태 (Fallback 빈 배열 안전 보장)
   const [projects, setProjects] = useState<ProjectItem[]>(() => INITIAL_LIFE_HUB_PROJECTS);
@@ -176,6 +190,85 @@ export const LifePage: React.FC = () => {
 
     showToast(`'${item.title}' 항목이 1초 퀵 인박스에 저장되었습니다.`, 'success');
   }, [projects, tasks, lifeLogs, persistState, showToast]);
+
+  // 2-1. [노아 AI 인텔리전스] 4대 마스터 DB 자동 분기 적재 (낙관적 업데이트)
+  const handleTriageCapture = useCallback((result: TriageResult) => {
+    if (result.destination === 'tasks' && result.taskData) {
+      const newTask: TaskHabitItem = {
+        id: `task-${Date.now()}`,
+        ...result.taskData,
+        createdAt: new Date().toISOString()
+      };
+      setTasks(prev => {
+        const next = [newTask, ...prev];
+        persistState(projects, next, resources, lifeLogs);
+        return next;
+      });
+      setDockStatusMessage('✅ 인박스: 방금 1건 자동 분류 완료');
+      showToast(`과제 등록 완료: ${result.explanation}`, 'success');
+    } else if (result.destination === 'lifeLogs' && result.logData) {
+      const newLog: LifeLogItem = {
+        id: `log-${Date.now()}`,
+        ...result.logData,
+        createdAt: new Date().toISOString()
+      };
+      setLifeLogs(prev => {
+        const next = [newLog, ...prev];
+        persistState(projects, tasks, resources, next);
+        return next;
+      });
+      setDockStatusMessage('✅ 인박스: 방금 1건 자동 분류 완료');
+      showToast(`가계부 기록 완료: ${result.explanation}`, 'success');
+    } else if (result.destination === 'projects' && result.projectData) {
+      const newProj: ProjectItem = {
+        id: `proj-${Date.now()}`,
+        ...result.projectData,
+        createdAt: new Date().toISOString()
+      };
+      setProjects(prev => {
+        const next = [newProj, ...prev];
+        persistState(next, tasks, resources, lifeLogs);
+        return next;
+      });
+      setDockStatusMessage('✅ 인박스: 방금 1건 자동 분류 완료');
+      showToast(`프로젝트 초안 등록: ${result.explanation}`, 'success');
+    } else {
+      const newRes: ResourceInboxItem = {
+        id: `res-${Date.now()}`,
+        title: result.resourceData?.title || result.itemTitle,
+        type: result.resourceData?.type || '빠른메모',
+        sourceUrl: result.resourceData?.sourceUrl,
+        summary: result.resourceData?.summary || result.explanation,
+        status: '인박스',
+        tags: result.resourceData?.tags || ['인박스'],
+        createdAt: new Date().toISOString()
+      };
+      setResources(prev => {
+        const next = [newRes, ...prev];
+        persistState(projects, tasks, next, lifeLogs);
+        return next;
+      });
+      setDockStatusMessage('✅ 인박스: 방금 1건 자동 분류 완료');
+      showToast(`인박스 보관 완료: ${result.explanation}`, 'success');
+    }
+
+    // 4초 후 독 메시지 정상화
+    setTimeout(() => {
+      setDockStatusMessage(null);
+    }, 4000);
+  }, [projects, tasks, resources, lifeLogs, persistState, showToast]);
+
+  // 2-2. 모닝 브리핑 모달 -> 하루 시작하기 (Top 3 영역으로 부드러운 스크롤 이동)
+  const handleStartDay = useCallback(() => {
+    setIsBriefingOpen(false);
+    setActiveTab('morning_command');
+    setTimeout(() => {
+      const top3El = document.getElementById('top3-action-card');
+      if (top3El) {
+        top3El.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }, 150);
+  }, []);
 
   // 3. 프로젝트 추가
   const handleAddProject = useCallback((newProjData: {
@@ -443,6 +536,16 @@ export const LifePage: React.FC = () => {
 
         {/* 우측 액션 툴바 (Linear/Apple 모노톤 스타일 정돈) */}
         <div className="flex items-center space-x-2 shrink-0">
+          {/* [ ☀️ 루틴 브리핑 ] 버튼 */}
+          <button
+            onClick={() => setIsBriefingOpen(true)}
+            className="flex items-center space-x-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs sm:text-sm font-medium bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100 dark:hover:bg-amber-900/50 text-amber-800 dark:text-amber-300 border border-amber-300/80 dark:border-amber-800/60 transition cursor-pointer shadow-2xs"
+            title="모닝 루틴 브리핑 카드 열기"
+          >
+            <Sun className="w-3.5 h-3.5 text-amber-500 fill-amber-500/20" />
+            <span className="hidden sm:inline">루틴 브리핑</span>
+          </button>
+
           {/* [ 💾 관리 ▼ (통합 드롭다운)] */}
           <div className="relative">
             <button
@@ -520,6 +623,8 @@ export const LifePage: React.FC = () => {
               resources={resources}
               onToggleTask={handleToggleTask}
               onAddResource={handleQuickCapture}
+              onTriageCapture={handleTriageCapture}
+              apiKey={apiKey}
               onAddProject={() => setActiveTab('para_second_brain')}
             />
           ) : activeTab === 'para_second_brain' ? (
@@ -572,7 +677,21 @@ export const LifePage: React.FC = () => {
       {/* ─────────────────────────────────────────────────────────────────────────────
           4. [하단 인텔리전스 독] - 2026 자율 AI 에이전트 브리핑 바
          ───────────────────────────────────────────────────────────────────────────── */}
-      <IntelligenceDock inboxCount={resources.filter(r => r.status === '인박스').length} />
+      <IntelligenceDock 
+        inboxCount={resources.filter(r => r.status === '인박스').length} 
+        statusMessage={dockStatusMessage}
+      />
+
+      {/* ─────────────────────────────────────────────────────────────────────────────
+          5. [모닝 루틴 브리핑 인터랙티브 모달]
+         ───────────────────────────────────────────────────────────────────────────── */}
+      <MorningBriefingModal
+        isOpen={isBriefingOpen}
+        onClose={() => setIsBriefingOpen(false)}
+        tasks={resolvedTasks}
+        projects={resolvedProjects}
+        onStartDay={handleStartDay}
+      />
     </div>
   );
 };

@@ -13,6 +13,8 @@ import {
 } from 'lucide-react';
 
 
+import type { TaskHabitItem } from '../../types/lifeHub';
+
 export interface MITItem {
   id: string;
   priority: '🔥 P0' | '⚡ P1' | '☕ P2';
@@ -23,6 +25,7 @@ export interface MITItem {
 }
 
 interface Top3MITsCardProps {
+  tasks?: TaskHabitItem[];
   onToggleTask?: (taskId: string) => void;
 }
 
@@ -53,13 +56,33 @@ const DEFAULT_MITS: MITItem[] = [
   }
 ];
 
-export const Top3MITsCard: React.FC<Top3MITsCardProps> = ({ onToggleTask }) => {
-  const [mits, setMits] = useState<MITItem[]>(DEFAULT_MITS);
+export const Top3MITsCard: React.FC<Top3MITsCardProps> = ({ tasks, onToggleTask }) => {
+  const [internalMits, setInternalMits] = useState<MITItem[]>(DEFAULT_MITS);
+
+  // tasks가 전달된 경우 tasks 중 미완료/우선순위 상위 3건 매핑
+  const mits: MITItem[] = tasks && tasks.length > 0 
+    ? [...tasks]
+        .sort((a, b) => {
+          if (a.completed !== b.completed) return a.completed ? 1 : -1;
+          const prioOrder: Record<string, number> = { '🔥 P0': 0, '⚡ P1': 1, '☕ P2': 2 };
+          return (prioOrder[a.priority] ?? 3) - (prioOrder[b.priority] ?? 3);
+        })
+        .slice(0, 3)
+        .map(t => ({
+          id: t.id,
+          priority: t.priority,
+          title: t.title,
+          duration: t.duration || '30m',
+          completed: t.completed,
+          notes: t.notes || (t.dueDate ? `마감: ${t.dueDate}` : undefined)
+        }))
+    : internalMits;
 
   const handleToggle = (id: string) => {
-    setMits(prev => prev.map(m => m.id === id ? { ...m, completed: !m.completed } : m));
     if (onToggleTask) {
       onToggleTask(id);
+    } else {
+      setInternalMits(prev => prev.map(m => m.id === id ? { ...m, completed: !m.completed } : m));
     }
   };
 
@@ -91,7 +114,7 @@ export const Top3MITsCard: React.FC<Top3MITsCardProps> = ({ onToggleTask }) => {
   const completedCount = mits.filter(m => m.completed).length;
 
   return (
-    <div className="rounded-2xl border border-zinc-200/90 dark:border-white/10 bg-white/95 dark:bg-zinc-900/95 p-4 shadow-xs transition-all hover:border-zinc-300 dark:hover:border-white/20">
+    <div id="top3-action-card" className="rounded-2xl border border-zinc-200/90 dark:border-white/10 bg-white/95 dark:bg-zinc-900/95 p-4 shadow-xs transition-all hover:border-zinc-300 dark:hover:border-white/20">
       {/* 헤더 */}
       <div className="flex items-center justify-between pb-2.5 mb-2.5 border-b border-zinc-100 dark:border-white/5">
         <div className="flex items-center space-x-2">
