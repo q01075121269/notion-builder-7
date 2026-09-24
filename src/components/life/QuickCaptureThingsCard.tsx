@@ -93,9 +93,9 @@ export const QuickCaptureThingsCard: React.FC<QuickCaptureThingsCardProps> = ({ 
   };
 
   return (
-    <div className="rounded-2xl border border-zinc-200/90 dark:border-white/10 bg-white/95 dark:bg-zinc-900/95 p-4 shadow-xs transition-all hover:border-zinc-300 dark:hover:border-white/20">
+    <div className="rounded-2xl border border-zinc-200/90 dark:border-white/10 bg-white/95 dark:bg-zinc-900/95 p-3.5 shadow-xs transition-all hover:border-zinc-300 dark:hover:border-white/20">
       {/* 헤더 */}
-      <div className="flex items-center justify-between pb-2.5 mb-2 border-b border-zinc-100 dark:border-white/5">
+      <div className="flex items-center justify-between pb-2 mb-2 border-b border-zinc-100 dark:border-white/5">
         <div className="flex items-center space-x-2">
           <div className="p-1 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400">
             <Zap className="w-3.5 h-3.5 fill-blue-500" />
@@ -104,17 +104,14 @@ export const QuickCaptureThingsCard: React.FC<QuickCaptureThingsCardProps> = ({ 
             1초 퀵 인박스 (Quick Inbox)
           </h3>
         </div>
-        <span className="text-[10px] px-1.5 py-0.5 rounded-full font-medium bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400">
-          Things 3 Style
-        </span>
       </div>
 
       {/* 인풋 영역 */}
-      <form onSubmit={handleSubmit} className="space-y-2.5">
+      <form onSubmit={handleSubmit} className="space-y-2">
         <div className="relative">
           <textarea
             id="quick-inbox-input"
-            rows={2}
+            rows={1}
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
             onKeyDown={(e) => {
@@ -124,7 +121,7 @@ export const QuickCaptureThingsCard: React.FC<QuickCaptureThingsCardProps> = ({ 
               }
             }}
             placeholder="떠오르는 생각, 영수증, 할 일을 1초 만에 털어놓으세요 (AI 자동분류)"
-            className="w-full resize-none rounded-xl border border-zinc-200/90 dark:border-zinc-800 bg-zinc-50/70 dark:bg-zinc-950/60 p-2.5 text-xs text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:border-blue-500 focus:bg-white dark:focus:bg-zinc-900 focus:outline-none focus:ring-1 focus:ring-blue-500/30 font-medium"
+            className="w-full resize-none rounded-xl border border-zinc-200/90 dark:border-zinc-800 bg-zinc-50/70 dark:bg-zinc-950/60 px-3 py-2 text-xs text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:border-blue-500 focus:bg-white dark:focus:bg-zinc-900 focus:outline-none focus:ring-1 focus:ring-blue-500/30 font-medium leading-relaxed"
           />
         </div>
 
@@ -169,7 +166,7 @@ export const QuickCaptureThingsCard: React.FC<QuickCaptureThingsCardProps> = ({ 
           <button
             type="submit"
             disabled={!inputText.trim()}
-            className="flex items-center space-x-1 px-3 py-1 rounded-lg text-[11px] font-bold bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white transition shadow-xs cursor-pointer"
+            className="flex items-center space-x-1 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white transition shadow-xs cursor-pointer"
           >
             <span>인박스 캡처</span>
             <ArrowUpRight className="w-3 h-3" />
@@ -177,18 +174,18 @@ export const QuickCaptureThingsCard: React.FC<QuickCaptureThingsCardProps> = ({ 
         </div>
       </form>
 
-      {/* 시드 인박스 칩 목록 */}
-      <div className="mt-3 pt-2.5 border-t border-zinc-100 dark:border-white/5 space-y-1.5">
+      {/* 시드 인박스 칩 목록 (최대 2건으로 압축) */}
+      <div className="mt-2.5 pt-2 border-t border-zinc-100 dark:border-white/5 space-y-1">
         <div className="flex items-center justify-between text-[10px] text-zinc-400 font-medium">
           <span className="flex items-center space-x-1">
             <Sparkles className="w-2.5 h-2.5 text-blue-500" />
-            <span>최근 캡처 인박스 큐</span>
+            <span>최근 캡처 큐</span>
           </span>
-          <span>{SEED_INBOX_CHIPS.length}건 대기</span>
+          <span>{SEED_INBOX_CHIPS.slice(0, 2).length}건</span>
         </div>
 
         <div className="space-y-1">
-          {SEED_INBOX_CHIPS.map((chip, idx) => (
+          {SEED_INBOX_CHIPS.slice(0, 2).map((chip, idx) => (
             <div
               key={idx}
               onClick={() => {
@@ -212,5 +209,6 @@ export const QuickCaptureThingsCard: React.FC<QuickCaptureThingsCardProps> = ({ 
         </div>
       </div>
     </div>
+
   );
 };

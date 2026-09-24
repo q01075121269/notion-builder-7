@@ -20,17 +20,17 @@ export const IntelligenceDock: React.FC<IntelligenceDockProps> = ({ inboxCount =
   const [isExpanded, setIsExpanded] = useState(false);
 
   return (
-    <div className="sticky bottom-3 z-30 max-w-7xl mx-auto w-full px-4 sm:px-7 pointer-events-none">
-      <div className="pointer-events-auto rounded-2xl border border-zinc-200/90 dark:border-white/10 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-xl shadow-lg p-2.5 sm:p-3 transition-all duration-300">
-        <div className="flex flex-wrap items-center justify-between gap-2">
+    <div className="sticky bottom-2 z-30 max-w-7xl mx-auto w-full px-4 sm:px-7 pointer-events-none">
+      <div className="pointer-events-auto rounded-2xl border border-zinc-200/90 dark:border-white/10 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-xl shadow-md py-1.5 px-3 sm:px-4 transition-all duration-300">
+        <div className="flex flex-wrap items-center justify-between gap-2 min-h-[36px]">
           {/* 좌측 에이전트 브랜딩 */}
-          <div className="flex items-center space-x-2 shrink-0">
+          <div className="flex items-center space-x-1.5 shrink-0">
             <div className="p-1 rounded-lg bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400">
               <Bot className="w-3.5 h-3.5 animate-pulse" />
             </div>
-            <span className="text-xs font-bold text-zinc-900 dark:text-zinc-100 flex items-center space-x-1">
-              <span>Agent 3.0 브리핑 독</span>
-              <span className="text-[10px] px-1.5 py-0.2 rounded font-mono font-medium bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300">
+            <span className="text-[11px] font-bold text-zinc-900 dark:text-zinc-100 flex items-center space-x-1">
+              <span>Agent 3.0</span>
+              <span className="text-[9px] px-1 py-0.2 rounded font-mono font-medium bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300">
                 LIVE
               </span>
             </span>
@@ -39,21 +39,21 @@ export const IntelligenceDock: React.FC<IntelligenceDockProps> = ({ inboxCount =
           {/* 중앙 3대 핵심 브리핑 칩 */}
           <div className="flex flex-wrap items-center gap-1.5 text-xs">
             {/* 1. 인박스 자동 분류 */}
-            <div className="flex items-center space-x-1 px-2.5 py-1 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border border-emerald-200/60 dark:border-emerald-800/60 text-[11px] font-semibold">
+            <div className="flex items-center space-x-1 px-2 py-0.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border border-emerald-200/60 dark:border-emerald-800/60 text-[10px] font-semibold">
               <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" />
-              <span>인박스: {inboxCount}건 자동 분류 완료</span>
+              <span>인박스: {inboxCount}건 분류 완료</span>
             </div>
 
             {/* 2. 일정 감시자 경고 */}
-            <div className="flex items-center space-x-1 px-2.5 py-1 rounded-xl bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 border border-amber-200/60 dark:border-amber-800/60 text-[11px] font-semibold">
+            <div className="flex items-center space-x-1 px-2 py-0.5 rounded-lg bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 border border-amber-200/60 dark:border-amber-800/60 text-[10px] font-semibold">
               <AlertTriangle className="w-3 h-3 text-amber-600 shrink-0" />
-              <span>일정 감시자: '독서 모임' D-4 진척도 저조 경고</span>
+              <span>일정 감시: '독서 모임' D-4 저조 경고</span>
             </div>
 
             {/* 3. 생체 에너지/집중도 권장 */}
-            <div className="flex items-center space-x-1 px-2.5 py-1 rounded-xl bg-blue-50 dark:bg-blue-950/40 text-blue-800 dark:text-blue-300 border border-blue-200/60 dark:border-blue-800/60 text-[11px] font-semibold">
+            <div className="flex items-center space-x-1 px-2 py-0.5 rounded-lg bg-blue-50 dark:bg-blue-950/40 text-blue-800 dark:text-blue-300 border border-blue-200/60 dark:border-blue-800/60 text-[10px] font-semibold hidden md:flex">
               <Sun className="w-3 h-3 text-blue-600 shrink-0" />
-              <span>에너지: 고집중 4시간 권장 (10:00~14:00)</span>
+              <span>에너지: 고집중 4시간 권장</span>
             </div>
           </div>
 

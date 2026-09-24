@@ -59,15 +59,16 @@ export const CockpitMorningCommandCenter: React.FC<CockpitMorningCommandCenterPr
           [좌측 패널] 데일리 실행 & 캡처 엔진 (35% 폭 -> lg:col-span-4 또는 5)
          ───────────────────────────────────────────────────────────────────────────── */}
       <div className="lg:col-span-4 xl:col-span-4 space-y-4">
-        {/* ① [⚡ 1초 퀵 인박스 (Things 3 스타일)] */}
+        {/* ① [⚡ 1초 퀵 인박스] */}
         <QuickCaptureThingsCard onCapture={onAddResource} />
 
-        {/* ② [🔥 모닝 루틴 & 스마트 해빗 트래커 (Sunsama 스타일)] */}
-        <HabitTrackerCard />
-
-        {/* ③ [🎯 오늘의 Top 3 (Next Actions / MITs)] */}
+        {/* ② [🎯 오늘의 Top 3 (Next Actions / MITs)] - 한눈에 정면 노출 */}
         <Top3MITsCard onToggleTask={onToggleTask} />
+
+        {/* ③ [🔥 모닝 루틴 & 스마트 해빗 트래커] */}
+        <HabitTrackerCard />
       </div>
+
 
       {/* ─────────────────────────────────────────────────────────────────────────────
           [우측 캔버스] PARA 마스터 매트릭스 & 프로젝트 코어 (65% 폭 -> lg:col-span-8)

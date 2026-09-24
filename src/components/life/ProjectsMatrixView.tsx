@@ -66,7 +66,7 @@ export const ProjectsMatrixView: React.FC<ProjectsMatrixViewProps> = ({
           </div>
           <div>
             <h3 className="text-xs font-bold text-zinc-900 dark:text-zinc-100 tracking-tight">
-              Active Projects 매트릭스 (Thomas Frank 스타일)
+              🎯 실행 프로젝트 (Active Projects)
             </h3>
           </div>
           <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400">
@@ -143,13 +143,13 @@ export const ProjectsMatrixView: React.FC<ProjectsMatrixViewProps> = ({
           <table className="w-full text-left text-xs border-collapse">
             <thead>
               <tr className="border-b border-zinc-200 dark:border-zinc-800 text-zinc-400 text-[11px] font-medium">
-                <th className="py-2 px-2.5">프로젝트명</th>
-                <th className="py-2 px-2">영역</th>
-                <th className="py-2 px-2">목표일</th>
-                <th className="py-2 px-2">상태</th>
-                <th className="py-2 px-2.5 min-w-[160px]">Formulas 2.0 진척률</th>
-                <th className="py-2 px-2">D-Day</th>
-                <th className="py-2 px-2">하위 과제</th>
+                <th className="py-2 px-2.5 whitespace-nowrap">프로젝트명</th>
+                <th className="py-2 px-2 whitespace-nowrap min-w-[75px] text-center">영역</th>
+                <th className="py-2 px-2 whitespace-nowrap">목표일</th>
+                <th className="py-2 px-2 whitespace-nowrap">상태</th>
+                <th className="py-2 px-2.5 min-w-[160px] whitespace-nowrap">Formulas 2.0 진척률</th>
+                <th className="py-2 px-2 whitespace-nowrap">D-Day</th>
+                <th className="py-2 px-2 whitespace-nowrap">하위 과제</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/60">
@@ -158,8 +158,8 @@ export const ProjectsMatrixView: React.FC<ProjectsMatrixViewProps> = ({
                   <td className="py-2.5 px-2.5 font-bold text-zinc-900 dark:text-zinc-100 max-w-[170px] truncate">
                     {proj.title}
                   </td>
-                  <td className="py-2.5 px-2">
-                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold border ${getAreaBadgeColor(proj.area)}`}>
+                  <td className="py-2.5 px-2 whitespace-nowrap min-w-[75px] text-center">
+                    <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold border whitespace-nowrap ${getAreaBadgeColor(proj.area)}`}>
                       {proj.area}
                     </span>
                   </td>
@@ -169,6 +169,7 @@ export const ProjectsMatrixView: React.FC<ProjectsMatrixViewProps> = ({
                   <td className="py-2.5 px-2 whitespace-nowrap">
                     {getStatusBadge(proj.status)}
                   </td>
+
                   <td className="py-2.5 px-2.5">
                     <div className="space-y-1">
                       <div className="font-mono text-[10px] font-bold text-zinc-700 dark:text-zinc-300">

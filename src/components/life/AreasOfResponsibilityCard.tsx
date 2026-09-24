@@ -81,14 +81,15 @@ export const AreasOfResponsibilityCard: React.FC<AreasOfResponsibilityCardProps>
           </div>
           <div>
             <h3 className="text-xs font-bold text-zinc-900 dark:text-zinc-100 tracking-tight">
-              Areas of Responsibility (4대 지속 책임 영역)
+              🌿 4대 책임 영역 (Areas)
             </h3>
           </div>
         </div>
-        <span className="text-[10px] px-1.5 py-0.5 rounded-full font-medium bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400">
-          Tiago Forte PARA
+        <span className="text-[10px] px-2 py-0.5 rounded-full font-medium bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400">
+          지속 관리 영역
         </span>
       </div>
+
 
       {/* 4대 벤토 카드 그리드 (2x2) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
