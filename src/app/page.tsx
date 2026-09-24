@@ -148,6 +148,33 @@ export const HomePage: React.FC = () => {
     }
   };
 
+  // 클립보드 붙여넣기(Ctrl+V) 이미지 감지 핸들러
+  const handlePaste = async (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+
+    let hasImage = false;
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (item.type.startsWith('image/')) {
+        const file = item.getAsFile();
+        if (file) {
+          hasImage = true;
+          try {
+            const parsed = await parseUploadedFile(file);
+            setAttachedFiles(prev => [...prev, parsed]);
+          } catch (err) {
+            console.error('Image paste failed:', err);
+          }
+        }
+      }
+    }
+
+    if (hasImage) {
+      e.preventDefault();
+    }
+  };
+
   // 파일 업로드 처리
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -159,7 +186,6 @@ export const HomePage: React.FC = () => {
         const file = files[i];
         const parsed = await parseUploadedFile(file);
         setAttachedFiles(prev => [...prev, parsed]);
-        showToast(`📎 [${file.name}] 파일 분석 완료`, 'success');
       }
     } catch (err: any) {
       showToast(err?.message || '파일 업로드 실패', 'error');
@@ -450,6 +476,7 @@ export const HomePage: React.FC = () => {
               value={inputPrompt}
               onChange={(e) => setInputPrompt(e.target.value)}
               onKeyDown={handleKeyDown}
+              onPaste={handlePaste}
               placeholder="노아(NOA)에게 어떤 업무를 도와드릴지 편하게 말씀해 주세요..."
               className="w-full bg-transparent text-sm text-neutral-900 dark:text-white placeholder-neutral-400 focus:outline-none resize-none leading-relaxed min-h-[40px]"
             />
@@ -464,6 +491,7 @@ export const HomePage: React.FC = () => {
                   ref={fileInputRef}
                   onChange={handleFileUpload}
                   multiple
+                  accept=".png,.jpg,.jpeg,.webp,.xlsx,.xls,.csv,.docx,.pdf,.hwpx,.txt,.md"
                   className="hidden"
                 />
                 <button

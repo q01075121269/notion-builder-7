@@ -15,7 +15,7 @@ import { LoginView } from './components/auth/LoginView';
 import { UnauthorizedView } from './components/auth/UnauthorizedView';
 import { QuickCaptureView } from './components/quickCapture/QuickCaptureView';
 import { BottomNavbar } from './components/layout/BottomNavbar';
-import { OmniChatBar } from './components/layout/OmniChatBar';
+import { NoaChatBar } from './components/layout/NoaChatBar';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
 import { Toast } from './components/common/Toast';
 
@@ -80,8 +80,8 @@ export const MainApp: React.FC = () => {
           )}
         </main>
         
-        {/* 중앙 옴니 챗바 — 메인 홈(activeTab === 'home')에서만 하단 플로팅 바로 렌더링, 전문 작업실에서는 마운트 해제하여 캔버스 세로 100% 확보 */}
-        {currentView === 'home' && <OmniChatBar />}
+        {/* 메인 홈 대화창 (NoaChatBar) — 메인 홈(currentView === 'home')에서 플로팅 만능 멀티모달 바로 렌더링 */}
+        {currentView === 'home' && <NoaChatBar />}
 
         {/* 모바일 하단 탭바 (빌더 / 보관함 / 퀵캡처) */}
         {currentView === 'home' && <BottomNavbar />}

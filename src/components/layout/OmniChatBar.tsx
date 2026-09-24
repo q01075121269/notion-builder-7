@@ -3,7 +3,6 @@ import { useApp } from '../../context/AppContext';
 import {
   Send,
   Mic,
-  MicOff,
   Bot,
   User,
   Loader2,
@@ -19,7 +18,15 @@ import {
   CheckCircle2,
 } from 'lucide-react';
 import { sendToOrchestrator } from '../../services/orchestratorService';
-import type { ChatMessage, OrchestratorResponse } from '../../services/orchestratorService';
+import type { ChatMessage, OrchestratorResponse, AttachedImageData } from '../../services/orchestratorService';
+
+export interface AttachedImageItem {
+  id: string;
+  name: string;
+  url: string;
+  base64: string;
+  mimeType: string;
+}
 import { dispatchRoutedTasksToNotion } from '../../services/quickCaptureService';
 import { extractDateFromKoreanText, extractDateRangeFromKoreanText, cleanTaskTitle, cleanDuplicateSpeech, detectReschedulePattern } from '../../services/quickCaptureLocalParser';
 import { saveQuickCaptureRecord, rescheduleTaskInQuickCapture, cleanupDuplicateRescheduleTasks } from '../../services/quickCaptureStorage';
@@ -175,6 +182,7 @@ export const OmniChatBar: React.FC = () => {
     setIsNotionSettingsModalOpen,
     showToast,
     selectedModel,
+    isThinkingEnabled,
     currentView,
     setCurrentView,
     currentTemplate,
@@ -206,8 +214,9 @@ export const OmniChatBar: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
 
-  // 첨부 파일 상태
+  // 첨부 파일 및 캡처 이미지 상태
   const [attachedFiles, setAttachedFiles] = useState<OmniAttachment[]>([]);
+  const [attachedImages, setAttachedImages] = useState<AttachedImageItem[]>([]);
   const [isParsingFiles, setIsParsingFiles] = useState(false);
   const [showLinkModal, setShowLinkModal] = useState(false);
   const [linkInput, setLinkInput] = useState('');
@@ -306,10 +315,10 @@ export const OmniChatBar: React.FC = () => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isLoading]);
 
-  // ── STT 토글 ────────────────────────────────────────────────────────────────
+  // ── STT 토글 (불필요한 팝업 없이 버튼 Red Pulse 피드백) ─────────────────────
   const toggleListening = () => {
     if (!sttSupported) {
-      alert('이 브라우저는 음성 인식을 지원하지 않습니다. Chrome 또는 최신 Edge를 사용해 주세요.');
+      console.warn('STT is not supported on this browser.');
       return;
     }
 
@@ -330,6 +339,83 @@ export const OmniChatBar: React.FC = () => {
       } catch (err) {
         console.error('STT 시작 실패:', err);
       }
+    }
+  };
+
+  // ── 캡처 이미지(Blob/Base64) 인라인 처리 (팝업 없이 미니 뱃지만 추가) ───────────
+  const processImageFile = async (file: File) => {
+    if (!file.type.startsWith('image/') && !/\.(png|jpe?g|webp|gif)$/i.test(file.name)) return;
+
+    try {
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const res = reader.result as string;
+          resolve(res);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+
+      const previewUrl = URL.createObjectURL(file);
+      const newImg: AttachedImageItem = {
+        id: `img-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+        name: file.name || `screenshot_${Date.now()}.png`,
+        url: previewUrl,
+        base64,
+        mimeType: file.type || 'image/png',
+      };
+
+      // 화면을 가리는 토스트 팝업 없이, 입력창 상단에 단정한 미니 썸네일 뱃지만 조용히 표시
+      setAttachedImages((prev) => [...prev, newImg]);
+    } catch (err) {
+      console.error('Image encoding failed:', err);
+    }
+  };
+
+  // ── 클립보드 붙여넣기(Ctrl + V) 이미지 감지 핸들러 ──────────────────────────
+  const handlePaste = async (e: React.ClipboardEvent) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+
+    let hasImage = false;
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (item.type.startsWith('image/')) {
+        const file = item.getAsFile();
+        if (file) {
+          hasImage = true;
+          await processImageFile(file);
+        }
+      }
+    }
+
+    if (hasImage) {
+      // 텍스트 영역에 가짜 문자열이 붙는 것 방지
+      e.preventDefault();
+    }
+  };
+
+  // ── 다중 파일 및 이미지 일괄 분기 처리 ─────────────────────────────────────
+  const handleFiles = async (files: FileList | File[]) => {
+    const fileList = Array.from(files);
+    const imageFiles: File[] = [];
+    const docFiles: File[] = [];
+
+    for (const f of fileList) {
+      if (f.type.startsWith('image/') || /\.(png|jpe?g|webp|gif)$/i.test(f.name)) {
+        imageFiles.push(f);
+      } else {
+        docFiles.push(f);
+      }
+    }
+
+    for (const img of imageFiles) {
+      await processImageFile(img);
+    }
+
+    if (docFiles.length > 0) {
+      await processSelectedFiles(docFiles);
     }
   };
 
@@ -401,7 +487,7 @@ export const OmniChatBar: React.FC = () => {
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
-      processSelectedFiles(e.target.files);
+      handleFiles(e.target.files);
     }
   };
 
@@ -417,12 +503,12 @@ export const OmniChatBar: React.FC = () => {
     setIsDragOver(false);
   };
 
-  const handleDrop = (e: React.DragEvent) => {
+  const handleDrop = async (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
     setIsDragOver(false);
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      processSelectedFiles(e.dataTransfer.files);
+      await handleFiles(e.dataTransfer.files);
     }
   };
 
@@ -447,10 +533,15 @@ export const OmniChatBar: React.FC = () => {
     setAttachedFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
+  const removeImage = (id: string) => {
+    setAttachedImages((prev) => prev.filter((img) => img.id !== id));
+  };
+
   // ── 입력창 및 첨부파일 명시적 Clear 핸들러 ────────────────────────────────
   const handleClearInput = () => {
     setInputValue('');
     setAttachedFiles([]);
+    setAttachedImages([]);
     if (inputRef.current) inputRef.current.value = '';
     baseTextRef.current = '';
     fullTranscriptRef.current = '';
@@ -464,6 +555,7 @@ export const OmniChatBar: React.FC = () => {
     try {
       localStorage.removeItem('notion_template_cache');
       localStorage.removeItem('notion_template_vault_draft');
+      localStorage.removeItem('notion_architect_draft_template');
       localStorage.removeItem('notion_builder_draft');
       localStorage.removeItem('notion_chat_messages');
       sessionStorage.clear();
@@ -476,13 +568,8 @@ export const OmniChatBar: React.FC = () => {
   const handleSendMessage = useCallback(async (overrideText?: string) => {
     const raw = (overrideText ?? inputValue).trim();
     const text = cleanDuplicateSpeech(raw);
-    if ((!text && attachedFiles.length === 0) || isLoadingRef.current) return;
-
-    // API 호출 전 핸들러 최상단 1라인에서 즉시 입력창 초기화
-    setInputValue('');
-    if (!overrideText) {
-      setAttachedFiles([]);
-    }
+    const hasMedia = attachedFiles.length > 0 || attachedImages.length > 0;
+    if ((!text && !hasMedia) || isLoadingRef.current) return;
 
     // 만약 음성 입력 중이었다면 마이크 중단
     if (isListeningRef.current) {
@@ -506,9 +593,19 @@ export const OmniChatBar: React.FC = () => {
       localStorage.removeItem('notion_template_vault_draft');
     } catch {}
 
+    const currentFiles = [...attachedFiles];
+    const currentImages = [...attachedImages];
+
+    // API 호출 전 핸들러 최상단 1라인에서 즉시 입력창 및 첨부 초기화
+    setInputValue('');
+    if (!overrideText) {
+      setAttachedFiles([]);
+      setAttachedImages([]);
+    }
+
     // [빈 껍데기 파일 파싱 실패 전송 방어 및 명확한 에러 경고]
-    const invalidFile = attachedFiles.find((a) => a.error || a.isUnsupportedHwp || (!a.parsedContent && (!a.sheets || a.sheets.length === 0)));
-    if (invalidFile && !text) {
+    const invalidFile = currentFiles.find((a) => a.error || a.isUnsupportedHwp || (!a.parsedContent && (!a.sheets || a.sheets.length === 0)));
+    if (invalidFile && !text && currentImages.length === 0) {
       isLoadingRef.current = false;
       setIsGenerating(false);
       setCurrentTemplate(null);
@@ -517,7 +614,7 @@ export const OmniChatBar: React.FC = () => {
       return;
     }
 
-    const hasValidContent = attachedFiles.some((a) => (a.parsedContent || (a.sheets && a.sheets.length > 0)) && !a.error);
+    const hasValidContent = currentFiles.some((a) => (a.parsedContent || (a.sheets && a.sheets.length > 0)) && !a.error) || currentImages.length > 0;
     if (!text && !hasValidContent) {
       isLoadingRef.current = false;
       setIsGenerating(false);
@@ -526,7 +623,7 @@ export const OmniChatBar: React.FC = () => {
       return;
     }
 
-    const fileContextList: FileContextItem[] = attachedFiles
+    const fileContextList: FileContextItem[] = currentFiles
       .filter((a) => !a.error && (a.parsedContent || (a.sheets && a.sheets.length > 0)))
       .map((a) => ({
         fileName: a.name,
@@ -538,8 +635,14 @@ export const OmniChatBar: React.FC = () => {
         summaryBadge: a.summaryBadge
       }));
 
+    const imagesPayload: AttachedImageData[] = currentImages.map((img) => ({
+      mimeType: img.mimeType,
+      data: img.base64,
+      name: img.name,
+    }));
+
     const pureText = text;
-    const attachedDataBlocks = attachedFiles
+    const attachedDataBlocks = currentFiles
       .filter((a) => a.parsedContent)
       .map((a) => {
         let block = `[ATTACHED_DOCUMENT_DATA]\n파일명: ${a.name}`;
@@ -562,15 +665,17 @@ export const OmniChatBar: React.FC = () => {
       : '';
 
     const fullMessageText = pureText + promptGuidance;
-    const displayContent = pureText + (attachedFiles.length > 0 ? `\n[첨부: ${attachedFiles.map((a) => a.name).join(', ')}]` : '');
+    const allAttachments = [
+      ...currentFiles.map((a) => a.name),
+      ...currentImages.map((img) => `[이미지: ${img.name}]`),
+    ];
+    const displayContent = pureText + (allAttachments.length > 0 ? `\n[첨부: ${allAttachments.join(', ')}]` : '');
 
     setInputValue('');
     if (inputRef.current) inputRef.current.value = '';
     fullTranscriptRef.current = '';
     baseTextRef.current = '';
     try { inputRef.current?.blur(); setTimeout(() => inputRef.current?.focus(), 50); } catch {}
-    const currentAttachments = [...attachedFiles.map((a) => a.name)];
-    setAttachedFiles([]);
     setIsExpanded(true);
 
     const userMsg: OmniMessage = {
@@ -578,7 +683,7 @@ export const OmniChatBar: React.FC = () => {
       role: 'user',
       content: displayContent,
       timestamp: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }),
-      attachments: currentAttachments,
+      attachments: allAttachments,
     };
     setMessages(prev => [...prev, userMsg]);
     setIsLoading(true);
@@ -733,16 +838,27 @@ export const OmniChatBar: React.FC = () => {
         return;
       }
 
-      const response: OrchestratorResponse = await sendToOrchestrator(fullMessageText, [...messages, userMsg], apiKey, authUser?.email, selectedModel, activeMode, fileContextList);
+      const response: OrchestratorResponse = await sendToOrchestrator(
+        fullMessageText,
+        [...messages, userMsg],
+        apiKey,
+        authUser?.email,
+        selectedModel,
+        activeMode,
+        fileContextList,
+        isThinkingEnabled,
+        imagesPayload,
+        currentTemplate
+      );
 
       // [🚨 핵심 방어: 템플릿 마스터 우선주의 및 오피스 스튜디오 오라우팅 원천 차단]
       const isBuilderChipActive = activeMode === 'builder';
-      const hasFileAttachment = attachedFiles.length > 0;
+      const hasMediaAttachment = currentFiles.length > 0 || currentImages.length > 0;
       const isTemplateRelated = /템플릿|노션|db|데이터베이스|대시보드|체크리스트|스케줄러|트래커|관리|워크스페이스/i.test(pureText);
 
       let effectiveIntent = response.intent;
-      if ((isBuilderChipActive || hasFileAttachment || isTemplateRelated) && response.intent === 'DEVLAB') {
-        console.warn('[OmniChatBar] Overriding DEVLAB intent to BUILDER because template mode/file attachment is active.');
+      if ((isBuilderChipActive || hasMediaAttachment || isTemplateRelated) && response.intent === 'DEVLAB') {
+        console.warn('[OmniChatBar] Overriding DEVLAB intent to BUILDER because template mode/media attachment is active.');
         effectiveIntent = 'BUILDER';
       }
 
@@ -845,13 +961,13 @@ export const OmniChatBar: React.FC = () => {
 
           receipts = buildReceipts('LIFE');
         }
-      } else if (effectiveIntent === 'BUILDER' || response.payload?.db_schema || isBuilderChipActive || hasFileAttachment) {
+      } else if (effectiveIntent === 'BUILDER' || response.payload?.db_schema || isBuilderChipActive || hasMediaAttachment) {
         receipts = buildReceipts('BUILDER');
         setIsViewingCurationHub(false);
 
         // [다중 첨부 엑셀 데이터 100% 직행 추출] 각 파일별 시트명, 컬럼, 샘플 행 파싱
         const extractedAttachedSchemas: any[] = [];
-        attachedFiles.forEach((file) => {
+        currentFiles.forEach((file) => {
           if (file.parsedContent) {
             const tableHeaderMatch = file.parsedContent.match(/\|\s*([^\n\r]+)\s*\|\s*\n\s*\|\s*[-|\s]+\|/);
             if (tableHeaderMatch) {
@@ -918,7 +1034,7 @@ export const OmniChatBar: React.FC = () => {
           targetTemplate = normalizeTemplatePayload(PRESET_TEMPLATES[response.payload.preset_key])!;
         } else {
           // AI 오케스트레이터 payload 기반 동적 템플릿 즉석 빌드
-          const allAttachedNames = attachedFiles.map((a) => a.name).join(' ');
+          const allAttachedNames = currentFiles.map((a) => a.name).join(' ');
           const fallbackTopic = pureText || (allAttachedNames ? allAttachedNames.replace(/\.[^.]+$/, '') : '') || '새 맞춤형 워크스페이스';
           const rawTopic = (response.payload?.template_topic as string) || fallbackTopic;
           const rawTitle = (response.payload?.suggested_title as string) || `${fallbackTopic} AI 템플릿`;
@@ -940,6 +1056,21 @@ export const OmniChatBar: React.FC = () => {
         if (targetTemplate) {
           generatedTemplateForMsg = targetTemplate;
           setCurrentTemplate(targetTemplate);
+
+          const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          const draftPayload = {
+            template: targetTemplate,
+            savedAt: Date.now(),
+            timeString: timeStr,
+          };
+          try {
+            localStorage.setItem('notion_architect_draft_template', JSON.stringify(draftPayload));
+            localStorage.setItem('notion_template_vault_draft', JSON.stringify(targetTemplate));
+            localStorage.setItem('notion_builder_draft', JSON.stringify(targetTemplate));
+          } catch (e) {
+            console.warn('Failed to save template draft:', e);
+          }
+
           try {
             saveArchivedTemplate({
               id: `created-tpl-${Date.now()}`,
@@ -958,13 +1089,11 @@ export const OmniChatBar: React.FC = () => {
           }
         }
 
-        finalReply = `${response.reply_message}\n\n✨ [Notion Architect AI 동적 템플릿 제작 완결]\n요청하신 "${targetTemplate.title}" 템플릿의 스키마와 수식이 성공적으로 설계되었습니다. 아래 카드 및 버튼을 통해 캔버스에서 확인하거나 노션으로 즉시 퍼블리시할 수 있습니다.`;
+        finalReply = `${response.reply_message}\n\n✨ [Notion Architect AI 동적 템플릿 제작 완결]\n요청하신 "${targetTemplate.title}" 템플릿의 스키마와 수식이 성공적으로 설계되었습니다.`;
         showToast(`✨ [${targetTemplate.title}] 템플릿이 캔버스에 즉시 투영되었습니다!`, 'success');
         
-        // 템플릿 빌더 라이브 캔버스로 화면 자동 안내
-        setTimeout(() => {
-          setCurrentView('builder');
-        }, 400);
+        // 템플릿 빌더 라이브 캔버스로 화면 즉각 전환 (딜레이 없이 자동 라우팅)
+        setCurrentView('builder');
       } else if (effectiveIntent === 'DEVLAB') {
         receipts = buildReceipts('DEVLAB');
         if (response.payload?.sheetsData) {
@@ -972,7 +1101,7 @@ export const OmniChatBar: React.FC = () => {
             localStorage.setItem('office_sheets_data', JSON.stringify(response.payload.sheetsData));
           } catch {}
         }
-        if (response.redirect_url === '/devlab' && !isBuilderChipActive && !hasFileAttachment && !isTemplateRelated) {
+        if (response.redirect_url === '/devlab' && !isBuilderChipActive && !hasMediaAttachment && !isTemplateRelated) {
           setTimeout(() => {
             setCurrentView('devlab');
             showToast('📊 스마트 시트 라이브 캔버스로 자동 전환되었습니다.', 'info');
@@ -1410,7 +1539,7 @@ export const OmniChatBar: React.FC = () => {
         </div>
       )}
 
-      {/* ── 옴니 챗 입력바 ─────────────────────────────────────────────────── */}
+      {/* ── 옴니 챗 입력바 ── Google AI Studio 감성 프로스트 글래스 & 1px 헤어라인 보더 ─────────────────── */}
       <div
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
@@ -1418,23 +1547,24 @@ export const OmniChatBar: React.FC = () => {
         className={`
           pointer-events-auto
           w-full max-w-2xl mx-auto
-          bg-slate-50 dark:bg-neutral-900
-          border-t border-x border-slate-200 dark:border-neutral-700
-          rounded-t-2xl
-          shadow-[0_-4px_24px_rgba(0,0,0,0.08)]
-          px-3 py-2.5
+          bg-white/70 dark:bg-[#111214]/70
+          backdrop-blur-md
+          border border-zinc-200/80 dark:border-white/10
+          rounded-2xl
+          shadow-lg shadow-black/5 dark:shadow-none
+          px-3.5 py-3
           mb-14 md:mb-0
           transition-all duration-200
-          ${isDragOver ? 'ring-4 ring-amber-400/60 bg-amber-50/50 dark:bg-amber-950/30 border-amber-500' : ''}
+          ${isDragOver ? 'ring-2 ring-amber-400/60 bg-amber-50/70 dark:bg-amber-950/40 border-amber-400' : ''}
         `}
       >
-        {/* 숨겨진 1차 accept 필터링 파일 탐색기 input 태그 */}
+        {/* 숨겨진 1차 accept 필터링 파일 탐색기 input 태그 (이미지 및 문서 화이트리스트 확장) */}
         <input
           ref={fileInputRef}
           type="file"
           onChange={handleFileChange}
           multiple
-          accept=".xlsx,.xls,.csv,.docx,.pdf,.hwpx,.txt,.md"
+          accept=".png,.jpg,.jpeg,.webp,.xlsx,.xls,.csv,.docx,.pdf,.hwpx,.txt,.md"
           className="hidden"
         />
 
@@ -1497,6 +1627,33 @@ export const OmniChatBar: React.FC = () => {
             );
           })}
         </div>
+
+        {/* ── 캡처 이미지 미니 썸네일 뱃지 목록 [ 🖼️ 캡처이미지.png ✕ ] (토스트 팝업 없이 조용히 표시) ── */}
+        {attachedImages.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1.5 mb-2 px-1">
+            {attachedImages.map((img) => (
+              <div
+                key={img.id}
+                className="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-zinc-100/90 dark:bg-zinc-800/90 text-zinc-800 dark:text-zinc-200 border border-zinc-200/80 dark:border-white/10 shadow-2xs backdrop-blur-xs transition group"
+              >
+                <img
+                  src={img.url}
+                  alt={img.name}
+                  className="w-4 h-4 rounded object-cover border border-zinc-300 dark:border-zinc-700"
+                />
+                <span className="truncate max-w-[140px] text-[11px] font-medium">{img.name}</span>
+                <button
+                  type="button"
+                  onClick={() => removeImage(img.id)}
+                  className="ml-0.5 text-zinc-400 hover:text-rose-500 transition cursor-pointer"
+                  title="이미지 삭제"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* 첨부 파일 칩 노출 영역 */}
         {attachedFiles.length > 0 && (
@@ -1566,14 +1723,15 @@ export const OmniChatBar: React.FC = () => {
                 setShowLinkModal(true);
               }}
               disabled={isLoading || isParsingFiles}
-              title="파일 드래그/선택 (우클릭: 웹 링크 첨부)"
+              title="파일/이미지 첨부 (화이트리스트: 이미지, 엑셀, 워드, PDF, 텍스트)"
               className="
                 w-9 h-9 flex items-center justify-center
                 rounded-xl
-                bg-slate-100 dark:bg-neutral-800
-                text-neutral-500 dark:text-neutral-400
-                hover:bg-slate-200 dark:hover:bg-neutral-700
-                transition
+                bg-zinc-100 dark:bg-zinc-800
+                text-zinc-500 dark:text-zinc-400
+                hover:bg-zinc-200 dark:hover:bg-zinc-700
+                hover:text-zinc-900 dark:hover:text-zinc-100
+                transition cursor-pointer
                 disabled:opacity-40 disabled:cursor-not-allowed
               "
             >
@@ -1581,13 +1739,14 @@ export const OmniChatBar: React.FC = () => {
             </button>
           </div>
 
-          {/* 텍스트 입력창 */}
+          {/* 텍스트 입력창 (Ctrl + V 클립보드 이미지 캡처 감지) */}
           <input
             ref={inputRef}
             type="text"
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             onKeyDown={handleKeyDown}
+            onPaste={handlePaste}
             onFocus={() => hasMessages && setIsExpanded(true)}
             placeholder={
               isParsingFiles
@@ -1595,25 +1754,27 @@ export const OmniChatBar: React.FC = () => {
                 : isLoading
                 ? '🧠 Gemini가 요청을 분석하고 화면을 업데이트하고 있습니다...'
                 : isListening
-                ? '🎙️ 단방향 음성 인식 중... (말을 멈춰도 유지됨, 전송 또는 마이크 재클릭)'
+                ? '🎙️ 실시간 음성 인식 중... (말씀을 멈춰도 유지됩니다)'
+                : attachedImages.length > 0
+                ? '📸 캡처 이미지 분석 요청: 변경할 스키마 지시를 입력하세요...'
                 : currentPlaceholder
             }
             disabled={isLoading}
             className="
               flex-1 min-w-0
-              bg-white dark:bg-neutral-800
-              text-neutral-900 dark:text-white
+              bg-zinc-100/80 dark:bg-zinc-800/80
+              text-zinc-900 dark:text-zinc-100
               text-xs sm:text-sm
               rounded-xl px-3.5 py-2.5
-              border border-slate-200 dark:border-neutral-700
-              focus:outline-none focus:ring-2 focus:ring-amber-400/40 dark:focus:ring-amber-500/30
-              placeholder:text-neutral-400 dark:placeholder:text-neutral-500
-              transition
+              border border-zinc-200/60 dark:border-white/10
+              focus:outline-none focus:ring-1 focus:ring-zinc-400 dark:focus:ring-zinc-500
+              placeholder:text-zinc-400 dark:placeholder:text-zinc-500
+              transition-all duration-150
               disabled:opacity-60 disabled:cursor-not-allowed
             "
           />
 
-          {/* 마이크 버튼 — Push-to-Dictate 단방향 연속 음성 버퍼 (빨간색 animate-pulse) */}
+          {/* 마이크 버튼 — Push-to-Dictate 단방향 연속 음성 버퍼 (빨간색 Red Pulse 깜빡임 피드백) */}
           <button
             type="button"
             onClick={toggleListening}
@@ -1622,23 +1783,23 @@ export const OmniChatBar: React.FC = () => {
             className={`
               w-10 h-10 min-w-[40px] shrink-0
               flex items-center justify-center
-              rounded-xl transition
+              rounded-xl transition-all duration-150 cursor-pointer
               disabled:opacity-40 disabled:cursor-not-allowed
               ${isListening
-                ? 'bg-rose-500 text-white animate-pulse ring-4 ring-rose-200 dark:ring-rose-900/50 shadow-lg shadow-rose-500/30'
-                : 'bg-slate-100 dark:bg-neutral-800 text-neutral-500 dark:text-neutral-400 hover:bg-slate-200 dark:hover:bg-neutral-700'
+                ? 'bg-rose-500 text-white animate-pulse ring-4 ring-rose-200 dark:ring-rose-950/50 shadow-md shadow-rose-500/30'
+                : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700'
               }
             `}
           >
             {isListening ? (
-              <MicOff className="w-4 h-4" />
+              <Mic className="w-4 h-4 text-white animate-pulse" />
             ) : (
               <Mic className="w-4 h-4" />
             )}
           </button>
 
           {/* 입력창 및 첨부파일 완전 초기화 'X' 버튼 */}
-          {(inputValue.trim() || attachedFiles.length > 0) && (
+          {(inputValue.trim() || attachedFiles.length > 0 || attachedImages.length > 0) && (
             <button
               type="button"
               onClick={handleClearInput}
@@ -1646,8 +1807,8 @@ export const OmniChatBar: React.FC = () => {
                 w-10 h-10 min-w-[40px] shrink-0
                 flex items-center justify-center
                 rounded-xl transition
-                bg-slate-100 dark:bg-neutral-800
-                text-neutral-400 hover:text-rose-600 dark:hover:text-rose-400
+                bg-zinc-100 dark:bg-zinc-800
+                text-zinc-400 hover:text-rose-600 dark:hover:text-rose-400
                 hover:bg-rose-50 dark:hover:bg-rose-950/40
                 cursor-pointer
               "
@@ -1658,22 +1819,22 @@ export const OmniChatBar: React.FC = () => {
             </button>
           )}
 
-          {/* 전송 버튼 */}
+          {/* 전송 버튼 — 호버 및 액티브 인터랙션 고급화 */}
           <button
             type="button"
             onClick={() => handleSendMessage()}
-            disabled={(!inputValue.trim() && attachedFiles.length === 0) || isLoading || isParsingFiles}
+            disabled={(!inputValue.trim() && attachedFiles.length === 0 && attachedImages.length === 0) || isLoading || isParsingFiles}
             className="
               w-10 h-10 min-w-[40px] shrink-0
               flex items-center justify-center
-              rounded-xl transition active:scale-95
-              bg-neutral-900 dark:bg-white
-              text-white dark:text-neutral-900
-              disabled:opacity-30 disabled:cursor-not-allowed
-              hover:opacity-90
-              shadow-xs
+              rounded-xl transition-all duration-150 active:scale-95 cursor-pointer
+              bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900
+              hover:bg-zinc-800 dark:hover:bg-white
+              hover:shadow-md active:shadow-xs
+              disabled:opacity-30 disabled:cursor-not-allowed disabled:active:scale-100
+              shadow-xs font-bold
             "
-            title="전송"
+            title="전송 (Enter)"
           >
             {isLoading ? (
               <Loader2 className="w-4 h-4 animate-spin text-amber-500" />
@@ -1689,10 +1850,10 @@ export const OmniChatBar: React.FC = () => {
               className="
                 shrink-0 flex items-center space-x-1
                 px-2.5 py-1.5 rounded-xl
-                bg-slate-100 dark:bg-neutral-800
-                text-xs font-medium text-neutral-500 dark:text-neutral-400
-                hover:bg-slate-200 dark:hover:bg-neutral-700
-                transition
+                bg-zinc-100 dark:bg-zinc-800
+                text-xs font-medium text-zinc-500 dark:text-zinc-400
+                hover:bg-zinc-200 dark:hover:bg-zinc-700
+                transition cursor-pointer
               "
               title="채팅 기록 보기"
             >
@@ -1706,7 +1867,7 @@ export const OmniChatBar: React.FC = () => {
             <button
               type="button"
               onClick={() => setIsExpanded(false)}
-              className="shrink-0 p-1.5 rounded-xl text-neutral-400 hover:text-neutral-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-neutral-800 transition"
+              className="shrink-0 p-1.5 rounded-xl text-zinc-400 hover:text-zinc-700 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition cursor-pointer"
               aria-label="피드 접기"
               title="피드 접기"
             >
@@ -1718,4 +1879,7 @@ export const OmniChatBar: React.FC = () => {
     </div>
   );
 };
+
+export const NoaChatBar = OmniChatBar;
+export default OmniChatBar;
 
