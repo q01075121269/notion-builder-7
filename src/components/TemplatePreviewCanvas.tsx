@@ -30,14 +30,28 @@ import {
   Code2,
   Share2,
   ChevronLeft,
-  RotateCcw
+  RotateCcw,
+  Undo2,
+  Save,
+  History,
+  Clock,
+  Check
 } from 'lucide-react';
 
 export interface TemplatePreviewCanvasProps {
   template: NotionTemplate | null;
 }
 
+export interface TemplateHistoryEntry {
+  id: string;
+  version: number;
+  label: string;
+  timestamp: string;
+  template: NotionTemplate;
+}
+
 const VAULT_STORAGE_KEY = 'notion_template_vault_draft';
+const DRAFT_STORAGE_KEY = 'notion_architect_draft_template';
 
 export const TemplatePreviewCanvas: React.FC<TemplatePreviewCanvasProps> = ({ template: rawTemplate }) => {
   const { 
@@ -76,31 +90,158 @@ export const TemplatePreviewCanvas: React.FC<TemplatePreviewCanvasProps> = ({ te
     return ensureTemplateAgentBlueprint(template);
   });
 
+  // ─── [작업 히스토리 스택 (Undo / Version History) 상태 신설] ─────────────────
+  const [templateHistory, setTemplateHistory] = useState<TemplateHistoryEntry[]>([]);
+  const [historyIndex, setHistoryIndex] = useState<number>(-1);
+  const [lastSavedNotice, setLastSavedNotice] = useState<string | null>(null);
+  const [isVersionDropdownOpen, setIsVersionDropdownOpen] = useState<boolean>(false);
+  const [recoveryDraft, setRecoveryDraft] = useState<{
+    template: NotionTemplate;
+    savedAt: number;
+    timeString: string;
+  } | null>(null);
+
   // [Clean Wipe & Canvas Reset Listener]
   useEffect(() => {
     const handleReset = () => {
       setEditableTemplate(null);
+      setTemplateHistory([]);
+      setHistoryIndex(-1);
       try {
         localStorage.removeItem(VAULT_STORAGE_KEY);
         localStorage.removeItem('notion_template_cache');
+        localStorage.removeItem(DRAFT_STORAGE_KEY);
       } catch {}
     };
     window.addEventListener('canvas:reset', handleReset);
     return () => window.removeEventListener('canvas:reset', handleReset);
   }, []);
 
-  // template prop이 외부에서 완전히 변경되었을 때
+  // [히스토리 스택 스냅샷 등록 헬퍼]
+  const pushHistoryEntry = (newTpl: NotionTemplate, label: string) => {
+    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    setTemplateHistory(prev => {
+      const base = historyIndex >= 0 ? prev.slice(0, historyIndex + 1) : [];
+      const nextVer = (base[base.length - 1]?.version || 0) + 1;
+      const newEntry: TemplateHistoryEntry = {
+        id: `v${nextVer}-${Date.now()}`,
+        version: nextVer,
+        label,
+        timestamp: timeStr,
+        template: JSON.parse(JSON.stringify(newTpl))
+      };
+      const nextHistory = [...base, newEntry].slice(-25); // 최대 25개 보관
+      setHistoryIndex(nextHistory.length - 1);
+      return nextHistory;
+    });
+  };
+
+  // [최초 자동 저장]: 템플릿이 처음 로드되거나 신규 생성되는 순간 history[0] (v1 - 초기 원본)으로 스냅샷 등록
   useEffect(() => {
     if (!template) {
       setEditableTemplate(null);
+      setTemplateHistory([]);
+      setHistoryIndex(-1);
     } else {
       const updated = ensureTemplateAgentBlueprint(template);
       setEditableTemplate(updated);
       if (updated.databases.length > 0) {
         setSelectedDbId(updated.databases[0].name);
       }
+      const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      const initialEntry: TemplateHistoryEntry = {
+        id: `v1-${Date.now()}`,
+        version: 1,
+        label: '최초 원본',
+        timestamp: timeStr,
+        template: JSON.parse(JSON.stringify(updated))
+      };
+      setTemplateHistory([initialEntry]);
+      setHistoryIndex(0);
     }
   }, [template]);
+
+  // [새로고침/재진입 감지]: 이전 작업 초안 세이프가드 감지
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(DRAFT_STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed?.template && parsed.template.title) {
+          // 기존 원본과 제목이나 구조가 다를 때 복구 배너 노출
+          if (!template || JSON.stringify(parsed.template) !== JSON.stringify(template)) {
+            setRecoveryDraft(parsed);
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Recovery draft check failed', e);
+    }
+  }, []);
+
+  // [2초 디바운스 자동 세이프가드]: 템플릿 변경 시 로컬 초안에 자동 동기화
+  useEffect(() => {
+    if (!editableTemplate) return;
+    const timer = setTimeout(() => {
+      try {
+        const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const payload = {
+          template: editableTemplate,
+          savedAt: Date.now(),
+          timeString: timeStr
+        };
+        localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(payload));
+        setLastSavedNotice(`임시 저장됨 (${timeStr})`);
+      } catch (e) {
+        console.warn('Auto draft sync failed', e);
+      }
+    }, 2000);
+    return () => clearTimeout(timer);
+  }, [editableTemplate]);
+
+  // [↩️ 되돌리기 (Undo) 핸들러]: 직전 상태로 즉시 롤백 (historyIndex > 0)
+  const handleUndo = () => {
+    if (historyIndex > 0) {
+      const prevIdx = historyIndex - 1;
+      const targetEntry = templateHistory[prevIdx];
+      if (targetEntry) {
+        setHistoryIndex(prevIdx);
+        setEditableTemplate(JSON.parse(JSON.stringify(targetEntry.template)));
+        showToast(`↩️ '${targetEntry.label}' (v${targetEntry.version}) 시점으로 되돌렸습니다.`, 'info');
+      }
+    }
+  };
+
+  // [💾 중간 저장 (Save) 핸들러]: 현재 상태를 localStorage에 즉시 저장
+  const handleSaveCheckpoint = () => {
+    if (!editableTemplate) return;
+    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    try {
+      const payload = {
+        template: editableTemplate,
+        savedAt: Date.now(),
+        timeString: timeStr
+      };
+      localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(payload));
+      setLastSavedNotice(`임시 저장되었습니다 (${timeStr})`);
+      pushHistoryEntry(editableTemplate, '중간 저장본');
+      showToast(`💾 임시 저장되었습니다 (${timeStr})`, 'success');
+    } catch (e) {
+      console.error('Failed to save checkpoint', e);
+      showToast('임시 저장에 실패했습니다.', 'error');
+    }
+  };
+
+  // [⏱️ 버전 복구 (Restore) 핸들러]: 특정 시점 데이터로 캔버스 즉각 원상 복구
+  const handleRestoreVersion = (index: number) => {
+    const target = templateHistory[index];
+    if (target) {
+      setHistoryIndex(index);
+      setEditableTemplate(JSON.parse(JSON.stringify(target.template)));
+      setIsVersionDropdownOpen(false);
+      showToast(`⏱️ '${target.label}' (v${target.version}) 시점으로 복원되었습니다.`, 'success');
+    }
+  };
 
   // 변경 시 Memory Vault (localStorage) 자동 지속 보존
   useEffect(() => {
@@ -359,6 +500,47 @@ export const TemplatePreviewCanvas: React.FC<TemplatePreviewCanvasProps> = ({ te
         className="h-full min-h-0"
         mainContent={({ isCollapsed, toggleCollapse }) => (
           <div className="flex flex-col h-full min-h-0 w-full overflow-hidden bg-white dark:bg-zinc-950">
+            {/* [세이프가드 복구 배너]: 이전에 작업 중이던 템플릿 초안 감지 시 노출 */}
+            {recoveryDraft && (
+              <div className="px-4 py-2 bg-gradient-to-r from-amber-500/15 via-zinc-100 dark:via-zinc-800 to-transparent border-b border-amber-400/40 dark:border-amber-500/30 flex items-center justify-between text-xs text-zinc-800 dark:text-zinc-200 z-30 shrink-0">
+                <div className="flex items-center space-x-2">
+                  <RotateCcw className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 animate-pulse" />
+                  <span>
+                    이전에 작업 중이던 템플릿 초안(<strong>{recoveryDraft.template.title}</strong>, {recoveryDraft.timeString || '최근 저장'})이 있습니다. 불러오시겠습니까?
+                  </span>
+                </div>
+                <div className="flex items-center space-x-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const restored = normalizeTemplatePayload(recoveryDraft.template);
+                      if (restored) {
+                        pushHistoryEntry(restored, '복구된 초안');
+                        setEditableTemplate(restored);
+                        showToast('이전 작업 초안을 성공적으로 불러왔습니다.', 'success');
+                      }
+                      setRecoveryDraft(null);
+                    }}
+                    className="px-2.5 py-1 rounded-md bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 text-[11px] font-bold hover:opacity-90 transition cursor-pointer shadow-xs"
+                  >
+                    초안 불러오기
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRecoveryDraft(null);
+                      try {
+                        localStorage.removeItem(DRAFT_STORAGE_KEY);
+                      } catch {}
+                    }}
+                    className="px-2 py-1 rounded-md text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200 text-[11px] transition cursor-pointer"
+                  >
+                    닫기
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* 1. 상단 툴바: 은은한 실버/아연 그라데이션 & 메탈릭 미니멀 룩 (뷰 전환 및 공유/배포) */}
             <div className="h-11 px-3 sm:px-6 bg-gradient-to-r from-zinc-100 via-slate-100 to-zinc-200 dark:from-zinc-900 dark:via-zinc-850 dark:to-zinc-800 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between gap-2 shrink-0 select-none z-20">
               <div className="flex items-center space-x-2 shrink-0">
@@ -386,6 +568,94 @@ export const TemplatePreviewCanvas: React.FC<TemplatePreviewCanvasProps> = ({ te
                     <GitBranch className="w-3.5 h-3.5" />
                     <span>구조 트리</span>
                   </button>
+                </div>
+
+                {/* [↩️ 되돌리기] & [💾 중간 저장] & [⏱️ 버전 이력] 액션 바 */}
+                <div className="flex items-center space-x-1 bg-white/80 dark:bg-zinc-800/80 p-0.5 rounded-lg border border-zinc-300 dark:border-zinc-700">
+                  {/* [↩️ 되돌리기 (Undo)] */}
+                  <button
+                    type="button"
+                    onClick={handleUndo}
+                    disabled={historyIndex <= 0}
+                    className="flex items-center space-x-1 px-2 py-1 rounded-md text-xs font-semibold text-zinc-700 dark:text-zinc-200 hover:bg-zinc-200/60 dark:hover:bg-zinc-700 disabled:opacity-35 disabled:cursor-not-allowed transition cursor-pointer"
+                    title={historyIndex > 0 ? "직전 변경 상태로 되돌리기 (Undo)" : "되돌릴 변경 이력이 없습니다"}
+                  >
+                    <Undo2 className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">되돌리기</span>
+                  </button>
+
+                  {/* [💾 중간 저장 (Save)] */}
+                  <button
+                    type="button"
+                    onClick={handleSaveCheckpoint}
+                    className="flex items-center space-x-1 px-2.5 py-1 rounded-md text-xs font-semibold text-zinc-700 dark:text-zinc-200 hover:bg-zinc-200/60 dark:hover:bg-zinc-700 transition cursor-pointer"
+                    title="현재 템플릿 상태를 로컬 체크포인트에 즉시 저장합니다"
+                  >
+                    <Save className="w-3.5 h-3.5 text-zinc-600 dark:text-zinc-300" />
+                    <span className="hidden sm:inline">중간 저장</span>
+                  </button>
+
+                  {/* [⏱️ 버전 복구 (Restore)] 드롭다운 */}
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setIsVersionDropdownOpen(prev => !prev)}
+                      className="flex items-center space-x-1 px-2 py-1 rounded-md text-xs font-semibold text-zinc-700 dark:text-zinc-200 hover:bg-zinc-200/60 dark:hover:bg-zinc-700 transition cursor-pointer"
+                      title="버전 히스토리 확인 및 원하는 시점으로 복원"
+                    >
+                      <History className="w-3.5 h-3.5 text-zinc-600 dark:text-zinc-300" />
+                      <span className="hidden md:inline">버전 이력</span>
+                      {templateHistory.length > 0 && (
+                        <span className="ml-0.5 px-1.5 py-0.2 rounded-full bg-zinc-200 dark:bg-zinc-700 text-[10px] font-mono font-bold">
+                          v{historyIndex >= 0 && templateHistory[historyIndex] ? templateHistory[historyIndex].version : templateHistory.length}
+                        </span>
+                      )}
+                    </button>
+
+                    {isVersionDropdownOpen && (
+                      <div className="absolute left-0 top-full mt-1.5 w-72 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl shadow-xl z-50 p-2 text-xs divide-y divide-zinc-100 dark:divide-zinc-800">
+                        <div className="p-2 font-bold text-zinc-700 dark:text-zinc-200 flex items-center justify-between">
+                          <span className="flex items-center space-x-1.5">
+                            <Clock className="w-3.5 h-3.5 text-zinc-500" />
+                            <span>버전 이력 ({templateHistory.length})</span>
+                          </span>
+                          <span className="text-[10px] text-zinc-400 font-normal">선택 시 즉각 복원</span>
+                        </div>
+                        <div className="max-h-60 overflow-y-auto py-1 space-y-1">
+                          {templateHistory.length === 0 ? (
+                            <div className="p-3 text-center text-zinc-400">기록된 버전이 없습니다.</div>
+                          ) : (
+                            templateHistory.map((item, idx) => {
+                              const isCurrent = idx === historyIndex;
+                              return (
+                                <button
+                                  key={item.id}
+                                  type="button"
+                                  onClick={() => handleRestoreVersion(idx)}
+                                  className={`w-full text-left px-2.5 py-1.5 rounded-lg flex items-center justify-between transition cursor-pointer ${
+                                    isCurrent
+                                      ? 'bg-zinc-100 dark:bg-zinc-800 font-bold text-zinc-900 dark:text-white ring-1 ring-zinc-300 dark:ring-zinc-600'
+                                      : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800/60'
+                                  }`}
+                                >
+                                  <div className="flex items-center space-x-1.5 truncate">
+                                    <span className="px-1.5 py-0.5 rounded bg-zinc-200 dark:bg-zinc-700 text-[10px] font-mono shrink-0">
+                                      v{item.version}
+                                    </span>
+                                    <span className="truncate">{item.label}</span>
+                                  </div>
+                                  <div className="flex items-center space-x-1.5 shrink-0 text-[10px] text-zinc-400">
+                                    <span>{item.timestamp}</span>
+                                    {isCurrent && <span className="text-emerald-500 font-bold text-xs">●</span>}
+                                  </div>
+                                </button>
+                              );
+                            })
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -494,6 +764,16 @@ export const TemplatePreviewCanvas: React.FC<TemplatePreviewCanvasProps> = ({ te
 
               {/* KPI 5: 무손실 검증 상태 뱃지 & Memory Vault 상태 */}
               <div className="flex items-center space-x-2 shrink-0">
+                {lastSavedNotice && (
+                  <span 
+                    className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-emerald-100/90 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800 whitespace-nowrap animate-fade-in"
+                    title={lastSavedNotice}
+                  >
+                    <Check className="w-3 h-3 mr-1 text-emerald-600 dark:text-emerald-400" />
+                    {lastSavedNotice}
+                  </span>
+                )}
+
                 <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-zinc-200 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 border border-zinc-300 dark:border-zinc-700 whitespace-nowrap">
                   <ShieldCheck className="w-3 h-3 mr-1 text-zinc-600 dark:text-zinc-300" />
                   무손실 검증: PASS
@@ -721,6 +1001,7 @@ export const TemplatePreviewCanvas: React.FC<TemplatePreviewCanvasProps> = ({ te
               handleApplySkill(instruction, '인스펙터 스키마 지시');
             }}
             onApplyTemplateUpdate={(updatedTemplate) => {
+              pushHistoryEntry(updatedTemplate, 'AI 인스펙터 수정');
               setEditableTemplate(updatedTemplate);
             }}
             isCollapsed={isCollapsed}

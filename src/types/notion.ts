@@ -27,10 +27,13 @@ export interface NotionProperty {
 
 export interface NotionDatabase {
   name: string;
+  icon?: string;
   description?: string;
-  view_type?: 'table' | 'board' | 'calendar' | 'gallery' | 'list' | 'dashboard';
+  view_type?: 'table' | 'board' | 'calendar' | 'gallery' | 'list' | 'dashboard' | 'timeline';
+  views?: Array<{ id: string; type: string; name: string }>;
   properties: NotionProperty[];
   sample_rows?: Array<Record<string, any>>;
+  [key: string]: any;
 }
 
 export type BlockType = 
