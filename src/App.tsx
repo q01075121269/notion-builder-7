@@ -60,7 +60,7 @@ export const MainApp: React.FC = () => {
         <Navbar />
         
         {/* 뷰 모드 분기: 홈 대시보드 vs 템플릿 빌더 vs 라이프 허브 vs 개발 랩 vs AI 미디어 랩 vs 내 보관함 vs 1초 퀵 캡처 */}
-        <main className="flex-1 flex flex-col overflow-hidden pb-28 md:pb-16">
+        <main className={`flex-1 flex flex-col overflow-hidden ${currentView === 'home' ? '' : 'pb-28 md:pb-16'}`}>
           {currentView === 'home' ? (
             <HomePage />
           ) : currentView === 'builder' ? (
@@ -80,8 +80,8 @@ export const MainApp: React.FC = () => {
           )}
         </main>
         
-        {/* 중앙 옴니 챗바 — 전역 하단 고정 (모든 뷰에서 공통 사용) */}
-        <OmniChatBar />
+        {/* 중앙 옴니 챗바 — 홈 화면을 제외한 작업실 뷰에서 전역 하단 고정 사용 */}
+        {currentView !== 'home' && <OmniChatBar />}
 
         {/* 모바일 하단 탭바 (빌더 / 보관함 / 퀵캡처) */}
         <BottomNavbar />

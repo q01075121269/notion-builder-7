@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import type { GeminiModelType } from '../../types/chat';
-import { Bot, ChevronDown, Lock, Info, Check } from 'lucide-react';
+import { Bot, ChevronDown, Check, Sparkles } from 'lucide-react';
 
 export interface ModelConfig {
   id: GeminiModelType;
@@ -11,10 +11,9 @@ export interface ModelConfig {
   icon: string;
   badge?: string;
   isLocked: boolean;
-  tierLabel?: string;
 }
 
-export const GEMINI_2026_MODELS: ModelConfig[] = [
+export const GEMINI_PRIMARY_MODELS: ModelConfig[] = [
   {
     id: 'gemini-3.5-flash-lite',
     name: '⚡ 3.5 Flash-Lite',
@@ -38,28 +37,24 @@ export const GEMINI_2026_MODELS: ModelConfig[] = [
     shortName: '3.1 Pro',
     description: '고급 추론 (다중 관계형 DB, Formulas 2.0 수식 설계)',
     icon: '🧠',
-    isLocked: true,
-    tierLabel: 'Pro 플랜',
-  },
-  {
-    id: 'gemini-3.1-thinking',
-    name: '🔬 확장된 사고 모델',
-    shortName: '확장 사고',
-    description: '복잡한 문제 해결 (시스템 아키텍처 자가 진단 및 심층 추론)',
-    icon: '🔬',
-    isLocked: true,
-    tierLabel: 'Ultra/종량',
+    isLocked: false,
   },
 ];
 
 export const ModelSelector: React.FC = () => {
-  const { selectedModel, setSelectedModel, showToast } = useApp();
+  const { 
+    selectedModel, 
+    setSelectedModel, 
+    isThinkingEnabled, 
+    toggleThinking, 
+    showToast 
+  } = useApp();
+
   const [isOpen, setIsOpen] = useState(false);
-  const [hoveredModel, setHoveredModel] = useState<ModelConfig | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   // 현재 선택된 모델 정보 탐색 (Fallback: 3.8 Flash)
-  const currentConfig = GEMINI_2026_MODELS.find(m => m.id === selectedModel) || GEMINI_2026_MODELS[1];
+  const currentConfig = GEMINI_PRIMARY_MODELS.find(m => m.id === selectedModel) || GEMINI_PRIMARY_MODELS[1];
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -72,14 +67,6 @@ export const ModelSelector: React.FC = () => {
   }, []);
 
   const handleSelectModel = (config: ModelConfig) => {
-    if (config.isLocked) {
-      showToast(
-        '현재 무료 API 키 범위를 초과하는 상위 모델입니다. Google AI Studio 유료 플랜 또는 상위 구독 키가 필요합니다.',
-        'info'
-      );
-      return;
-    }
-
     setSelectedModel(config.id);
     if (typeof window !== 'undefined') {
       localStorage.setItem('selected_gemini_model', config.id);
@@ -89,100 +76,150 @@ export const ModelSelector: React.FC = () => {
     setIsOpen(false);
   };
 
+  const handleToggleThinking = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    toggleThinking();
+    const nextState = !isThinkingEnabled;
+    if (nextState) {
+      showToast('🔬 확장된 사고 모델 (Thinking Engine 2.0)이 활성화되었습니다.', 'success');
+    } else {
+      showToast('🔬 확장된 사고 모델이 비활성화되었습니다.', 'info');
+    }
+  };
+
   return (
     <div className="relative shrink-0 z-50 overflow-visible" ref={containerRef}>
       {/* 헤더 모델 셀렉터 토글 버튼 */}
       <button
         type="button"
         onClick={() => setIsOpen(prev => !prev)}
-        className="flex items-center space-x-1.5 px-2 sm:px-2.5 py-1.5 rounded-xl border border-neutral-200 dark:border-neutral-700/80 bg-neutral-50/80 dark:bg-neutral-800/80 hover:bg-neutral-100 dark:hover:bg-neutral-700/90 text-neutral-700 dark:text-neutral-200 text-xs font-semibold transition whitespace-nowrap cursor-pointer shadow-2xs"
-        title="2026 최신 Gemini AI 모델 선택 (구글 공식 라인업)"
+        className="flex items-center space-x-1.5 px-2.5 py-1.5 rounded-xl border border-neutral-200 dark:border-neutral-700/80 bg-neutral-50/80 dark:bg-neutral-800/80 hover:bg-neutral-100 dark:hover:bg-neutral-700/90 text-neutral-700 dark:text-neutral-200 text-xs font-semibold transition whitespace-nowrap cursor-pointer shadow-2xs"
+        title="2026 최신 Gemini AI 모델 선택 (구글 공식 2단 라인업)"
       >
         <Bot className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
         <span className="hidden lg:inline font-extrabold">{currentConfig.name}</span>
         <span className="lg:hidden font-extrabold">{currentConfig.shortName}</span>
+
+        {isThinkingEnabled && (
+          <span className="px-1.5 py-0.2 rounded-full text-[9px] font-black bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+            사고ON
+          </span>
+        )}
+
         <ChevronDown className={`w-3 h-3 text-neutral-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
       </button>
 
-      {/* 모델 선택 드롭다운 팝오버 (z-[9999] 최상위 배치) */}
+      {/* 구글 공식 2단 구조 드롭다운 팝오버 (z-[9999] 최상위 배치) */}
       {isOpen && (
-        <div className="absolute right-0 top-full mt-2 w-80 bg-white dark:bg-notion-dark-card border border-slate-200 dark:border-neutral-700 rounded-xl shadow-2xl p-2 z-[9999] flex flex-col gap-1 animate-fadeIn">
-          <div className="px-2.5 py-1.5 border-b border-neutral-100 dark:border-neutral-800 flex items-center justify-between">
-            <span className="text-[11px] font-black text-neutral-400 dark:text-neutral-500 uppercase tracking-wider">
-              2026 Gemini AI 모델 셀렉터
+        <div className="absolute right-0 top-full mt-2 w-84 bg-white dark:bg-notion-dark-card border border-slate-200 dark:border-neutral-700 rounded-2xl shadow-2xl p-2.5 z-[9999] flex flex-col gap-2 animate-fadeIn select-none">
+          {/* 드롭다운 상단 타이틀 */}
+          <div className="px-2 py-1 border-b border-neutral-100 dark:border-neutral-800 flex items-center justify-between">
+            <span className="text-[11px] font-black text-neutral-400 dark:text-neutral-500 uppercase tracking-wider flex items-center space-x-1">
+              <Sparkles className="w-3 h-3 text-amber-500" />
+              <span>2026 Gemini AI 모델 셀렉터</span>
             </span>
             <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 font-bold">
-              Google AI Official
+              Google Official
             </span>
           </div>
 
-          <div className="space-y-1 pt-1">
-            {GEMINI_2026_MODELS.map((m) => {
+          {/* 1단: 기본 모델 선택 라디오 리스트 */}
+          <div className="space-y-1">
+            <div className="px-2 pt-1 text-[10px] font-bold text-neutral-400 dark:text-neutral-500 uppercase">
+              1단: 기본 AI 엔진 선택
+            </div>
+            {GEMINI_PRIMARY_MODELS.map((m) => {
               const isSelected = selectedModel === m.id;
               return (
-                <div key={m.id} className="relative group">
-                  <button
-                    type="button"
-                    onClick={() => handleSelectModel(m)}
-                    onMouseEnter={() => setHoveredModel(m)}
-                    onMouseLeave={() => setHoveredModel(null)}
-                    className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl transition text-left text-xs ${
-                      m.isLocked
-                        ? 'opacity-50 hover:bg-neutral-100/50 dark:hover:bg-neutral-800/30 cursor-not-allowed'
-                        : isSelected
-                        ? 'bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 font-bold shadow-xs'
-                        : 'text-neutral-800 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer'
-                    }`}
-                  >
-                    <div className="flex items-center space-x-2 min-w-0 pr-2">
-                      <span className="text-base shrink-0">{m.icon}</span>
-                      <div className="truncate">
-                        <div className="flex items-center space-x-1.5">
-                          <span className="font-bold truncate">{m.name}</span>
-                          {m.badge && (
-                            <span className={`text-[9px] px-1.5 py-0.2 rounded font-extrabold ${
-                              isSelected 
-                                ? 'bg-amber-400 text-neutral-900' 
-                                : 'bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300'
-                            }`}>
-                              {m.badge}
-                            </span>
-                          )}
-                        </div>
-                        <p className={`text-[10px] truncate ${
-                          isSelected ? 'text-neutral-300 dark:text-neutral-600' : 'text-neutral-500 dark:text-neutral-400'
-                        }`}>
-                          {m.description}
-                        </p>
+                <button
+                  key={m.id}
+                  type="button"
+                  onClick={() => handleSelectModel(m)}
+                  className={`w-full flex items-center justify-between px-3 py-2 rounded-xl transition text-left text-xs ${
+                    isSelected
+                      ? 'bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 font-bold shadow-xs'
+                      : 'text-neutral-800 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer'
+                  }`}
+                >
+                  <div className="flex items-center space-x-2.5 min-w-0 pr-2">
+                    <span className="text-base shrink-0">{m.icon}</span>
+                    <div className="truncate">
+                      <div className="flex items-center space-x-1.5">
+                        <span className="font-bold truncate">{m.name}</span>
+                        {m.badge && (
+                          <span className={`text-[9px] px-1.5 py-0.2 rounded font-extrabold ${
+                            isSelected 
+                              ? 'bg-amber-400 text-neutral-900' 
+                              : 'bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300'
+                          }`}>
+                            {m.badge}
+                          </span>
+                        )}
                       </div>
+                      <p className={`text-[10px] truncate ${
+                        isSelected ? 'text-neutral-300 dark:text-neutral-600' : 'text-neutral-500 dark:text-neutral-400'
+                      }`}>
+                        {m.description}
+                      </p>
                     </div>
+                  </div>
 
-                    <div className="shrink-0 flex items-center space-x-1 ml-1">
-                      {m.isLocked ? (
-                        <div className="flex items-center space-x-1 text-rose-500 dark:text-rose-400 font-extrabold text-[10px] bg-rose-50 dark:bg-rose-950/60 px-2 py-0.5 rounded-full border border-rose-200 dark:border-rose-900">
-                          <Lock className="w-3 h-3" />
-                          <span>{m.tierLabel}</span>
-                        </div>
-                      ) : isSelected ? (
-                        <Check className="w-4 h-4 text-emerald-400 dark:text-emerald-600" />
-                      ) : null}
-                    </div>
-                  </button>
-
-                  {/* 구글 공식 설명 툴팁 (마우스 호버 시 세부 안내) */}
-                  {hoveredModel?.id === m.id && (
-                    <div className="absolute left-0 right-0 -bottom-10 z-50 p-2 rounded-lg bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900 text-[10px] shadow-lg border border-neutral-700 dark:border-neutral-300 pointer-events-none animate-fadeIn flex items-center space-x-1.5">
-                      <Info className="w-3 h-3 text-amber-400 shrink-0" />
-                      <span>{m.description}</span>
-                    </div>
-                  )}
-                </div>
+                  <div className="shrink-0 ml-1">
+                    {isSelected && (
+                      <Check className="w-4 h-4 text-emerald-400 dark:text-emerald-600" />
+                    )}
+                  </div>
+                </button>
               );
             })}
           </div>
 
-          <div className="pt-2 pb-1 px-2 border-t border-neutral-100 dark:border-neutral-800 text-[10px] text-neutral-400 dark:text-neutral-500 leading-normal">
-            💡 Pro & 사고 모델은 Google AI Studio 유료 플랜 계정 키 연동 시 활성화됩니다.
+          {/* 1단과 2단 구분선 */}
+          <div className="border-t border-slate-100 dark:border-neutral-800 my-0.5" />
+
+          {/* 2단: 부가 기능 독립 토글 (확장된 사고 모델) */}
+          <div className="space-y-1">
+            <div className="px-2 text-[10px] font-bold text-neutral-400 dark:text-neutral-500 uppercase">
+              2단: 부가 추론 엔진 옵션
+            </div>
+            
+            <div 
+              onClick={handleToggleThinking}
+              className="group p-2.5 rounded-xl bg-slate-50 dark:bg-neutral-800/60 border border-slate-200/80 dark:border-neutral-700/80 hover:border-purple-300 dark:hover:border-purple-700 transition flex items-center justify-between cursor-pointer"
+            >
+              <div className="flex items-start space-x-2.5 min-w-0 pr-2">
+                <span className="text-base shrink-0">🔬</span>
+                <div className="min-w-0">
+                  <div className="flex items-center space-x-1.5">
+                    <span className="text-xs font-bold text-neutral-900 dark:text-white group-hover:text-purple-600 dark:group-hover:text-purple-400 transition">
+                      확장된 사고 모델
+                    </span>
+                    <span className="text-[9px] px-1.5 py-0.2 rounded font-extrabold bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300">
+                      Thinking 2.0
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-neutral-500 dark:text-neutral-400 leading-tight mt-0.5">
+                    복잡한 문제 해결 (시스템 자가 진단 및 심층 추론 엔진 가동)
+                  </p>
+                </div>
+              </div>
+
+              {/* 스위치 토글 버튼 */}
+              <button
+                type="button"
+                onClick={handleToggleThinking}
+                className={`w-10 h-6 rounded-full transition-colors p-0.5 flex items-center shrink-0 cursor-pointer ${
+                  isThinkingEnabled ? 'bg-purple-600 justify-end' : 'bg-neutral-300 dark:bg-neutral-700 justify-start'
+                }`}
+                title={isThinkingEnabled ? '확장 사고 모델 끄기' : '확장 사고 모델 켜기'}
+              >
+                <div className="w-5 h-5 rounded-full bg-white shadow-md transform transition-transform" />
+              </button>
+            </div>
+          </div>
+
+          <div className="pt-1.5 px-2 text-[10px] text-neutral-400 dark:text-neutral-500 leading-tight border-t border-neutral-100 dark:border-neutral-800">
+            💡 기본 AI 엔진에 심층 사고(Thinking Engine) 옵션을 자유롭게 켜고 끌 수 있습니다.
           </div>
         </div>
       )}

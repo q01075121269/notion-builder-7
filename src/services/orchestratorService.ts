@@ -32,10 +32,14 @@ export async function sendToOrchestrator(
   userEmail?: string,
   model?: GeminiModelType,
   currentMode?: string,
-  fileContextList?: FileContextItem[]
+  fileContextList?: FileContextItem[],
+  thinking?: boolean
 ): Promise<OrchestratorResponse> {
   const geminiKey = apiKey || (typeof window !== 'undefined' ? localStorage.getItem('gemini_api_key') || '' : '');
   const notionKey = typeof window !== 'undefined' ? localStorage.getItem('notion_api_key') || '' : '';
+  const isThinking = thinking !== undefined 
+    ? thinking 
+    : (typeof window !== 'undefined' ? localStorage.getItem('gemini_thinking_enabled') === 'true' : false);
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -73,6 +77,7 @@ export async function sendToOrchestrator(
     text: enrichedText,
     file_context_list: fileContextList,
     model: model || 'auto',
+    thinking: isThinking,
     current_mode: currentMode || 'builder',
     conversation_history: history.slice(-6).map((h) => ({
       role: h.role,

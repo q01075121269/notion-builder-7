@@ -36,6 +36,9 @@ interface AppContextType {
   toggleDarkMode: () => void;
   selectedModel: GeminiModelType;
   setSelectedModel: (model: GeminiModelType) => void;
+  isThinkingEnabled: boolean;
+  setIsThinkingEnabled: (enabled: boolean) => void;
+  toggleThinking: () => void;
   apiKey: string;
   setApiKey: (key: string) => void;
 
@@ -169,7 +172,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   // Gemini Model & API Key
   const [selectedModel, setSelectedModelState] = useState<GeminiModelType>(() => {
     const saved = (localStorage.getItem('selected_gemini_model') || localStorage.getItem('gemini_selected_model')) as GeminiModelType;
-    if (saved && (saved === 'gemini-3.5-flash-lite' || saved === 'gemini-3.8-flash')) return saved;
+    if (saved && (saved === 'gemini-3.5-flash-lite' || saved === 'gemini-3.8-flash' || saved === 'gemini-3.1-pro')) return saved;
     return 'gemini-3.8-flash';
   });
 
@@ -177,6 +180,26 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setSelectedModelState(model);
     localStorage.setItem('selected_gemini_model', model);
     localStorage.setItem('gemini_selected_model', model);
+  };
+
+  // 2026 확장된 사고 모델 (Thinking Switch) 상태
+  const [isThinkingEnabled, setIsThinkingEnabledState] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('gemini_thinking_enabled') === 'true';
+    }
+    return false;
+  });
+
+  const setIsThinkingEnabled = (enabled: boolean) => {
+    setIsThinkingEnabledState(enabled);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('gemini_thinking_enabled', enabled ? 'true' : 'false');
+    }
+  };
+
+  const toggleThinking = () => {
+    const next = !isThinkingEnabled;
+    setIsThinkingEnabled(next);
   };
   const [apiKey, setApiKeyState] = useState<string>(() => {
     return localStorage.getItem('gemini_api_key') || import.meta.env.VITE_GEMINI_API_KEY || '';
@@ -818,6 +841,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         toggleDarkMode,
         selectedModel,
         setSelectedModel,
+        isThinkingEnabled,
+        setIsThinkingEnabled,
+        toggleThinking,
         apiKey,
         setApiKey,
         currentView,

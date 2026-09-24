@@ -115,17 +115,19 @@ export const HomePage: React.FC = () => {
 
   // Quick Starters 유도 칩 클릭 핸들러
   const handleQuickStarter = (promptText: string) => {
-    setInputPrompt(promptText);
-    sendMessage(promptText);
     setInputPrompt('');
+    sendMessage(promptText);
   };
 
-  // 입력 전송 핸들러
+  // 입력 전송 핸들러 (전송 즉시 자동 초기화)
   const handleSend = () => {
-    if ((!inputPrompt.trim() && attachedFiles.length === 0) || isGenerating) return;
-    sendMessage(inputPrompt, attachedFiles);
+    const trimmed = inputPrompt.trim();
+    if ((!trimmed && attachedFiles.length === 0) || isGenerating) return;
+    const promptToSend = inputPrompt;
+    const filesToSend = [...attachedFiles];
     setInputPrompt('');
     setAttachedFiles([]);
+    sendMessage(promptToSend, filesToSend);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
