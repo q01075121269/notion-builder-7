@@ -527,11 +527,15 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         throw new Error('Gemini API 키가 필요합니다. 열린 설정 창에서 API 키를 입력해 주세요.');
       }
 
+      // 신규 생성 의도(제안 생성 클릭 등)일 경우 기존 템플릿 맥락을 끊고 null 전달
+      const isExplicitCreateIntent = prompt.includes('신규 생성') || prompt.includes('템플릿 생성') || prompt.includes('새로 만들어줘') || prompt.includes('바로 생성해줘');
+      const targetTemplateContext = isExplicitCreateIntent ? null : currentTemplate;
+
       // Gemini Master Brain Engine 호출 (멀티턴 히스토리 전달)
       const response = await processConversationWithGemini(
         prompt,
         apiKey,
-        currentTemplate,
+        targetTemplateContext,
         selectedModel,
         attachedFiles,
         messages

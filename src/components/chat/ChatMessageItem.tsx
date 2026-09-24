@@ -28,8 +28,21 @@ export const ChatMessageItem: React.FC<{ message: ChatMessage }> = ({ message })
   );
 
   const handleConfirmGenerate = () => {
+    // 1. 과거 메모리 캐시(기존 previewTemplate)를 재사용하지 말고 무조건 'null'로 강제 초기화
+    setCurrentTemplate(null);
+    try {
+      localStorage.removeItem('notion_template_cache');
+    } catch {}
+
     showToast('✨ 제안된 구조로 템플릿 실물 생성을 시작합니다...', 'info');
-    sendMessage("위에서 제안된 구조와 기획안대로 템플릿 바로 생성해줘");
+
+    // 2. 클릭된 메시지 버블의 AI 제안 내용(차계부 및 차량 정비 명세 등)을 추출하여 전달
+    const rawProposalText = message.content ? message.content.trim() : '';
+    const proposalPrompt = rawProposalText 
+      ? `다음 제안된 구조와 기획안을 바탕으로 새로운 노션 템플릿을 신규 생성해줘:\n\n${rawProposalText}`
+      : '위에서 제안된 구조와 기획안대로 템플릿을 새로 만들어줘';
+
+    sendMessage(proposalPrompt);
   };
 
   return (

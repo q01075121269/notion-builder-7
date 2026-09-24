@@ -16,6 +16,7 @@ import {
   X,
   Link as LinkIcon
 } from 'lucide-react';
+import { getSafeProperties } from '../../services/archiveStorage';
 import type { ArchivedTemplate } from '../../types/dashboard';
 
 interface TemplateArchiveTabProps {
@@ -194,7 +195,7 @@ export const TemplateArchiveTab: React.FC<TemplateArchiveTabProps> = ({
             const blockCount = tpl.templateData?.page_layout?.length || 0;
             const isCreatedByMe = tpl.source === 'created';
             const hasDateProp = tpl.templateData?.databases?.some(db =>
-              db?.properties?.some(p => p?.type === 'date')
+              getSafeProperties(db?.properties).some(p => p?.type === 'date')
             ) || false;
 
             return (
@@ -405,7 +406,7 @@ export const TemplateArchiveTab: React.FC<TemplateArchiveTabProps> = ({
                       
                       {/* Properties tags */}
                       <div className="flex flex-wrap gap-1 pt-1">
-                        {db.properties?.map((prop, pi) => (
+                        {getSafeProperties(db.properties).map((prop, pi) => (
                           <span key={pi} className="px-2 py-0.5 rounded text-[10px] bg-slate-100 dark:bg-neutral-700 text-neutral-700 dark:text-neutral-300 border border-slate-200 dark:border-neutral-600">
                             {prop.name} <span className="text-neutral-400">({prop.type})</span>
                           </span>

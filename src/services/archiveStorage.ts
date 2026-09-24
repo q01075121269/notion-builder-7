@@ -293,52 +293,96 @@ const DEFAULT_GOOGLE_SYNC_CONFIG: GoogleSyncConfig = {
   autoSyncEnabled: false
 };
 
-// =================== 스토리지 API =================== //
+// 방어적 배열 정규화 (Safe Array Normalization) 헬퍼
+export function getSafeProperties(properties: any): Array<{ name: string; type: string; [key: string]: any }> {
+  if (Array.isArray(properties)) {
+    return properties.map(p => {
+      if (typeof p === 'string') return { name: p, type: 'text' };
+      if (p && typeof p === 'object') return { name: p.name || '속성', type: p.type || 'text', ...p };
+      return { name: '속성', type: 'text' };
+    });
+  }
+  if (properties && typeof properties === 'object') {
+    return Object.entries(properties).map(([name, val]: [string, any]) => ({
+      name,
+      type: typeof val === 'string' ? val : val?.type || 'text',
+      ...(typeof val === 'object' ? val : {})
+    }));
+  }
+  return [];
+}
 
-// 템플릿 목록 조회 (초기 시드 자동 병합, 제목 정제기 가드레일 및 무결성 보장)
+// 템플릿 목록 조회 (Self-Healing 클린업, 초기 시드 자동 병합, 무결성 보장)
 export const getArchivedTemplates = (): ArchivedTemplate[] => {
   try {
-    const raw = localStorage.getItem(STORAGE_KEYS.TEMPLATES);
+    const raw = localStorage.getItem(STORAGE_KEYS.TEMPLATES) || localStorage.getItem('saved_templates');
     let templates: any[] = [];
     if (!raw) {
       localStorage.setItem(STORAGE_KEYS.TEMPLATES, JSON.stringify(SEED_TEMPLATES));
+      localStorage.setItem('saved_templates', JSON.stringify(SEED_TEMPLATES));
       templates = SEED_TEMPLATES;
     } else {
       const parsed = JSON.parse(raw);
       templates = Array.isArray(parsed) ? parsed : SEED_TEMPLATES;
     }
 
-    // 데이터 손상 방어 및 음성 말버릇/비정형 제목 자동 정제(Sanitization)
-    return templates.map((item, idx) => {
-      const rawTitle = item?.title || '제목 없는 템플릿';
-      const cleanTitle = sanitizeTemplateTitle(rawTitle);
-      
-      const tplData = item?.templateData || {
-        title: cleanTitle,
-        description: item?.description || '',
-        icon: item?.icon || '📑',
-        databases: [],
-        page_layout: []
-      };
-      if (tplData.title) {
-        tplData.title = sanitizeTemplateTitle(tplData.title);
-      }
+    // ── Self-Healing: 오염 데이터 자동 검사 및 필터링 ──────────────────
+    const sanitizedTemplates: ArchivedTemplate[] = [];
 
-      return {
-        id: item?.id || `arch-${Date.now()}-${idx}`,
+    for (let idx = 0; idx < templates.length; idx++) {
+      const item = templates[idx];
+      if (!item || typeof item !== 'object') continue; // 불량 레코드 버림
+
+      const rawTitle = item.title || item.templateData?.title;
+      // 필수 필드 누락 검사: 제목이 완전히 없는 레코드는 제거
+      if (!rawTitle || typeof rawTitle !== 'string' || !rawTitle.trim()) continue;
+
+      const cleanTitle = sanitizeTemplateTitle(rawTitle);
+
+      const rawTplData = item.templateData || {};
+      const rawDbs = Array.isArray(rawTplData.databases) ? rawTplData.databases : [];
+
+      // 데이터베이스 내부의 properties 방어적 배열 정규화 적용
+      const safeDbs = rawDbs.map((db: any) => ({
+        ...db,
+        name: db?.name || '데이터베이스',
+        view_type: db?.view_type || 'table',
+        properties: getSafeProperties(db?.properties)
+      }));
+
+      const safeTplData = {
+        ...rawTplData,
         title: cleanTitle,
-        description: item?.description || '',
-        icon: item?.icon || '📑',
-        cover_url: item?.cover_url || 'https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=1600&q=80',
-        tags: Array.isArray(item?.tags) ? item.tags : ['#템플릿'],
-        templateData: tplData,
-        createdAt: typeof item?.createdAt === 'number' ? item.createdAt : Date.now(),
-        updatedAt: typeof item?.updatedAt === 'number' ? item.updatedAt : Date.now(),
-        source: item?.source || (item?.id?.startsWith('arch-tpl-') ? 'curated' : 'created'),
-        notionUrl: item?.notionUrl || undefined,
-        folderId: item?.folderId || null
+        description: rawTplData.description || item.description || '',
+        icon: rawTplData.icon || item.icon || '📑',
+        databases: safeDbs,
+        page_layout: Array.isArray(rawTplData.page_layout) ? rawTplData.page_layout : []
       };
-    });
+
+      sanitizedTemplates.push({
+        id: item.id || `arch-${Date.now()}-${idx}`,
+        title: cleanTitle,
+        description: item.description || safeTplData.description || '',
+        icon: item.icon || safeTplData.icon || '📑',
+        cover_url: item.cover_url || 'https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=1600&q=80',
+        tags: Array.isArray(item.tags) ? item.tags : ['#템플릿'],
+        templateData: safeTplData,
+        createdAt: typeof item.createdAt === 'number' ? item.createdAt : Date.now(),
+        updatedAt: typeof item.updatedAt === 'number' ? item.updatedAt : Date.now(),
+        source: item.source || (item.id?.startsWith('arch-tpl-') ? 'curated' : 'created'),
+        notionUrl: item.notionUrl || undefined,
+        folderId: item.folderId || null
+      });
+    }
+
+    // 세척된 데이터가 비어있다면 SEED 사용
+    const finalTemplates = sanitizedTemplates.length > 0 ? sanitizedTemplates : SEED_TEMPLATES;
+
+    // 클린업된 데이터로 localStorage 자가치유 업데이트
+    localStorage.setItem(STORAGE_KEYS.TEMPLATES, JSON.stringify(finalTemplates));
+    localStorage.setItem('saved_templates', JSON.stringify(finalTemplates));
+
+    return finalTemplates;
   } catch (e) {
     console.error('Failed to get archived templates:', e);
     return SEED_TEMPLATES;

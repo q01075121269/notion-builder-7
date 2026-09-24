@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import { getSafeProperties } from '../../services/archiveStorage';
 import type { ArchivedTemplate, TemplateFolder } from '../../types/dashboard';
 import { 
   FolderGit2, 
@@ -195,7 +196,7 @@ export const InteractiveCardGridView: React.FC<InteractiveCardGridViewProps> = (
         const dbCount = tpl.templateData?.databases?.length || 0;
         const blockCount = tpl.templateData?.page_layout?.length || 0;
         const hasFormula = tpl.templateData?.databases?.some(db => 
-          db.properties?.some(p => p.type === 'formula')
+          getSafeProperties(db?.properties).some(p => p.type === 'formula')
         );
 
         return (
