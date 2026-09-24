@@ -78,11 +78,6 @@ export const InspectorChat: React.FC<InspectorChatProps> = ({
   template,
   selectedDbName,
   onSelectDbName,
-  onAddProperty,
-  onUpdatePropertyName,
-  onUpdatePropertyType,
-  onDeleteProperty,
-  onApplyPresetInstruction,
   onApplyTemplateUpdate,
   isCollapsed,
   toggleCollapse,
@@ -127,7 +122,6 @@ export const InspectorChat: React.FC<InspectorChatProps> = ({
   // 현재 활성화된 타깃 DB 찾기
   const databases = template?.databases || [];
   const currentDb = databases.find((db) => db.name === selectedDbName) || databases[0] || null;
-  const currentDbIndex = currentDb ? databases.findIndex((db) => db.name === currentDb.name) : 0;
 
   // 자동 스크롤
   useEffect(() => {
@@ -206,13 +200,11 @@ export const InspectorChat: React.FC<InspectorChatProps> = ({
       try {
         recognitionRef.current.stop();
       } catch {}
-      showToast('⏹️ 음성 인식이 중지되었습니다.', 'info');
     } else {
       isListeningRef.current = true;
       setIsListening(true);
       try {
         recognitionRef.current.start();
-        showToast('🎙️ 연속 음성 인식을 시작합니다. 편하게 말씀해 주세요.', 'info');
       } catch (err) {
         console.error('STT Start Error:', err);
       }
@@ -396,162 +388,80 @@ export const InspectorChat: React.FC<InspectorChatProps> = ({
     setIsProcessing(true);
 
     try {
-      const targetDbTitle = currentDb ? currentDb.name : '선택된 DB';
-      let actionResult = '';
+      const targetDbTitle = currentDb ? currentDb.name : '전체 워크스페이스';
 
-      // (A) 이미지가 첨부되었거나 문서가 첨부된 경우 -> Gemini Vision 멀티모달 API 직결
-      if (currentImages.length > 0 || currentDocs.length > 0) {
+      const imagesPayload: AttachedImageData[] = currentImages.map((img) => ({
+        mimeType: img.mimeType,
+        data: img.base64,
+        name: img.name,
+      }));
+
+      const fileContextList: FileContextItem[] = currentDocs.map((d) => d.fileContext);
+
+      // 타깃 DB 맥락과 사용자 지시사항 결합
+      let promptText = text;
+      if (currentDb) {
+        promptText = `[TARGET_DB_CONTEXT: 현재 포커스된 DB는 "${currentDb.name}"입니다.]\n${text || '화면 캡처 이미지의 표/데이터를 분석하여 캔버스 스키마에 반영해줘.'}`;
+      } else if (!promptText) {
+        promptText = '첨부된 화면 캡처 이미지의 표/컬럼/데이터를 정밀 판독하고 현재 노션 템플릿 스키마에 즉시 반영해줘.';
+      }
+
+      // 오케스트레이터 호출 안내
+      if (currentImages.length > 0) {
         showToast('🧠 Gemini Vision 시각 분석 엔진이 이미지와 캔버스 스키마를 정밀 대조 중입니다...', 'info');
+      }
 
-        const imagesPayload: AttachedImageData[] = currentImages.map((img) => ({
-          mimeType: img.mimeType,
-          data: img.base64,
-          name: img.name,
-        }));
+      const response = await sendToOrchestrator(
+        promptText,
+        messages.map((m) => ({
+          id: m.id,
+          role: m.sender === 'user' ? 'user' : 'assistant',
+          content: m.content,
+          timestamp: m.timestamp,
+        })),
+        apiKey,
+        authUser?.email,
+        selectedModel,
+        'builder',
+        fileContextList,
+        isThinkingEnabled,
+        imagesPayload,
+        template
+      );
 
-        const fileContextList: FileContextItem[] = currentDocs.map((d) => d.fileContext);
+      const actionResult = response.reply_message || `[${targetDbTitle}] 스키마 수정 작업이 완료되었습니다.`;
 
-        const promptText = text || '첨부된 화면 캡처 이미지의 표/컬럼/데이터를 정밀 판독하고 현재 노션 템플릿 스키마에 즉시 반영해줘.';
+      // Gemini가 갱신한 db_schema가 있거나 builder payload가 유입된 경우 캔버스 템플릿에 즉시 반영
+      if (response.payload?.db_schema || response.intent === 'BUILDER') {
+        const rawTopic = (response.payload?.template_topic as string) || template?.title || '수정된 맞춤형 워크스페이스';
+        const rawTitle = (response.payload?.suggested_title as string) || template?.title || '수정된 맞춤형 워크스페이스';
+        const sanitizedTopic = sanitizeTemplateTitle(rawTopic, rawTopic);
+        const sanitizedTitle = sanitizeTemplateTitle(rawTitle, rawTitle);
 
-        const response = await sendToOrchestrator(
-          promptText,
-          messages.map((m) => ({
-            id: m.id,
-            role: m.sender === 'user' ? 'user' : 'assistant',
-            content: m.content,
-            timestamp: m.timestamp,
-          })),
-          apiKey,
-          authUser?.email,
-          selectedModel,
-          'builder',
-          fileContextList,
-          isThinkingEnabled,
-          imagesPayload,
-          template
-        );
+        const newTemplate = buildDynamicTemplateFromPayload({
+          topic: sanitizedTopic,
+          title: sanitizedTitle,
+          initialPrompt: promptText,
+          dbSchemas: (response.payload?.db_schema as any[]) || template?.databases,
+          formulas: response.payload?.formulas as any[],
+          valueAdd: response.payload?.value_add as string[],
+          complexity: response.payload?.complexity as string,
+        });
 
-        actionResult = response.reply_message || '시각 분석 및 템플릿 스키마 수정이 성공적으로 완료되었습니다.';
-
-        // Gemini가 갱신한 db_schema가 있거나 builder payload가 유입된 경우 캔버스 템플릿에 즉시 반영
-        if (response.payload?.db_schema || response.intent === 'BUILDER') {
-          const rawTopic = (response.payload?.template_topic as string) || template?.title || '수정된 맞춤형 워크스페이스';
-          const rawTitle = (response.payload?.suggested_title as string) || template?.title || '수정된 맞춤형 워크스페이스';
-          const sanitizedTopic = sanitizeTemplateTitle(rawTopic, rawTopic);
-          const sanitizedTitle = sanitizeTemplateTitle(rawTitle, rawTitle);
-
-          const newTemplate = buildDynamicTemplateFromPayload({
-            topic: sanitizedTopic,
-            title: sanitizedTitle,
-            initialPrompt: promptText,
-            dbSchemas: response.payload?.db_schema as any[] || template?.databases,
-            formulas: response.payload?.formulas as any[],
-            valueAdd: response.payload?.value_add as string[],
-            complexity: response.payload?.complexity as string,
-          });
-
-          const normalized = normalizeTemplatePayload(newTemplate);
-          if (normalized) {
-            if (onApplyTemplateUpdate) {
-              onApplyTemplateUpdate(normalized);
-            }
-            setCurrentTemplate(normalized);
-            showToast('✨ Gemini Vision 분석 결과가 중앙 캔버스 스키마에 즉시 동기화되었습니다!', 'success');
+        const normalized = normalizeTemplatePayload(newTemplate);
+        if (normalized) {
+          if (onApplyTemplateUpdate) {
+            onApplyTemplateUpdate(normalized);
           }
+          setCurrentTemplate(normalized);
+          showToast('✨ Gemini 분석 결과가 중앙 캔버스 스키마에 즉시 동기화되었습니다!', 'success');
         }
       }
-      // (B) 순수 텍스트 정밀 지시인 경우 (속성 추가, 수식 추가, 롤업, 명칭 변경 등)
-      else if (/속성|필드/.test(text) && /삭제|제거|빼/.test(text)) {
-        const nameMatch = text.match(/['"‘“]([^'"’“”]+)['"’”]/) || text.match(/\[([^\]]+)\]/);
-        const targetPropName = nameMatch ? nameMatch[1] : '';
-        if (targetPropName && onDeleteProperty && currentDbIndex >= 0) {
-          onDeleteProperty(currentDbIndex, targetPropName);
-          actionResult = `[${targetDbTitle}] 데이터베이스에서 "${targetPropName}" 속성을 삭제했습니다.`;
-        } else {
-          actionResult = `[${targetDbTitle}] 삭제할 속성명을 따옴표로 감싸서 입력해 주세요.`;
-        }
-      } else if (/이름|명칭|속성명/.test(text) && /변경|수정|바꿔/.test(text)) {
-        const matches = text.match(/['"‘“]([^'"’“”]+)['"’”]/g);
-        if (matches && matches.length >= 2 && onUpdatePropertyName && currentDbIndex >= 0) {
-          const oldName = matches[0].replace(/['"‘“”’]/g, '');
-          const newName = matches[1].replace(/['"‘“”’]/g, '');
-          onUpdatePropertyName(currentDbIndex, oldName, newName);
-          actionResult = `[${targetDbTitle}] 속성명이 "${oldName}"에서 "${newName}"(으)로 변경되었습니다.`;
-        } else {
-          actionResult = `[${targetDbTitle}] 변경할 기존 속성명과 새 속성명을 따옴표로 입력하세요.`;
-        }
-      } else if (/타입/.test(text) && /변경|수정|바꿔/.test(text)) {
-        const nameMatch = text.match(/['"‘“]([^'"’“”]+)['"’”]/);
-        if (nameMatch && onUpdatePropertyType && currentDbIndex >= 0) {
-          const propName = nameMatch[1];
-          let newType: NotionPropertyType = 'text';
-          if (/날짜|date/i.test(text)) newType = 'date';
-          else if (/상태|status/i.test(text)) newType = 'status';
-          else if (/수식|formula/i.test(text)) newType = 'formula';
-          else if (/숫자|number/i.test(text)) newType = 'number';
-          else if (/선택|select/i.test(text)) newType = 'select';
-
-          onUpdatePropertyType(currentDbIndex, propName, newType);
-          actionResult = `[${targetDbTitle}] "${propName}" 속성 타입이 '${newType}'(으)로 변경되었습니다.`;
-        } else {
-          actionResult = `[${targetDbTitle}] 속성 타입 변경 요청을 수신했습니다.`;
-        }
-      } else if (/속성|필드|컬럼/.test(text) && /추가|생성|넣어/.test(text)) {
-        let propName = '신규 속성';
-        let propType: NotionPropertyType = 'text';
-
-        const nameMatch = text.match(/['"‘“]([^'"’“”]+)['"’”]/) || text.match(/\[([^\]]+)\]/);
-        if (nameMatch) {
-          propName = nameMatch[1];
-        } else {
-          const words = text.replace(/속성|필드|컬럼|추가해줘|추가|넣어줘/g, '').trim().split(/\s+/);
-          if (words.length > 0 && words[0]) propName = words[0];
-        }
-
-        if (/수식|formula/i.test(text)) propType = 'formula';
-        else if (/날짜|date|일시|기한/i.test(text)) propType = 'date';
-        else if (/숫자|number|금액|수량|점수/i.test(text)) propType = 'number';
-        else if (/상태|status/i.test(text)) propType = 'status';
-        else if (/선택|select|구분/i.test(text)) propType = 'select';
-        else if (/체크|checkbox/i.test(text)) propType = 'checkbox';
-        else if (/롤업|rollup/i.test(text)) propType = 'rollup';
-        else if (/관계|relation/i.test(text)) propType = 'relation';
-
-        if (onAddProperty && currentDbIndex >= 0) {
-          onAddProperty(currentDbIndex, {
-            id: `prop-${Date.now()}`,
-            name: propName,
-            type: propType,
-          });
-          actionResult = `[${targetDbTitle}] 데이터베이스에 "${propName}" (${propType}) 속성이 안전하게 추가되었습니다.`;
-        }
-      } else if (/수식|formula|계산/i.test(text)) {
-        actionResult = `[${targetDbTitle}] 수식 스키마가 Formula 2.0 최신 문법(dateBetween/ifs 등)으로 자동 검증 및 캔버스에 최적화되었습니다.`;
-        if (onApplyPresetInstruction) {
-          onApplyPresetInstruction(text);
-        }
-      } else if (/롤업|관계형|relation|rollup/i.test(text)) {
-        if (onAddProperty && currentDbIndex >= 0) {
-          onAddProperty(currentDbIndex, {
-            id: `prop-rel-${Date.now()}`,
-            name: '상위 프로젝트 롤업',
-            type: 'rollup',
-          });
-        }
-        actionResult = `[${targetDbTitle}] 상위 프로젝트 DB와의 양방향 관계형 롤업 속성이 신규 연결되었습니다.`;
-      } else {
-        if (onApplyPresetInstruction) {
-          onApplyPresetInstruction(text);
-        }
-        actionResult = `[${targetDbTitle}] 지시사항 "${text}"이(가) 스키마 파이프라인에 반영되었습니다.`;
-      }
-
-      await new Promise((res) => setTimeout(res, 300));
 
       const inspectorReply: InspectorMessage = {
         id: `inspector-${Date.now()}`,
         sender: 'inspector',
-        content: actionResult || `[${targetDbTitle}] 스키마 수정 작업이 완료되었습니다.`,
+        content: actionResult,
         targetDb: currentDb?.name,
         actionSummary: '완료',
         timestamp: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }),
@@ -559,10 +469,11 @@ export const InspectorChat: React.FC<InspectorChatProps> = ({
 
       setMessages((prev) => [...prev, inspectorReply]);
     } catch (err: any) {
+      console.error('[InspectorChat] Schema update error:', err);
       const errorReply: InspectorMessage = {
         id: `err-${Date.now()}`,
         sender: 'inspector',
-        content: `시각 분석 및 스키마 수정 중 오류가 발생했습니다: ${err?.message || '알 수 없는 오류'}`,
+        content: `❌ 스키마 수정 요청 실패: ${err?.message || 'Gemini 오케스트레이터 응답을 수신하지 못했습니다.'}`,
         timestamp: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }),
       };
       setMessages((prev) => [...prev, errorReply]);

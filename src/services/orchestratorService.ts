@@ -81,14 +81,18 @@ export async function sendToOrchestrator(
     }
   }
 
+  const firstImageBase64 = images && images.length > 0 ? images[0].data : null;
   const payload = {
+    prompt: enrichedText,
     text: enrichedText,
-    file_context_list: fileContextList,
+    image: firstImageBase64,
     images: images || [],
+    currentTemplate: currentTemplate || null,
     current_template: currentTemplate || null,
-    model: model || 'auto',
+    model: model || 'gemini-2.5-flash',
     thinking: isThinking,
     current_mode: currentMode || 'builder',
+    file_context_list: fileContextList,
     conversation_history: history.slice(-6).map((h) => ({
       role: h.role,
       content: h.content,

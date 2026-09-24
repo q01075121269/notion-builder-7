@@ -224,8 +224,8 @@ async function callGeminiForOrchestrator(
     }
   }
 
-  // 모든 Gemini 호출 실패 시 스마트 로컬 휴리스틱 Fallback
-  return fallbackRuleBasedOrchestrator(userText, lastError?.message);
+  // 모든 Gemini 호출 실패 시 가짜 Mock 대신 정직한 에러 반환
+  throw new Error(`Gemini Vision/Orchestrator 호출 실패: ${lastError?.message || '모든 모델 응답 없음'}`);
 }
 
 // 오프라인/키 누락 시 안전한 로컬 휴리스틱 폴백
@@ -342,9 +342,19 @@ export async function POST(req: Request): Promise<Response> {
     }
 
     const reqModel = body.model || body.selectedModel || 'gemini-3.8-flash';
-    const images = body.images || [];
-    const currentTemplate = body.current_template || null;
-    const result = await callGeminiForOrchestrator(userText, history, apiKey, reqModel, images, currentTemplate);
+    let rawImages = Array.isArray(body.images) ? [...body.images] : [];
+    if (body.image) {
+      if (typeof body.image === 'string') {
+        const mimeMatch = body.image.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,/);
+        const mimeType = mimeMatch ? mimeMatch[1] : 'image/png';
+        const data = body.image.replace(/^data:image\/[^;]+;base64,/, '');
+        rawImages.push({ mimeType, data });
+      } else if (body.image.data) {
+        rawImages.push(body.image);
+      }
+    }
+    const currentTemplate = body.currentTemplate || body.current_template || null;
+    const result = await callGeminiForOrchestrator(userText, history, apiKey, reqModel, rawImages, currentTemplate);
 
     return new Response(JSON.stringify(result), {
       status: 200,
@@ -371,7 +381,7 @@ export async function OPTIONS(): Promise<Response> {
     headers: {
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Methods': 'POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, x-gemini-api-key, x-user-email'
+      'Access-Control-Allow-Headers': 'Content-Type, x-gemini-api-key, x-user-email, x-notion-api-key, x-current-mode'
     }
   });
 }
@@ -381,7 +391,7 @@ export default async function handler(req: any, res: any) {
   if (req.method === 'OPTIONS') {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-gemini-api-key, x-user-email');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-gemini-api-key, x-user-email, x-notion-api-key, x-current-mode');
     return res.status(200).end();
   }
 
@@ -420,9 +430,19 @@ export default async function handler(req: any, res: any) {
     }
 
     const reqModel = body.model || body.selectedModel || 'gemini-3.8-flash';
-    const images = body.images || [];
-    const currentTemplate = body.current_template || null;
-    const result = await callGeminiForOrchestrator(userText, history, apiKey, reqModel, images, currentTemplate);
+    let rawImages = Array.isArray(body.images) ? [...body.images] : [];
+    if (body.image) {
+      if (typeof body.image === 'string') {
+        const mimeMatch = body.image.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,/);
+        const mimeType = mimeMatch ? mimeMatch[1] : 'image/png';
+        const data = body.image.replace(/^data:image\/[^;]+;base64,/, '');
+        rawImages.push({ mimeType, data });
+      } else if (body.image.data) {
+        rawImages.push(body.image);
+      }
+    }
+    const currentTemplate = body.currentTemplate || body.current_template || null;
+    const result = await callGeminiForOrchestrator(userText, history, apiKey, reqModel, rawImages, currentTemplate);
 
     return res.status(200).json(result);
   } catch (err: any) {

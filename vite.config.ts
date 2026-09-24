@@ -87,6 +87,181 @@ function geminiApiProxyPlugin(): Plugin {
           return
         }
 
+        // /api/orchestrator 로컬 개발 서버 프록시 및 멀티모달 오케스트레이터 핸들러 (404 방지)
+        if (req.url && req.url.startsWith('/api/orchestrator')) {
+          if (req.method === 'OPTIONS') {
+            res.statusCode = 204
+            res.setHeader('Access-Control-Allow-Origin', '*')
+            res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
+            res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-gemini-api-key, x-user-email, x-current-mode, x-notion-api-key')
+            res.end()
+            return
+          }
+
+          let bodyBuffer = ''
+          req.on('data', (chunk) => {
+            bodyBuffer += chunk
+          })
+
+          req.on('end', async () => {
+            let bodyObj: any = {}
+            try {
+              if (bodyBuffer) bodyObj = JSON.parse(bodyBuffer)
+            } catch (e) {}
+
+            const apiKey =
+              (req.headers['x-gemini-api-key'] as string) ||
+              bodyObj.geminiApiKey ||
+              env.GEMINI_API_KEY ||
+              process.env.GEMINI_API_KEY ||
+              ''
+
+            if (!apiKey) {
+              res.statusCode = 401
+              res.setHeader('Content-Type', 'application/json')
+              res.end(JSON.stringify({ error: 'Gemini API 키가 설정되지 않았습니다. 우측 상단 [설정]에서 등록해 주세요.' }))
+              return
+            }
+
+            const promptText = (bodyObj.prompt || bodyObj.text || bodyObj.message || '').trim()
+            let rawImages = Array.isArray(bodyObj.images) ? [...bodyObj.images] : []
+            if (bodyObj.image) {
+              if (typeof bodyObj.image === 'string') {
+                const mimeMatch = bodyObj.image.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,/)
+                const mimeType = mimeMatch ? mimeMatch[1] : 'image/png'
+                const data = bodyObj.image.replace(/^data:image\/[^;]+;base64,/, '')
+                rawImages.push({ mimeType, data })
+              } else if (bodyObj.image.data) {
+                rawImages.push(bodyObj.image)
+              }
+            }
+
+            const currentTemplate = bodyObj.currentTemplate || bodyObj.current_template || null
+            const rawModel = bodyObj.model || 'gemini-2.5-flash'
+            const candidateModels = Array.from(
+              new Set([rawModel.replace(/^models\//, '').trim(), 'gemini-2.5-flash', 'gemini-3.8-flash', 'gemini-3.5-flash-lite', 'gemini-3.1-pro'])
+            )
+
+            // 시스템 프롬프트: 지능형 오케스트레이터 및 노션 빌더 스키마 갱신 지침
+            const systemPrompt = `당신은 올인원 워크스페이스의 수석 대화형 AI 오케스트레이터입니다.
+사용자의 지시사항, 첨부 이미지(Vision), 첨부 문서를 정밀 분석하여 응답을 JSON 형식으로 반환하십시오.
+
+[응답 JSON 규격]
+{
+  "intent": "BUILDER" | "CHAT" | "LIFE" | "DEVLAB",
+  "reply_message": "사용자에게 전할 명확하고 친절한 설명 (한국어 구어체)",
+  "needs_clarification": false,
+  "redirect_url": null,
+  "payload": {
+    "template_topic": "템플릿 주제",
+    "suggested_title": "노션 페이지 제목",
+    "db_schema": [
+      {
+        "name": "DB 이름",
+        "icon": "📋",
+        "description": "DB 설명",
+        "properties": [
+          { "id": "prop-1", "name": "이름", "type": "title" },
+          { "id": "prop-2", "name": "상태", "type": "status" }
+        ],
+        "sample_rows": []
+      }
+    ],
+    "formulas": [],
+    "value_add": []
+  }
+}
+
+[핵심 규칙 - Vision 시각 분석 및 캔버스 스키마 수정]
+1. 사용자가 화면 캡처, 표 이미지 등을 첨부했거나 캔버스 스키마 수정을 요청한 경우:
+   - "intent": "BUILDER"로 설정하고, 현재 캔버스 템플릿의 databases 스키마를 정밀 분석하여 사용자가 의도한 수정사항(컬럼 추가, 삭제, 명칭/타입 변경, 수식 보정 등)을 완벽히 반영한 갱신된 "db_schema"를 payload에 반드시 포함하십시오.
+2. 일반 대화인 경우:
+   - "intent": "CHAT", "reply_message": "답변", "payload": null 로 응답하십시오.`
+
+            // 멀티모달 parts 조립
+            const userParts: any[] = []
+            for (const img of rawImages) {
+              if (img && img.data) {
+                userParts.push({
+                  inlineData: {
+                    mimeType: img.mimeType || 'image/png',
+                    data: img.data.replace(/^data:image\/[^;]+;base64,/, '')
+                  }
+                })
+              }
+            }
+
+            let enrichedPrompt = promptText
+            if (currentTemplate) {
+              enrichedPrompt = `[CURRENT_CANVAS_TEMPLATE_CONTEXT]\n제목: ${currentTemplate.title}\nDB목록:\n${JSON.stringify(currentTemplate.databases?.map((d: any) => ({ name: d.name, properties: d.properties })) || [], null, 2)}\n[/CURRENT_CANVAS_TEMPLATE_CONTEXT]\n\n${promptText}`
+            }
+            userParts.push({ text: enrichedPrompt || '현재 캔버스 스키마를 분석하고 최적화해줘.' })
+
+            const contents = [
+              {
+                role: 'user',
+                parts: userParts
+              }
+            ]
+
+            const requestBody = {
+              systemInstruction: {
+                parts: [{ text: systemPrompt }]
+              },
+              contents,
+              generationConfig: {
+                temperature: 0.3,
+                responseMimeType: 'application/json'
+              }
+            }
+
+            let lastErr = null
+            for (const m of candidateModels) {
+              try {
+                const gRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${apiKey}`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(requestBody)
+                })
+
+                if (!gRes.ok) {
+                  const errText = await gRes.text()
+                  lastErr = new Error(`Gemini ${m} failed (${gRes.status}): ${errText}`)
+                  continue
+                }
+
+                const data: any = await gRes.json()
+                const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text || ''
+                const cleanJson = rawText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
+                const parsed = JSON.parse(cleanJson)
+
+                res.statusCode = 200
+                res.setHeader('Content-Type', 'application/json')
+                res.setHeader('Access-Control-Allow-Origin', '*')
+                res.end(JSON.stringify({
+                  intent: parsed.intent || 'BUILDER',
+                  reply_message: parsed.reply_message || '스키마 분석 및 수정이 완료되었습니다.',
+                  needs_clarification: Boolean(parsed.needs_clarification),
+                  redirect_url: parsed.redirect_url || null,
+                  payload: parsed.payload || null
+                }))
+                return
+              } catch (e: any) {
+                lastErr = e
+                continue
+              }
+            }
+
+            // 모든 모델 실패 시 정직하게 에러 반환 (가짜 성공 없음)
+            res.statusCode = 502
+            res.setHeader('Content-Type', 'application/json')
+            res.end(JSON.stringify({
+              error: `Gemini API 호출에 실패했습니다: ${lastErr?.message || '알 수 없는 오류'}`
+            }))
+          })
+          return
+        }
+
         if (req.url && req.url.startsWith('/api/gemini')) {
           const urlObj = new URL(req.url, 'http://localhost:5173')
           const rawModel = urlObj.searchParams.get('model') || 'gemini-2.5-flash'
