@@ -1,5 +1,5 @@
 // src/components/life/QuickCaptureThingsCard.tsx
-// Things 3 스타일 1초 퀵 인박스 카드 (노아 AI 멀티모달 자동 분류, 클립보드, 음성, 낙관적 업데이트)
+// Things 3 스타일 1초 퀵 인박스 카드 (동적 사용자 입력 상태 양방향 바인딩, 실시간 큐 unshift, 하드코딩 완전 배제)
 
 import React, { useState } from 'react';
 import { 
@@ -8,9 +8,10 @@ import {
   Mic, 
   Paperclip, 
   ArrowUpRight, 
-  Sparkles,
-  Check,
-  Loader2
+  Sparkles, 
+  Check, 
+  Loader2,
+  Clock
 } from 'lucide-react';
 import type { ResourceType } from '../../types/lifeHub';
 import { 
@@ -18,6 +19,13 @@ import {
   triageQuickCaptureWithAI,
   type TriageResult 
 } from '../../services/lifeHubAutoTriageRouter';
+
+interface RecentCaptureItem {
+  id: string;
+  text: string;
+  hint: string;
+  timestamp: string;
+}
 
 interface QuickCaptureThingsCardProps {
   onCapture?: (item: {
@@ -30,34 +38,41 @@ interface QuickCaptureThingsCardProps {
   apiKey?: string;
 }
 
-const SEED_INBOX_CHIPS = [
-  { text: '🎙️ 내일 2시 세무사 미팅 서류 준비 [과제]', hint: 'Tasks로 자동 분류' },
-  { text: '🍜 점심 12,000원 김치찌개 식사 [지출]', hint: 'Life Log로 자동 분류' },
-  { text: '💡 2026 AI 에이전트 프롬프트 팁 [지식]', hint: 'Resources로 자동 분류' }
-];
-
 export const QuickCaptureThingsCard: React.FC<QuickCaptureThingsCardProps> = ({ 
   onCapture,
   onTriageCapture,
   apiKey
 }) => {
-  const [inputText, setInputText] = useState('');
-  const [isRecording, setIsRecording] = useState(false);
-  const [copiedSuccess, setCopiedSuccess] = useState(false);
-  const [isTriaging, setIsTriaging] = useState(false);
+  // ① 사용자 입력 양방향 바인딩 상태 (Zero-Hardcoding)
+  const [inboxInput, setInboxInput] = useState<string>('');
+  const [recentCaptures, setRecentCaptures] = useState<RecentCaptureItem[]>([]);
+  const [isRecording, setIsRecording] = useState<boolean>(false);
+  const [copiedSuccess, setCopiedSuccess] = useState<boolean>(false);
+  const [isTriaging, setIsTriaging] = useState<boolean>(false);
 
-  // 통합 자동 분류 처리기 (낙관적 업데이트)
+  // ② 실제 사용자 텍스트 동적 분류 및 큐 unshift
   const processTriage = async (textToProcess: string) => {
     const trimmed = textToProcess.trim();
     if (!trimmed) return;
 
-    // 1. 낙관적 업데이트 (Optimistic Instant Update): 로컬 지능형 Fast-Path
+    // 1. 낙관적 업데이트 (Optimistic Instant Update): 실제 사용자 입력 텍스트로 로컬 Fast-Path 분기
     const localResult = triageQuickCaptureLocally(trimmed);
     
+    // 최근 캡처 큐 최상단에 실제 입력된 텍스트 unshift
+    const nowTime = new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
+    const newCaptureItem: RecentCaptureItem = {
+      id: `cap-${Date.now()}`,
+      text: trimmed,
+      hint: `${localResult.destination.toUpperCase()} 분류`,
+      timestamp: nowTime
+    };
+
+    setRecentCaptures(prev => [newCaptureItem, ...prev.filter(item => item.text !== trimmed).slice(0, 3)]);
+
+    // 상위 컴포넌트로 전달하여 4대 마스터 DB 및 Top 3 맨 앞에 unshift
     if (onTriageCapture) {
       onTriageCapture(localResult);
     } else if (onCapture) {
-      // 레거시 호환
       onCapture({
         title: localResult.itemTitle,
         type: localResult.resourceData?.type || '빠른메모',
@@ -66,14 +81,14 @@ export const QuickCaptureThingsCard: React.FC<QuickCaptureThingsCardProps> = ({
       });
     }
 
-    setInputText('');
+    // 입력창 즉시 빈 문자열로 초기화
+    setInboxInput('');
 
-    // 2. 비동기 AI 정밀 분류 (API 키 존재 시 백그라운드 고도화)
+    // 2. 비동기 AI 백그라운드 정밀 분석
     if (apiKey) {
       setIsTriaging(true);
       try {
         const aiResult = await triageQuickCaptureWithAI(trimmed, apiKey);
-        // AI 판정 결과가 로컬 결과와 다르거나 더 정밀한 경우 추가 콜백
         if (aiResult.destination !== localResult.destination && onTriageCapture) {
           onTriageCapture(aiResult);
         }
@@ -87,7 +102,7 @@ export const QuickCaptureThingsCard: React.FC<QuickCaptureThingsCardProps> = ({
 
   const handleSubmit = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    processTriage(inputText);
+    processTriage(inboxInput);
   };
 
   // 클립보드 붙여넣기 핸들러
@@ -96,7 +111,7 @@ export const QuickCaptureThingsCard: React.FC<QuickCaptureThingsCardProps> = ({
       if (navigator.clipboard && navigator.clipboard.readText) {
         const text = await navigator.clipboard.readText();
         if (text && text.trim()) {
-          setInputText(text);
+          setInboxInput(text.trim());
           setCopiedSuccess(true);
           setTimeout(() => setCopiedSuccess(false), 1500);
         }
@@ -106,11 +121,10 @@ export const QuickCaptureThingsCard: React.FC<QuickCaptureThingsCardProps> = ({
     }
   };
 
-  // 음성 녹음 핸들러 (Web Speech API 또는 폴백 샘플)
+  // 음성 녹음 핸들러 (실제 Web Speech API 연동 - 하드코딩 더미 텍스트 배제)
   const handleToggleVoice = () => {
     if (!isRecording) {
       setIsRecording(true);
-      // 브라우저 Web Speech API 지원 확인
       const SpeechRecognition = (window as unknown as { SpeechRecognition?: any; webkitSpeechRecognition?: any }).SpeechRecognition || 
                                 (window as unknown as { webkitSpeechRecognition?: any }).webkitSpeechRecognition;
 
@@ -124,14 +138,12 @@ export const QuickCaptureThingsCard: React.FC<QuickCaptureThingsCardProps> = ({
           recognition.onresult = (event: any) => {
             const speechText = event.results[0][0].transcript;
             if (speechText) {
-              setInputText(speechText);
+              setInboxInput(speechText);
             }
             setIsRecording(false);
           };
 
           recognition.onerror = () => {
-            // 마이크 에러 시 지능형 샘플 텍스트 폴백
-            setInputText('내일 2시 세무사 미팅 서류 준비');
             setIsRecording(false);
           };
 
@@ -141,26 +153,22 @@ export const QuickCaptureThingsCard: React.FC<QuickCaptureThingsCardProps> = ({
 
           recognition.start();
         } catch {
-          setTimeout(() => {
-            setIsRecording(false);
-            setInputText('내일 2시 세무사 미팅 서류 준비');
-          }, 1200);
+          setIsRecording(false);
         }
       } else {
-        // Speech API 미지원 브라우저 폴백
-        setTimeout(() => {
-          setIsRecording(false);
-          setInputText('내일 2시 세무사 미팅 서류 준비');
-        }, 1200);
+        setIsRecording(false);
       }
     } else {
       setIsRecording(false);
     }
   };
 
-  // 첨부 파일 핸들러 (모의)
+  // 첨부 파일 또는 빠른 URL 핸들러
   const handleAttachFile = () => {
-    setInputText('https://notion.so/formulas-v2-guide 노션 공식 수식 문서 스크랩');
+    const entered = window.prompt('수집할 웹 URL 링크나 문서 제목을 입력하세요:');
+    if (entered && entered.trim()) {
+      setInboxInput(entered.trim());
+    }
   };
 
   return (
@@ -184,14 +192,14 @@ export const QuickCaptureThingsCard: React.FC<QuickCaptureThingsCardProps> = ({
         )}
       </div>
 
-      {/* 인풋 영역 */}
+      {/* 인풋 영역 (양방향 바인딩 inboxInput) */}
       <form onSubmit={handleSubmit} className="space-y-2">
         <div className="relative">
           <textarea
             id="quick-inbox-input"
             rows={1}
-            value={inputText}
-            onChange={(e) => setInputText(e.target.value)}
+            value={inboxInput}
+            onChange={(e) => setInboxInput(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
@@ -233,17 +241,17 @@ export const QuickCaptureThingsCard: React.FC<QuickCaptureThingsCardProps> = ({
             <button
               type="button"
               onClick={handleAttachFile}
-              title="URL/자료 자동 첨부 샘플"
+              title="URL/자료 직접 입력"
               className="flex items-center space-x-1 px-2 py-1 rounded-lg text-[10px] font-semibold bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 transition cursor-pointer"
             >
               <Paperclip className="w-3 h-3" />
-              <span>첨부</span>
+              <span>자료첨부</span>
             </button>
           </div>
 
           <button
             type="submit"
-            disabled={!inputText.trim()}
+            disabled={!inboxInput.trim()}
             className="flex items-center space-x-1 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white transition shadow-xs cursor-pointer"
           >
             <span>인박스 캡처</span>
@@ -252,35 +260,49 @@ export const QuickCaptureThingsCard: React.FC<QuickCaptureThingsCardProps> = ({
         </div>
       </form>
 
-      {/* 시드 인박스 칩 목록 (최대 2건으로 압축) */}
+      {/* 최근 캡처 큐: 사용자가 실제로 캡처한 항목들이 실시간으로 unshift되어 렌더링됨 */}
       <div className="mt-2.5 pt-2 border-t border-zinc-100 dark:border-white/5 space-y-1">
         <div className="flex items-center justify-between text-[10px] text-zinc-400 font-medium">
           <span className="flex items-center space-x-1">
             <Sparkles className="w-2.5 h-2.5 text-blue-500" />
-            <span>최근 캡처 큐</span>
+            <span>최근 캡처 큐 (실시간 동적 반영)</span>
           </span>
-          <span>{SEED_INBOX_CHIPS.slice(0, 2).length}건</span>
+          <span>{recentCaptures.length}건</span>
         </div>
 
-        <div className="space-y-1">
-          {SEED_INBOX_CHIPS.slice(0, 2).map((chip, idx) => (
-            <div
-              key={idx}
-              onClick={() => {
-                processTriage(chip.text.replace(/^[🎙️🍜💡]\s*/, ''));
-              }}
-              className="group flex items-center justify-between p-1.5 rounded-lg bg-zinc-50/80 dark:bg-zinc-950/40 hover:bg-blue-50/60 dark:hover:bg-blue-950/30 border border-zinc-100 dark:border-zinc-800/60 transition cursor-pointer text-[11px]"
-              title={chip.hint}
-            >
-              <span className="text-zinc-700 dark:text-zinc-300 truncate font-medium">
-                {chip.text}
-              </span>
-              <span className="opacity-0 group-hover:opacity-100 text-[10px] text-blue-600 dark:text-blue-400 font-bold shrink-0 ml-1">
-                +분류
-              </span>
-            </div>
-          ))}
-        </div>
+        {recentCaptures.length > 0 ? (
+          <div className="space-y-1">
+            {recentCaptures.map((item) => (
+              <div
+                key={item.id}
+                onClick={() => processTriage(item.text)}
+                className="group flex items-center justify-between p-1.5 rounded-lg bg-zinc-50/80 dark:bg-zinc-950/40 hover:bg-blue-50/60 dark:hover:bg-blue-950/30 border border-zinc-100 dark:border-zinc-800/60 transition cursor-pointer text-[11px]"
+                title="클릭하여 재분류 실행"
+              >
+                <div className="flex items-center space-x-1.5 truncate">
+                  <Clock className="w-2.5 h-2.5 text-zinc-400 shrink-0" />
+                  <span className="text-zinc-800 dark:text-zinc-200 truncate font-medium">
+                    {item.text}
+                  </span>
+                </div>
+                <div className="flex items-center space-x-1 shrink-0 ml-1">
+                  <span className="text-[9px] px-1 py-0.2 rounded font-mono bg-zinc-200/60 dark:bg-zinc-800 text-zinc-500">
+                    {item.timestamp}
+                  </span>
+                  <span className="opacity-0 group-hover:opacity-100 text-[10px] text-blue-600 dark:text-blue-400 font-bold">
+                    재분류
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="p-2 rounded-lg bg-zinc-50/50 dark:bg-zinc-950/30 border border-dashed border-zinc-200 dark:border-zinc-800 text-center">
+            <p className="text-[10px] text-zinc-400">
+              💡 입력창에 할일이나 지출을 적고 엔터를 치면 실시간으로 큐에 쌓입니다.
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );

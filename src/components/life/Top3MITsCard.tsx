@@ -33,7 +33,7 @@ const DEFAULT_MITS: MITItem[] = [
   {
     id: 'mit-1',
     priority: '🔥 P0',
-    title: '3분기 런칭 발표자료 최종 검수',
+    title: '3분기 런칭 발표자료 최종 점검',
     duration: '45m',
     completed: false,
     notes: 'Vercel 서버리스 엣지 아키텍처 및 벤치마크 지표 슬라이드 점검'
@@ -41,31 +41,35 @@ const DEFAULT_MITS: MITItem[] = [
   {
     id: 'mit-2',
     priority: '⚡ P1',
-    title: '세무 상담 필요 서류 PDF 인박스 정리',
-    duration: '20m',
+    title: '팀 스프린트 계획 회의 준비',
+    duration: '30m',
     completed: false,
-    notes: '종합소득세 및 법인카드 지출 영수증 클라우드 업로드'
+    notes: '백로그 우선순위 및 로드맵 산정'
   },
   {
     id: 'mit-3',
     priority: '☕ P2',
-    title: '헬스장 하체 루틴 및 단백질 섭취',
-    duration: '60m',
+    title: '스트레칭 및 모닝 수분 섭취',
+    duration: '15m',
     completed: true,
-    notes: '스쿼트 5세트 + 레그프레스 & 운동 후 쉐이크 섭취 완료'
+    notes: '수분 보충 및 컨디션 체크'
   }
 ];
 
 export const Top3MITsCard: React.FC<Top3MITsCardProps> = ({ tasks, onToggleTask }) => {
   const [internalMits, setInternalMits] = useState<MITItem[]>(DEFAULT_MITS);
 
-  // tasks가 전달된 경우 tasks 중 미완료/우선순위 상위 3건 매핑
+  // tasks가 전달된 경우 tasks 중 미완료/우선순위 상위 3건 매핑 (최신 생성일 unshift 우선 정렬)
   const mits: MITItem[] = tasks && tasks.length > 0 
     ? [...tasks]
         .sort((a, b) => {
           if (a.completed !== b.completed) return a.completed ? 1 : -1;
           const prioOrder: Record<string, number> = { '🔥 P0': 0, '⚡ P1': 1, '☕ P2': 2 };
-          return (prioOrder[a.priority] ?? 3) - (prioOrder[b.priority] ?? 3);
+          const prioDiff = (prioOrder[a.priority] ?? 3) - (prioOrder[b.priority] ?? 3);
+          if (prioDiff !== 0) return prioDiff;
+          const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+          const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+          return timeB - timeA;
         })
         .slice(0, 3)
         .map(t => ({

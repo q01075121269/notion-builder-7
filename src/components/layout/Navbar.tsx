@@ -5,7 +5,7 @@ import {
   Leaf,
   FileText,
   Palette,
-  Clock, 
+  Sun, 
   Settings, 
   Crown,
   ExternalLink
@@ -51,10 +51,11 @@ export const Navbar: React.FC = () => {
 
   const handleDailyRoutine = () => {
     setCurrentView('life');
+    window.dispatchEvent(new CustomEvent('open-morning-briefing'));
     setTimeout(() => {
       window.dispatchEvent(new CustomEvent('open-morning-briefing'));
-    }, 50);
-    showToast('⏰ 오늘의 데일리 루틴 브리핑 카드를 불러왔습니다.', 'info');
+    }, 120);
+    showToast('☀️ 오늘의 모닝 루틴 브리핑 카드를 불러왔습니다.', 'info');
   };
 
   return (
@@ -159,11 +160,11 @@ export const Navbar: React.FC = () => {
             {/* 데일리 루틴 퀵 버튼 */}
             <button
               onClick={handleDailyRoutine}
-              className="flex items-center space-x-1 px-2 sm:px-2.5 py-1.5 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-amber-50/70 dark:bg-amber-950/30 hover:bg-amber-100 dark:hover:bg-amber-900/40 text-amber-700 dark:text-amber-300 text-xs font-bold transition whitespace-nowrap shadow-xs cursor-pointer active:scale-95 shrink-0"
+              className="flex items-center space-x-1 px-2 sm:px-2.5 py-1.5 rounded-xl border border-amber-300/80 dark:border-amber-700/60 bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100 dark:hover:bg-amber-900/60 text-amber-800 dark:text-amber-200 text-xs font-bold transition whitespace-nowrap shadow-xs cursor-pointer active:scale-95 shrink-0"
               title="오늘의 데일리 루틴 브리핑"
             >
-              <Clock className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-              <span className="whitespace-nowrap">⏰ 루틴 브리핑</span>
+              <Sun className="w-3.5 h-3.5 text-amber-500 fill-amber-500/20 shrink-0" />
+              <span className="whitespace-nowrap">☀️ 루틴 브리핑</span>
             </button>
             
             {/* 1. Gemini 2026 모델 셀렉터 (티어 잠금 연동) */}

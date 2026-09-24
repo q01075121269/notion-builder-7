@@ -536,15 +536,6 @@ export const LifePage: React.FC = () => {
 
         {/* 우측 액션 툴바 (Linear/Apple 모노톤 스타일 정돈) */}
         <div className="flex items-center space-x-2 shrink-0">
-          {/* [ ☀️ 루틴 브리핑 ] 버튼 */}
-          <button
-            onClick={() => setIsBriefingOpen(true)}
-            className="flex items-center space-x-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs sm:text-sm font-medium bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100 dark:hover:bg-amber-900/50 text-amber-800 dark:text-amber-300 border border-amber-300/80 dark:border-amber-800/60 transition cursor-pointer shadow-2xs"
-            title="모닝 루틴 브리핑 카드 열기"
-          >
-            <Sun className="w-3.5 h-3.5 text-amber-500 fill-amber-500/20" />
-            <span className="hidden sm:inline">루틴 브리핑</span>
-          </button>
 
           {/* [ 💾 관리 ▼ (통합 드롭다운)] */}
           <div className="relative">
