@@ -11,7 +11,13 @@ import {
   Camera
 } from 'lucide-react';
 import type { AttachedFile } from '../../types/fileAttachment';
-import { parseUploadedFile } from '../../services/fileParserService';
+import {
+  parseUploadedFile,
+  validateFileBeforeParsing,
+  HWP_CONVERSION_GUIDE_MSG,
+  UNSUPPORTED_FORMAT_MSG,
+  MIN_TEXT_LENGTH_MSG
+} from '../../services/fileParserService';
 import { FileAttachmentZone } from './FileAttachmentZone';
 import { cleanDuplicateSpeech } from '../../services/quickCaptureLocalParser';
 
@@ -93,14 +99,30 @@ export const ChatInput: React.FC<{ inputPrompt?: string; onClearPrompt?: () => v
     }
   };
 
-  // 다중 파일(Multiple Files) 동시 파싱 핸들러 (Promise.all 적용)
+  // 다중 파일(Multiple Files) 동시 파싱 핸들러
   const handleAddFiles = async (fileList: FileList | null) => {
     if (!fileList || fileList.length === 0) return;
 
     const filesArray = Array.from(fileList);
-    
-    // 임시 로딩 항목 먼저 생성
-    const tempEntries: AttachedFile[] = filesArray.map(file => {
+    const validFiles: File[] = [];
+
+    for (const file of filesArray) {
+      const validation = validateFileBeforeParsing(file);
+      if (!validation.valid) {
+        if (validation.reason === 'hwp') {
+          showToast(HWP_CONVERSION_GUIDE_MSG, 'warning');
+        } else {
+          showToast(`⚠️ [${file.name}] ${UNSUPPORTED_FORMAT_MSG}`, 'error');
+        }
+        continue;
+      }
+      validFiles.push(file);
+    }
+
+    if (validFiles.length === 0) return;
+
+    // 임시 로딩 항목 생성
+    const tempEntries: AttachedFile[] = validFiles.map((file) => {
       const ext = file.name.split('.').pop()?.toLowerCase() || '';
       return {
         id: `temp_${Date.now()}_${Math.random()}`,
@@ -111,30 +133,41 @@ export const ChatInput: React.FC<{ inputPrompt?: string; onClearPrompt?: () => v
         extension: ext,
         category: 'document',
         mimeType: file.type,
-        isParsing: true
+        isParsing: true,
       };
     });
 
-    setAttachedFiles(prev => [...prev, ...tempEntries]);
+    setAttachedFiles((prev) => [...prev, ...tempEntries]);
 
-    // Promise.all로 모든 파일의 파싱 결과를 동시 처리
-    const parsedResults = await Promise.all(
-      filesArray.map(file => parseUploadedFile(file))
-    );
+    // Promise.all로 파싱 실행
+    const parsedResults = await Promise.all(validFiles.map((file) => parseUploadedFile(file)));
 
-    setAttachedFiles(prev =>
-      prev.map(item => {
-        const idx = tempEntries.findIndex(t => t.id === item.id);
-        if (idx !== -1) {
-          const parsed = parsedResults[idx];
-          if (parsed.warning || parsed.error) {
-            showToast(parsed.warning || parsed.error || '파일 파싱에 주의가 필요합니다.', 'warning');
+    setAttachedFiles((prev) => {
+      const remaining = prev.filter((item) => !tempEntries.some((t) => t.id === item.id));
+      const parsedSuccesses: AttachedFile[] = [];
+
+      parsedResults.forEach((parsed, idx) => {
+        const fileObj = validFiles[idx];
+        if (parsed.error || parsed.isTooShort || parsed.isUnsupportedHwp) {
+          if (parsed.isUnsupportedHwp) {
+            showToast(HWP_CONVERSION_GUIDE_MSG, 'warning');
+          } else {
+            showToast(`⚠️ [${fileObj.name}] ${parsed.error || MIN_TEXT_LENGTH_MSG}`, 'error');
           }
-          return parsed;
+          return;
         }
-        return item;
-      })
-    );
+
+        const textLen = (parsed.parsedContent || '').replace(/[#\-\|\*\s`]/g, '').length;
+        if (textLen < 10 && (!parsed.sheets || parsed.sheets.length === 0)) {
+          showToast(`⚠️ [${fileObj.name}] ${MIN_TEXT_LENGTH_MSG}`, 'error');
+          return;
+        }
+
+        parsedSuccesses.push(parsed);
+      });
+
+      return [...remaining, ...parsedSuccesses];
+    });
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -290,7 +323,7 @@ export const ChatInput: React.FC<{ inputPrompt?: string; onClearPrompt?: () => v
             ref={fileInputRef}
             type="file"
             multiple
-            accept=".xlsx,.xls,.csv,.docx,.txt,.md,.pdf,.png,.jpg,.jpeg,.webp,.hwp,.hwpx"
+            accept=".xlsx,.xls,.csv,.docx,.pdf,.hwpx,.txt,.md"
             onChange={handleFileChange}
             className="hidden"
           />

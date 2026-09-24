@@ -9,15 +9,85 @@ import type {
 } from '../types/notion';
 
 /**
- * 템플릿 제목 이스케이프 및 정동화(Sanitize)
+ * 프롬프트 지시문/시스템 명령어/Echo 문구 완전 박멸을 위한 정규식 패턴 목록
+ */
+export const INSTRUCTION_ECHO_PATTERNS = [
+  /(?:천북|첨부)?\s*파일(?:을|의|에)?\s*(?:반영|참고|분석|기반)[^\s]*\s*/gi,
+  /지침\s*:\s*/gi,
+  /\[지침\]\s*/gi,
+  /사용자(?:가|의)?\s*(?:첨부한|입력한|요청한)?\s*(?:표|문서|파일|데이터|프롬프트)?(?:의|를)?\s*/gi,
+  /1\s*:\s*1(?:로)?\s*(?:노션\s*DB|속성|데이터베이스)?\s*/gi,
+  /노션\s*DB\s*속성[^\s]*\s*/gi,
+  /(?:반영|참고|대조)하여\s*(?:설계|생성|구축|작성)하십시오\s*/gi,
+  /(?:설계|생성|구축|작성)하십시오\s*/gi,
+  /(?:만들어|작성해|생성해)\s*(?:주세요|줘)\s*/gi,
+  /다음은\s*사용자의\s*/gi,
+  /프롬프트\s*:\s*/gi,
+  /명령어\s*:\s*/gi,
+  /아래\s*지침에\s*따라\s*/gi,
+  /다음\s*지침을\s*준수하여\s*/gi,
+  /입력된\s*파일\s*/gi,
+  /첨부된\s*문서\s*/gi,
+  /템플릿\s*제작[^\s]*\s*/gi,
+  /템플릿을\s*(?:만들어|생성)\s*/gi,
+  /노션\s*(?:템플릿|페이지|워크스페이스)를?\s*/gi,
+  /기반으로\s*(?:작성|생성|설계)\s*/gi,
+];
+
+/**
+ * 일반 텍스트 내 프롬프트 지시어 / 시스템 Echo 제거
+ */
+export function sanitizeTextContent(raw?: string): string {
+  if (!raw) return '';
+  let cleaned = raw;
+  for (const pattern of INSTRUCTION_ECHO_PATTERNS) {
+    cleaned = cleaned.replace(pattern, '');
+  }
+  return cleaned.trim();
+}
+
+/**
+ * 맥락 기반 제목 정제기 (Contextual Title Sanitizer)
+ * - 프롬프트 지시문/명령어 문자열 완전 제거
+ * - 30자 이내의 핵심 도메인 명사형 제목만 추출하여 할당
  */
 export function sanitizeTemplateTitle(rawTitle?: string, fallback = '마스터 워크스페이스'): string {
   if (!rawTitle) return fallback;
-  const cleaned = rawTitle
+
+  // 1. 프롬프트 지시어 및 Echo 패턴 정규식으로 차단
+  let cleaned = sanitizeTextContent(rawTitle);
+
+  // 2. 따옴표, 대괄호, 마크다운 특수기호 및 특수문자 정리
+  cleaned = cleaned
     .replace(/^["'‘“`]+|["'’”`]+$/g, '')
     .replace(/[\[\]]/g, '')
+    .replace(/^[\s:\-\.=]+|[\s:\-\.=]+$/g, '')
     .trim();
-  return cleaned.length > 0 ? cleaned : fallback;
+
+  // 3. 문장형 서술어 제거 및 핵심 도메인 명사구 정제
+  cleaned = cleaned
+    .replace(/(?:을|를)\s*위한\s*/g, ' ')
+    .replace(/(?:에|의)\s*관한\s*/g, ' ')
+    .replace(/(?:에|의)\s*대한\s*/g, ' ')
+    .replace(/(?:템플릿|페이지|워크스페이스)\s*(?:생성|제작|구축)?$/g, '')
+    .trim();
+
+  // 4. 30자 이내 제한 및 핵심 도메인 명사형 제목 포맷팅
+  if (cleaned.length > 30) {
+    cleaned = cleaned.substring(0, 30).trim();
+    const lastSpace = cleaned.lastIndexOf(' ');
+    if (lastSpace > 15) {
+      cleaned = cleaned.substring(0, lastSpace).trim();
+    }
+  }
+
+  // 5. 정제 후 비어있거나 무의미한 지시문이었던 경우 fallback 리턴
+  if (!cleaned || cleaned.length < 2 || /^(프롬프트|명령어|지침|템플릿|파일|문서)$/i.test(cleaned)) {
+    const validFallback = fallback && fallback !== rawTitle ? sanitizeTemplateTitle(fallback, '마스터 워크스페이스') : '마스터 워크스페이스';
+    return validFallback;
+  }
+
+  return cleaned;
 }
 
 /**
@@ -197,11 +267,41 @@ export function buildDynamicTemplateFromPayload(payload: DynamicPayloadInput): N
   const tags = data.tags || payload.tags || ['#동적워크스페이스', '#노션빌더', '#AI에이전트3.0'];
 
   // 2. 데이터베이스 구성 (전달받은 데이터 우선 사용)
-  const databases: NotionDatabase[] = (data.databases && data.databases.length > 0)
+  const rawDatabases: NotionDatabase[] = (data.databases && data.databases.length > 0)
     ? data.databases
     : (payload.databases && payload.databases.length > 0)
       ? payload.databases
       : buildDynamicDatabases(cleanTitle, description);
+
+  // 데이터베이스 이름, 설명 및 sample_rows 지시문 echo 정제
+  const databases: NotionDatabase[] = rawDatabases.map((db) => {
+    const rawDbName = db.name.replace(/^[📌📋📂📊]\s*/, '');
+    const cleanDbName = sanitizeTemplateTitle(rawDbName, `${cleanTitle} 항목`);
+    const prefix = db.name.match(/^[📌📋📂📊]\s*/)?.[0] || '📊 ';
+    const dbName = `${prefix}${cleanDbName}`;
+    const dbDesc = sanitizeTextContent(db.description) || `${cleanDbName} 데이터베이스`;
+
+    const cleanSampleRows = db.sample_rows?.map((row) => {
+      const sanitizedRow: Record<string, any> = {};
+      Object.entries(row).forEach(([k, v]) => {
+        const cleanKey = sanitizeTextContent(k) || k;
+        let cleanVal = v;
+        if (typeof v === 'string') {
+          cleanVal = sanitizeTextContent(v);
+          if (!cleanVal) cleanVal = `${cleanTitle} 실행 항목`;
+        }
+        sanitizedRow[cleanKey] = cleanVal;
+      });
+      return sanitizedRow;
+    });
+
+    return {
+      ...db,
+      name: dbName,
+      description: dbDesc,
+      sample_rows: cleanSampleRows,
+    };
+  });
 
   // 3. 에이전트 블루프린트 구성 (전달받은 데이터 우선 사용)
   const agentBlueprint: AgentBlueprint = data.agentBlueprint || buildDynamicAgentBlueprint(cleanTitle, description);

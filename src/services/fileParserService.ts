@@ -38,6 +38,35 @@ try {
   console.warn('[PDF.js Worker Setup Warning]', e);
 }
 
+// ─── 파일 화이트리스트 및 친절한 가이드 메시지 ─────────────────────────────
+export const ALLOWED_EXTENSIONS = ['xlsx', 'xls', 'csv', 'docx', 'pdf', 'hwpx', 'txt', 'md'];
+
+export const HWP_CONVERSION_GUIDE_MSG =
+  '⚠️ 구형 한글(.hwp) 파일은 보안 바이너리 규격으로 웹에서 직접 분석할 수 없습니다. 한글 프로그램에서 [파일 -> PDF로 저장하기] 또는 [다른 이름으로 저장 -> Word(DOCX)]로 변환하여 첨부해 주세요.';
+
+export const UNSUPPORTED_FORMAT_MSG =
+  '⚠️ 분석 가능한 문서 포맷(Excel, CSV, Word, PDF, HWPX, 메모장)만 첨부할 수 있습니다.';
+
+export const MIN_TEXT_LENGTH_MSG =
+  '⚠️ 추출된 본문 텍스트가 10자 미만인 빈 파일이거나 읽을 수 없는 문서입니다.';
+
+export interface FileValidationResult {
+  valid: boolean;
+  reason?: 'hwp' | 'unsupported';
+  message?: string;
+}
+
+export function validateFileBeforeParsing(file: File): FileValidationResult {
+  const ext = file.name.split('.').pop()?.toLowerCase() || '';
+  if (ext === 'hwp') {
+    return { valid: false, reason: 'hwp', message: HWP_CONVERSION_GUIDE_MSG };
+  }
+  if (!ALLOWED_EXTENSIONS.includes(ext)) {
+    return { valid: false, reason: 'unsupported', message: UNSUPPORTED_FORMAT_MSG };
+  }
+  return { valid: true };
+}
+
 /**
  * 파일 확장자에 따른 카테고리 판별
  */
@@ -735,6 +764,18 @@ export async function parseUploadedFile(file: File): Promise<AttachedFile> {
     isParsing: true
   };
 
+  // 1차/2차 화이트리스트 사전 검증
+  const validation = validateFileBeforeParsing(file);
+  if (!validation.valid) {
+    attached.isParsing = false;
+    attached.error = validation.message;
+    if (validation.reason === 'hwp') {
+      attached.isUnsupportedHwp = true;
+      attached.warning = validation.message;
+    }
+    return attached;
+  }
+
   try {
     switch (category) {
       case 'spreadsheet': {
@@ -753,17 +794,9 @@ export async function parseUploadedFile(file: File): Promise<AttachedFile> {
         attached.parsedContent = content;
         break;
       }
-      case 'image': {
-        const { dataUrl, base64, mimeType } = await parseImageFile(file);
-        attached.previewUrl = dataUrl;
-        attached.base64 = base64;
-        attached.mimeType = mimeType;
-        attached.parsedContent = `🖼️ [첨부된 이미지: "${file.name}"] (Gemini Vision 레이아웃 및 뷰타입 역설계 연동)`;
-        break;
-      }
       case 'hwp': {
-        const lowerName = file.name.toLowerCase();
-        if (lowerName.endsWith('.hwpx')) {
+        // HWPX 파일만 파싱 허용
+        if (file.name.toLowerCase().endsWith('.hwpx')) {
           try {
             const hwpxText = await parseHwpxDocument(file);
             attached.parsedContent = hwpxText;
@@ -775,25 +808,16 @@ export async function parseUploadedFile(file: File): Promise<AttachedFile> {
             attached.summaryBadge = 'HWPX 파싱 실패';
           }
         } else {
-          // .hwp 바이너리 안전 파서
-          const result = await parseHwpDocument(file);
-          if (result.hasExtractedText && result.text) {
-            attached.parsedContent = result.text;
-            attached.summaryBadge = 'HWP 텍스트 추출 완료';
-            if (result.warning) attached.warning = result.warning;
-          } else {
-            attached.isUnsupportedHwp = true;
-            const hwpWarnMsg = "구형 HWP 파일은 보안 바이너리 포맷입니다. 정확한 데이터 분석을 위해 PDF 또는 Word(DOCX)로 변환해 첨부해주세요.";
-            attached.warning = hwpWarnMsg;
-            attached.error = hwpWarnMsg;
-            attached.parsedContent = undefined;
-            attached.summaryBadge = 'HWP 변환 필요';
-          }
+          attached.isUnsupportedHwp = true;
+          attached.error = HWP_CONVERSION_GUIDE_MSG;
+          attached.warning = HWP_CONVERSION_GUIDE_MSG;
+          attached.parsedContent = undefined;
+          attached.summaryBadge = 'HWP 변환 필요';
         }
         break;
       }
       default: {
-        attached.error = '지원되지 않는 파일 포맷입니다.';
+        attached.error = UNSUPPORTED_FORMAT_MSG;
       }
     }
   } catch (err: any) {
@@ -802,18 +826,45 @@ export async function parseUploadedFile(file: File): Promise<AttachedFile> {
   } finally {
     attached.isParsing = false;
 
-    // [칩(Badge) 요약 텍스트 정밀 산출]
-    const totalRows = attached.sheets?.reduce((acc, s) => acc + (s.rowCount || 0), 0) || 0;
-    const isMetering = /검침|계량기|수도|전기|가스|원격|meter|energy/i.test(attached.name + ' ' + (attached.parsedContent || ''));
+    // 본문 텍스트 유효 길이(10자 미만) 검증
+    if (!attached.error) {
+      let rawTextLength = 0;
+      if (attached.parsedContent) {
+        rawTextLength += attached.parsedContent.replace(/[#\-\|\*\s`]/g, '').length;
+      }
+      if (attached.sheets) {
+        attached.sheets.forEach((s) => {
+          s.rows.forEach((r) => {
+            Object.values(r).forEach((v) => {
+              if (v) rawTextLength += String(v).trim().length;
+            });
+          });
+        });
+      }
 
-    if (isMetering && totalRows > 0) {
-      attached.summaryBadge = `[실시간 검침정보] ${totalRows}개 행 파싱 완료`;
-    } else if (isMetering) {
-      attached.summaryBadge = '[실시간 검침정보] 파싱 완료';
-    } else if (totalRows > 0) {
-      attached.summaryBadge = `${totalRows}개 행 파싱 완료`;
-    } else if (attached.parsedContent) {
-      attached.summaryBadge = '파싱 완료';
+      if (rawTextLength < 10) {
+        attached.isTooShort = true;
+        attached.error = MIN_TEXT_LENGTH_MSG;
+        attached.parsedContent = undefined;
+        attached.sheets = undefined;
+        attached.summaryBadge = undefined;
+      }
+    }
+
+    // 칩(Badge) 요약 텍스트 산출
+    if (!attached.error && !attached.isTooShort) {
+      const totalRows = attached.sheets?.reduce((acc, s) => acc + (s.rowCount || 0), 0) || 0;
+      const isMetering = /검침|계량기|수도|전기|가스|원격|meter|energy/i.test(attached.name + ' ' + (attached.parsedContent || ''));
+
+      if (isMetering && totalRows > 0) {
+        attached.summaryBadge = `[실시간 검침정보] ${totalRows}개 행 파싱 완료`;
+      } else if (isMetering) {
+        attached.summaryBadge = '[실시간 검침정보] 파싱 완료';
+      } else if (totalRows > 0) {
+        attached.summaryBadge = `${totalRows}개 행 파싱 완료`;
+      } else if (attached.parsedContent) {
+        attached.summaryBadge = '파싱 완료';
+      }
     }
   }
 

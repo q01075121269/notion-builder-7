@@ -32,7 +32,13 @@ import { saveTodayOverrideConfig } from '../../services/dailyRoutineStorage';
 import { archiveAudioArtifact, archiveTextDiscussionArtifact } from '../../services/zeroRotArchiver';
 import { isNotionUrlPrompt, extractNotionUrl, generateMasterHubTemplateFromUrl } from '../../services/notionLinkAnalyzer';
 import { buildDynamicTemplateFromPayload, sanitizeTemplateTitle } from '../../services/notionDynamicBuilder';
-import { parseUploadedFile } from '../../services/fileParserService';
+import {
+  parseUploadedFile,
+  validateFileBeforeParsing,
+  HWP_CONVERSION_GUIDE_MSG,
+  UNSUPPORTED_FORMAT_MSG,
+  MIN_TEXT_LENGTH_MSG
+} from '../../services/fileParserService';
 import { createNotionTemplateInWorkspace } from '../../services/notionApi';
 import type { NotionTemplate } from '../../types/notion';
 import type { FileContextItem } from '../../types/fileAttachment';
@@ -204,6 +210,8 @@ export const OmniChatBar: React.FC = () => {
   const [isParsingFiles, setIsParsingFiles] = useState(false);
   const [showLinkModal, setShowLinkModal] = useState(false);
   const [linkInput, setLinkInput] = useState('');
+  const [hwpAlertModal, setHwpAlertModal] = useState<{ open: boolean; fileName: string }>({ open: false, fileName: '' });
+  const [isDragOver, setIsDragOver] = useState(false);
 
   // STT 상태 (Push-to-Dictate 단방향 누적 버퍼 모드)
   const [isListening, setIsListening] = useState(false);
@@ -324,18 +332,48 @@ export const OmniChatBar: React.FC = () => {
     }
   };
 
-    // ── 범용 다중 파일 첨부 (Universal File Ingestion) 파이프라인 ───────────────
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
+  // ── 범용 다중 파일 첨부 (Universal File Ingestion) 파이프라인 ───────────────
+  const processSelectedFiles = async (fileList: FileList | File[]) => {
+    const filesArray = Array.from(fileList);
+    if (filesArray.length === 0) return;
 
     setIsParsingFiles(true);
     const newItems: OmniAttachment[] = [];
 
-    for (const file of Array.from(files)) {
+    for (const file of filesArray) {
+      // 1. 사전 화이트리스트 및 .hwp 검증 (2차 검증)
+      const validation = validateFileBeforeParsing(file);
+      if (!validation.valid) {
+        if (validation.reason === 'hwp') {
+          setHwpAlertModal({ open: true, fileName: file.name });
+          showToast(HWP_CONVERSION_GUIDE_MSG, 'warning');
+        } else {
+          showToast(`⚠️ [${file.name}] ${UNSUPPORTED_FORMAT_MSG}`, 'error');
+        }
+        continue; // 즉시 첨부 목록 추가 차단
+      }
+
+      // 2. 파싱 및 유효 본문 길이 검증 (10자 미만 취소)
       try {
         showToast(`⏳ [${file.name}] 파일 데이터를 정밀 분석 중...`, 'info');
         const parsed = await parseUploadedFile(file);
+
+        if (parsed.error || parsed.isTooShort || parsed.isUnsupportedHwp) {
+          if (parsed.isUnsupportedHwp) {
+            setHwpAlertModal({ open: true, fileName: file.name });
+            showToast(HWP_CONVERSION_GUIDE_MSG, 'warning');
+          } else {
+            showToast(`⚠️ [${file.name}] ${parsed.error || MIN_TEXT_LENGTH_MSG}`, 'error');
+          }
+          continue; // 파란 배지 표시 안 하고 첨부 취소
+        }
+
+        const textLen = (parsed.parsedContent || '').replace(/[#\-\|\*\s`]/g, '').length;
+        if (textLen < 10 && (!parsed.sheets || parsed.sheets.length === 0)) {
+          showToast(`⚠️ [${file.name}] ${MIN_TEXT_LENGTH_MSG}`, 'error');
+          continue;
+        }
+
         newItems.push({
           id: parsed.id,
           name: parsed.name,
@@ -343,33 +381,48 @@ export const OmniChatBar: React.FC = () => {
           type: 'file',
           parsedContent: parsed.parsedContent,
           sheets: parsed.sheets,
-          summaryBadge: parsed.summaryBadge,
+          summaryBadge: parsed.summaryBadge || '파싱 완료',
           isParsing: false,
-          error: parsed.error,
         });
 
-        if (parsed.error) {
-          showToast(`⚠️ [${file.name}] ${parsed.error}`, 'error');
-        } else if ((parsed as any).warning) {
-          showToast((parsed as any).warning, 'info');
-        } else {
-          showToast(`📊 [${file.name}] 데이터 분석 완료 (${parsed.summaryBadge || '추출 성공'})`, 'success');
-        }
+        showToast(`📊 [${file.name}] 데이터 분석 완료 (${parsed.summaryBadge || '추출 성공'})`, 'success');
       } catch (err: any) {
-        newItems.push({
-          id: `file_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-          name: file.name,
-          sizeFormatted: `${(file.size / 1024).toFixed(1)}KB`,
-          type: 'file',
-          isParsing: false,
-          error: err.message,
-        });
+        showToast(`⚠️ [${file.name}] 파싱 처리 실패: ${err.message}`, 'error');
       }
     }
 
-    setAttachedFiles((prev) => [...prev, ...newItems]);
+    if (newItems.length > 0) {
+      setAttachedFiles((prev) => [...prev, ...newItems]);
+    }
     setIsParsingFiles(false);
     if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      processSelectedFiles(e.target.files);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      processSelectedFiles(e.dataTransfer.files);
+    }
   };
 
   const addLinkAttachment = () => {
@@ -1364,7 +1417,10 @@ export const OmniChatBar: React.FC = () => {
 
       {/* ── 옴니 챗 입력바 ─────────────────────────────────────────────────── */}
       <div
-        className="
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+        className={`
           pointer-events-auto
           w-full max-w-2xl mx-auto
           bg-slate-50 dark:bg-neutral-900
@@ -1373,8 +1429,54 @@ export const OmniChatBar: React.FC = () => {
           shadow-[0_-4px_24px_rgba(0,0,0,0.08)]
           px-3 py-2.5
           mb-14 md:mb-0
-        "
+          transition-all duration-200
+          ${isDragOver ? 'ring-4 ring-amber-400/60 bg-amber-50/50 dark:bg-amber-950/30 border-amber-500' : ''}
+        `}
       >
+        {/* 숨겨진 1차 accept 필터링 파일 탐색기 input 태그 */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          onChange={handleFileChange}
+          multiple
+          accept=".xlsx,.xls,.csv,.docx,.pdf,.hwpx,.txt,.md"
+          className="hidden"
+        />
+
+        {/* ── 구형 한글(.hwp) 변환 가이드 호박색(Amber) 경고 모달 ────────────────── */}
+        {hwpAlertModal.open && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fadeIn">
+            <div className="w-full max-w-md bg-amber-50 dark:bg-neutral-900 border-2 border-amber-500 rounded-2xl p-5 shadow-2xl space-y-4">
+              <div className="flex items-center space-x-3 text-amber-700 dark:text-amber-400">
+                <div className="w-10 h-10 rounded-xl bg-amber-500/20 flex items-center justify-center shrink-0">
+                  <span className="text-xl">⚠️</span>
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-sm sm:text-base text-amber-900 dark:text-amber-300">
+                    구형 한글(.hwp) 변환 가이드
+                  </h3>
+                  <p className="text-[11px] text-amber-700 dark:text-amber-400 font-medium">
+                    {hwpAlertModal.fileName ? `[${hwpAlertModal.fileName}] 파일 감지됨` : '파일 첨부 제한'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="bg-amber-100/70 dark:bg-amber-950/50 p-3.5 rounded-xl text-xs text-amber-900 dark:text-amber-200 font-semibold leading-relaxed border border-amber-300 dark:border-amber-800/60">
+                ⚠️ 구형 한글(.hwp) 파일은 보안 바이너리 규격으로 웹에서 직접 분석할 수 없습니다. 한글 프로그램에서 <span className="underline font-bold text-amber-900 dark:text-amber-100">[파일 -&gt; PDF로 저장하기]</span> 또는 <span className="underline font-bold text-amber-900 dark:text-amber-100">[다른 이름으로 저장 -&gt; Word(DOCX)]</span>로 변환하여 첨부해 주세요.
+              </div>
+
+              <div className="flex justify-end pt-1">
+                <button
+                  type="button"
+                  onClick={() => setHwpAlertModal({ open: false, fileName: '' })}
+                  className="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-black text-xs transition shadow-md cursor-pointer active:scale-95"
+                >
+                  확인 (첨부 취소)
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
         
         {/* ── 4대 모드 퀵 프리셋 칩 (Pill Chips) ── */}
         <div className="flex items-center gap-1.5 mb-2 overflow-x-auto no-scrollbar py-0.5">
