@@ -10,14 +10,19 @@ export type NotionPropertyType =
   | 'number'
   | 'url'
   | 'text'
-  | 'person';
+  | 'person'
+  | 'rollup'
+  | 'rich_text'
+  | 'people';
 
 export interface NotionProperty {
+  id?: string;
   name: string;
   type: NotionPropertyType;
   expression?: string; // formula 용
   options?: string[]; // status, select, multi_select 용
   target?: string; // relation 용 대상 DB명
+  [key: string]: any;
 }
 
 export interface NotionDatabase {

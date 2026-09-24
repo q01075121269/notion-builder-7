@@ -60,7 +60,7 @@ export const MainApp: React.FC = () => {
         <Navbar />
         
         {/* 뷰 모드 분기: 홈 대시보드 vs 템플릿 빌더 vs 라이프 허브 vs 개발 랩 vs AI 미디어 랩 vs 내 보관함 vs 1초 퀵 캡처 */}
-        <main className={`flex-1 flex flex-col overflow-hidden ${currentView === 'home' ? '' : 'pb-28 md:pb-16'}`}>
+        <main className={`flex-1 flex flex-col overflow-hidden ${currentView === 'home' ? 'pb-28 md:pb-16' : ''}`}>
           {currentView === 'home' ? (
             <HomePage />
           ) : currentView === 'builder' ? (
@@ -80,14 +80,14 @@ export const MainApp: React.FC = () => {
           )}
         </main>
         
-        {/* 중앙 옴니 챗바 — 홈 화면을 제외한 작업실 뷰에서 전역 하단 고정 사용 */}
-        {currentView !== 'home' && <OmniChatBar />}
+        {/* 중앙 옴니 챗바 — 메인 홈(activeTab === 'home')에서만 하단 플로팅 바로 렌더링, 전문 작업실에서는 마운트 해제하여 캔버스 세로 100% 확보 */}
+        {currentView === 'home' && <OmniChatBar />}
 
         {/* 모바일 하단 탭바 (빌더 / 보관함 / 퀵캡처) */}
-        <BottomNavbar />
+        {currentView === 'home' && <BottomNavbar />}
 
         {/* Mobile Floating Action Button (모바일에서 언제든 새 템플릿 작성으로 복귀) */}
-        <MobileFab />
+        {currentView === 'home' && <MobileFab />}
 
         {/* Global Floating Toast Alerts */}
         <Toast toast={toast} onClose={hideToast} />

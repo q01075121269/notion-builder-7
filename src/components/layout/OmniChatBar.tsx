@@ -42,6 +42,7 @@ import {
 import { createNotionTemplateInWorkspace } from '../../services/notionApi';
 import type { NotionTemplate } from '../../types/notion';
 import type { FileContextItem } from '../../types/fileAttachment';
+import { normalizeTemplatePayload } from '../../utils/schemaAdapter';
 
 // ─── 실행 영수증 카드 타입 ──────────────────────────────────────────────────
 type ReceiptType = 'builder' | 'life' | 'devlab';
@@ -588,7 +589,7 @@ export const OmniChatBar: React.FC = () => {
         const url = extractNotionUrl(text);
 
         // 1. 템플릿 역설계 & 생성
-        const generatedTemplate = generateMasterHubTemplateFromUrl(url, text);
+        const generatedTemplate = normalizeTemplatePayload(generateMasterHubTemplateFromUrl(url, text))!;
 
         // 2. 전역 템플릿 주입 & 큐레이션 허브 닫기 (즉시 미리보기 렌더링 활성화)
         setCurrentTemplate(generatedTemplate);
@@ -737,7 +738,7 @@ export const OmniChatBar: React.FC = () => {
       // [🚨 핵심 방어: 템플릿 마스터 우선주의 및 오피스 스튜디오 오라우팅 원천 차단]
       const isBuilderChipActive = activeMode === 'builder';
       const hasFileAttachment = attachedFiles.length > 0;
-      const isTemplateRelated = /템플릿|노션|db|데이터베이스|대시보드|시설|객실|하자|아덴힐|체크리스트|자격증|수험|합격/i.test(pureText);
+      const isTemplateRelated = /템플릿|노션|db|데이터베이스|대시보드|체크리스트|스케줄러|트래커|관리|워크스페이스/i.test(pureText);
 
       let effectiveIntent = response.intent;
       if ((isBuilderChipActive || hasFileAttachment || isTemplateRelated) && response.intent === 'DEVLAB') {
@@ -885,20 +886,8 @@ export const OmniChatBar: React.FC = () => {
                   }
                 });
 
-                let cleanDbName = `📋 ${file.name.replace(/\.[^.]+$/, '')} 마스터 DB`;
-                const lowerFileName = (file.name + ' ' + rawCols.join(' ')).toLowerCase();
-                // [중요: '소음|층간'을 최우선 판별하여 소음민원이 '민원'에 가로채이지 않도록 함]
-                if (/소음|층간/i.test(lowerFileName)) {
-                  cleanDbName = '🔇 [DB 2] 세대간 층간소음 중재 관리 DB';
-                } else if (/누수|하자|방수/i.test(lowerFileName)) {
-                  cleanDbName = '💧 [DB 3] 세대 누수 및 하자보수 관리 DB';
-                } else if (/민원|조치|일지|접수/i.test(lowerFileName)) {
-                  cleanDbName = '📋 [DB 1] 일반 민원 접수·조치 일지';
-                } else if (lowerFileName.includes('검침')) {
-                  cleanDbName = '⚡ 원격검침 실시간 모니터링 관리 DB';
-                } else if (lowerFileName.includes('ardenhill') || lowerFileName.includes('아덴힐')) {
-                  cleanDbName = '🏢 [아덴힐] 객실 및 시설 점검 마스터 DB';
-                }
+                const baseName = file.name.replace(/\.[^.]+$/, '').trim();
+                const cleanDbName = `📋 ${baseName || '데이터'} 마스터 DB`;
 
                 extractedAttachedSchemas.push({
                   name: cleanDbName,
@@ -926,9 +915,7 @@ export const OmniChatBar: React.FC = () => {
 
         let targetTemplate: NotionTemplate;
         if (response.payload?.preset_key && PRESET_TEMPLATES[response.payload.preset_key]) {
-          targetTemplate = PRESET_TEMPLATES[response.payload.preset_key];
-        } else if (/자격증|수험생|시험|공부|오답노트/.test(text) && PRESET_TEMPLATES.certification_exam) {
-          targetTemplate = PRESET_TEMPLATES.certification_exam;
+          targetTemplate = normalizeTemplatePayload(PRESET_TEMPLATES[response.payload.preset_key])!;
         } else {
           // AI 오케스트레이터 payload 기반 동적 템플릿 즉석 빌드
           const allAttachedNames = attachedFiles.map((a) => a.name).join(' ');
@@ -938,7 +925,7 @@ export const OmniChatBar: React.FC = () => {
           const sanitizedTopic = sanitizeTemplateTitle(rawTopic, fallbackTopic);
           const sanitizedTitle = sanitizeTemplateTitle(rawTitle, fallbackTopic);
 
-          targetTemplate = buildDynamicTemplateFromPayload({
+          const built = buildDynamicTemplateFromPayload({
             topic: sanitizedTopic,
             title: sanitizedTitle,
             initialPrompt: text,
@@ -947,6 +934,7 @@ export const OmniChatBar: React.FC = () => {
             valueAdd: response.payload?.value_add as string[],
             complexity: response.payload?.complexity as string
           });
+          targetTemplate = normalizeTemplatePayload(built)!;
         }
 
         if (targetTemplate) {

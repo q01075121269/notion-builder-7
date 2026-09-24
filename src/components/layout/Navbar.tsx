@@ -62,14 +62,14 @@ export const Navbar: React.FC = () => {
 
   return (
     <>
-      <header className="sticky top-0 z-50 w-full h-14 bg-white/95 dark:bg-notion-dark-bg/95 backdrop-blur-md border-b border-neutral-200/90 dark:border-notion-dark-border transition-colors select-none overflow-visible">
+      <header className="sticky top-0 z-50 w-full h-14 bg-gradient-to-r from-zinc-100 via-slate-100 to-zinc-200 dark:from-zinc-900 dark:via-zinc-850 dark:to-zinc-800 border-b border-zinc-300 dark:border-zinc-700 transition-colors select-none overflow-visible">
         <div className="w-full max-w-[1600px] mx-auto px-2 sm:px-4 h-full flex items-center justify-between gap-1.5 sm:gap-3 flex-nowrap overflow-visible relative z-50">
           
           {/* [좌측]: Notion Architect 심플 로고 (클릭 시 홈 대시보드로 이동) */}
           <div className="flex items-center space-x-2 shrink-0">
             <button 
               onClick={() => setCurrentView('home')}
-              className="w-8 h-8 rounded-xl bg-neutral-900 dark:bg-white flex items-center justify-center text-white dark:text-neutral-900 font-bold text-base shadow-xs hover:scale-105 transition cursor-pointer shrink-0"
+              className="w-8 h-8 rounded-xl bg-zinc-900 dark:bg-zinc-100 flex items-center justify-center text-white dark:text-zinc-900 font-bold text-base shadow-xs hover:scale-105 transition cursor-pointer shrink-0"
               title="홈 대시보드로 이동"
             >
               <span>N</span>
@@ -78,42 +78,42 @@ export const Navbar: React.FC = () => {
               className="flex items-center space-x-1.5 cursor-pointer shrink-0"
               onClick={() => setCurrentView('home')}
             >
-              <span className="font-bold text-xs sm:text-sm md:text-base tracking-tight text-neutral-900 dark:text-white whitespace-nowrap">
+              <span className="font-bold text-xs sm:text-sm md:text-base tracking-tight text-zinc-900 dark:text-zinc-100 whitespace-nowrap">
                 Notion Architect
               </span>
-              <span className="hidden xl:inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 whitespace-nowrap">
+              <span className="hidden xl:inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 whitespace-nowrap border border-zinc-300 dark:border-zinc-700">
                 AI Studio
               </span>
             </div>
           </div>
 
-          {/* [중앙]: [🏗️ 템플릿 마스터 | 🌱 라이프 Hub | 📄 오피스 스튜디오 | 🎨 AI 미디어 랩] 4대 메인 탭 */}
-          <div className="flex items-center bg-neutral-100/90 dark:bg-neutral-800/80 p-1 rounded-xl border border-neutral-200/70 dark:border-neutral-700/60 shrink-0 gap-0.5 sm:gap-1">
+          {/* [중앙]: [🏗️ 템플릿 마스터 | 🌱 라이프 Hub | 📄 오피스 스튜디오 | 🎨 AI 미디어 랩] 4대 메인 탭 (모노톤 & 메탈릭) */}
+          <div className="flex items-center bg-zinc-200/70 dark:bg-zinc-800/80 p-1 rounded-xl border border-zinc-300 dark:border-zinc-700 shrink-0 gap-0.5 sm:gap-1">
             {/* 1. 🏗️ 템플릿 마스터 */}
             <button
               onClick={() => setCurrentView('builder')}
               className={`flex items-center space-x-1 px-2 sm:px-2.5 py-1.5 text-xs font-semibold rounded-lg transition whitespace-nowrap cursor-pointer ${
                 currentView === 'builder'
-                  ? 'bg-white dark:bg-notion-dark-card text-amber-600 dark:text-amber-400 font-bold shadow-xs'
-                  : 'text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white'
+                  ? 'bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 font-bold shadow-xs border border-zinc-300 dark:border-zinc-700'
+                  : 'text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100'
               }`}
               title="템플릿 마스터"
             >
-              <Sparkles className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+              <Sparkles className="w-3.5 h-3.5 text-zinc-600 dark:text-zinc-300 shrink-0" />
               <span className="whitespace-nowrap">🏗️ 템플릿 마스터</span>
             </button>
 
-            {/* 2. 🌱 라이프 Hub (기존 잘못된 중복 루틴 명칭을 라이프 Hub로 정정) */}
+            {/* 2. 🌱 라이프 Hub */}
             <button
               onClick={() => setCurrentView('life')}
               className={`flex items-center space-x-1 px-2 sm:px-2.5 py-1.5 text-xs font-semibold rounded-lg transition whitespace-nowrap cursor-pointer ${
                 currentView === 'life'
-                  ? 'bg-white dark:bg-notion-dark-card text-emerald-600 dark:text-emerald-400 font-bold shadow-xs'
-                  : 'text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white'
+                  ? 'bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 font-bold shadow-xs border border-zinc-300 dark:border-zinc-700'
+                  : 'text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100'
               }`}
               title="라이프 Hub & 루틴 관리"
             >
-              <Leaf className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+              <Leaf className="w-3.5 h-3.5 text-zinc-600 dark:text-zinc-300 shrink-0" />
               <span className="whitespace-nowrap">🌱 라이프 Hub</span>
             </button>
 
@@ -122,12 +122,12 @@ export const Navbar: React.FC = () => {
               onClick={() => setCurrentView('devlab')}
               className={`flex items-center space-x-1 px-2 sm:px-2.5 py-1.5 text-xs font-semibold rounded-lg transition whitespace-nowrap cursor-pointer ${
                 currentView === 'devlab'
-                  ? 'bg-white dark:bg-notion-dark-card text-blue-600 dark:text-blue-400 font-bold shadow-xs'
-                  : 'text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white'
+                  ? 'bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 font-bold shadow-xs border border-zinc-300 dark:border-zinc-700'
+                  : 'text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100'
               }`}
               title="오피스 스튜디오"
             >
-              <FileText className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+              <FileText className="w-3.5 h-3.5 text-zinc-600 dark:text-zinc-300 shrink-0" />
               <span className="whitespace-nowrap">📄 오피스 스튜디오</span>
             </button>
 
@@ -136,12 +136,12 @@ export const Navbar: React.FC = () => {
               onClick={() => setCurrentView('media_lab')}
               className={`flex items-center space-x-1 px-2 sm:px-2.5 py-1.5 text-xs font-semibold rounded-lg transition whitespace-nowrap cursor-pointer ${
                 currentView === 'media_lab'
-                  ? 'bg-white dark:bg-notion-dark-card text-purple-600 dark:text-purple-400 font-bold shadow-xs'
-                  : 'text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white'
+                  ? 'bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 font-bold shadow-xs border border-zinc-300 dark:border-zinc-700'
+                  : 'text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100'
               }`}
               title="AI 미디어 랩"
             >
-              <Palette className="w-3.5 h-3.5 text-purple-500 shrink-0" />
+              <Palette className="w-3.5 h-3.5 text-zinc-600 dark:text-zinc-300 shrink-0" />
               <span className="whitespace-nowrap">🎨 AI 미디어 랩</span>
             </button>
           </div>
@@ -151,12 +151,12 @@ export const Navbar: React.FC = () => {
             {/* 👑 통합 허브 */}
             <button
               onClick={handleOpenMasterHub}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-900 text-white hover:bg-slate-800 transition-colors shadow-sm cursor-pointer border border-slate-800 shrink-0 tracking-tight"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-zinc-900 text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200 transition-colors shadow-xs cursor-pointer border border-zinc-700 dark:border-zinc-300 shrink-0 tracking-tight"
               title="내 노션 통합 허브 워크스페이스 새 탭 열기"
             >
-              <Crown className="w-3.5 h-3.5 text-slate-200 shrink-0" />
+              <Crown className="w-3.5 h-3.5 text-zinc-200 dark:text-zinc-700 shrink-0" />
               <span className="whitespace-nowrap">👑 통합 허브</span>
-              <ExternalLink className="w-3 h-3 opacity-70 shrink-0 text-slate-300" />
+              <ExternalLink className="w-3 h-3 opacity-70 shrink-0 text-zinc-300 dark:text-zinc-600" />
             </button>
 
             {/* 데일리 루틴 퀵 버튼 */}

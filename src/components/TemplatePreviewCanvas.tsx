@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import type { NotionTemplate, NotionDatabase, NotionProperty, NotionPropertyType } from '../types/notion';
 import { ResizableSplitLayout } from './ui/ResizableSplitLayout';
 import { NotionCover } from './preview/NotionCover';
@@ -9,24 +9,20 @@ import { TemplateSchemaTable } from './preview/TemplateSchemaTable';
 import { TemplateBenchmarkCard } from './preview/TemplateBenchmarkCard';
 import { StructureTreeView } from './preview/StructureTreeView';
 import { AgentBlueprintCallout } from './preview/AgentBlueprintCallout';
+import { InspectorChat } from './workspace/InspectorChat';
 import { ensureTemplateAgentBlueprint } from '../services/notionDynamicBuilder';
 import { saveArchivedTemplate } from '../services/archiveStorage';
 import { getSafeProperties } from '../lib/templateUtils';
+import { normalizeTemplatePayload } from '../utils/schemaAdapter';
 import { useApp } from '../context/AppContext';
 import {
-  Layers,
   BookmarkCheck,
   Sparkles,
   Database,
   ShieldCheck,
-  Activity,
-  CheckCircle2,
-  Clock,
-  ArrowRight,
   Calculator,
   Zap,
   Tag,
-  Radio,
   MessageSquare,
   Loader2,
   FileText,
@@ -34,8 +30,6 @@ import {
   Code2,
   Share2,
   ChevronLeft,
-  ChevronRight,
-  SlidersHorizontal,
   RotateCcw
 } from 'lucide-react';
 
@@ -45,7 +39,7 @@ export interface TemplatePreviewCanvasProps {
 
 const VAULT_STORAGE_KEY = 'notion_template_vault_draft';
 
-export const TemplatePreviewCanvas: React.FC<TemplatePreviewCanvasProps> = ({ template }) => {
+export const TemplatePreviewCanvas: React.FC<TemplatePreviewCanvasProps> = ({ template: rawTemplate }) => {
   const { 
     setPendingChatPrompt, 
     setActiveMobileTab, 
@@ -59,6 +53,9 @@ export const TemplatePreviewCanvas: React.FC<TemplatePreviewCanvasProps> = ({ te
     isGenerating,
   } = useApp();
 
+  // [Step 1: DB properties 스키마 어댑터 정규화 - 런타임 타입 충돌 원천 차단]
+  const template = useMemo(() => normalizeTemplatePayload(rawTemplate), [rawTemplate]);
+
   const [selectedDbId, setSelectedDbId] = useState<string | null>(null);
 
   // [Step 4] Memory Vault & 캔버스 인라인 편집기 상태 관리
@@ -69,7 +66,8 @@ export const TemplatePreviewCanvas: React.FC<TemplatePreviewCanvasProps> = ({ te
       if (saved) {
         const parsed = JSON.parse(saved);
         if (parsed && parsed.databases && parsed.databases.length > 0 && parsed.title === template.title) {
-          return ensureTemplateAgentBlueprint(parsed);
+          const normalizedSaved = normalizeTemplatePayload(parsed);
+          return normalizedSaved ? ensureTemplateAgentBlueprint(normalizedSaved) : null;
         }
       }
     } catch (e) {
@@ -91,13 +89,16 @@ export const TemplatePreviewCanvas: React.FC<TemplatePreviewCanvasProps> = ({ te
     return () => window.removeEventListener('canvas:reset', handleReset);
   }, []);
 
-  // template prop이 외부에서 완전히 변경되었을 때 (예: 다른 프리셋 선택)
+  // template prop이 외부에서 완전히 변경되었을 때
   useEffect(() => {
     if (!template) {
       setEditableTemplate(null);
     } else {
       const updated = ensureTemplateAgentBlueprint(template);
       setEditableTemplate(updated);
+      if (updated.databases.length > 0) {
+        setSelectedDbId(updated.databases[0].name);
+      }
     }
   }, [template]);
 
@@ -115,9 +116,7 @@ export const TemplatePreviewCanvas: React.FC<TemplatePreviewCanvasProps> = ({ te
     }
   }, [editableTemplate]);
 
-  // 초기화 핸들러 (원래 템플릿 복원)
-  
-  // [Step 5 신규] 캔버스에서 인라인 수정한 스키마를 보관함에 즉시 덮어쓰기(Upsert) 저장
+  // 인라인 수정한 스키마를 보관함에 덮어쓰기 저장
   const handleSaveToArchive = () => {
     if (!editableTemplate) return;
 
@@ -136,7 +135,7 @@ export const TemplatePreviewCanvas: React.FC<TemplatePreviewCanvasProps> = ({ te
       description: updatedTemplate.description || '캔버스 인라인 편집 템플릿',
       icon: updatedTemplate.icon || '📑',
       cover_url: updatedTemplate.cover_url || 'https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=1600&q=80',
-      tags: ['#내가만든템플릿', '#캔버스편집', '#에이전트3.0'],
+      tags: ['#내가만든템플릿', '#캔버스편집', '#NOA인스펙터'],
       templateData: updatedTemplate,
       source: 'created',
       createdAt: Date.now(),
@@ -265,12 +264,26 @@ export const TemplatePreviewCanvas: React.FC<TemplatePreviewCanvasProps> = ({ te
       if (!updatedDbs[dbIndex]) return prev;
       const currentProps = getSafeProperties(updatedDbs[dbIndex].properties);
       const newIndex = currentProps.length + 1;
-      const newProp: NotionProperty = { name: `새 속성 ${newIndex}`, type: "text" };
+      const newProp: NotionProperty = { name: `새 속성 ${newIndex}`, type: "rich_text" };
       updatedDbs[dbIndex] = { ...updatedDbs[dbIndex], properties: [...currentProps, newProp] };
       const res: NotionTemplate = { ...prev, title: prev.title || "", databases: updatedDbs };
       return res;
     });
     showToast("새 속성이 추가되었습니다. 캔버스에서 명칭과 타입을 설정하세요.", "success");
+  };
+
+  // 5-1. 인스펙터 커스텀 속성 추가 핸들러
+  const handleAddCustomProperty = (dbIndex: number, property: NotionProperty) => {
+    if (!editableTemplate) return;
+    setEditableTemplate((prev): NotionTemplate | null => {
+      if (!prev) return null;
+      const updatedDbs = [...prev.databases];
+      if (!updatedDbs[dbIndex]) return prev;
+      const currentProps = getSafeProperties(updatedDbs[dbIndex].properties);
+      updatedDbs[dbIndex] = { ...updatedDbs[dbIndex], properties: [...currentProps, property] };
+      return { ...prev, databases: updatedDbs };
+    });
+    showToast(`"${property.name}" 속성이 추가되었습니다.`, "success");
   };
 
   // 6. 새 관계형 데이터베이스 추가
@@ -334,213 +347,29 @@ export const TemplatePreviewCanvas: React.FC<TemplatePreviewCanvasProps> = ({ te
   };
 
   return (
-    <div className="w-full h-full min-h-0 overflow-hidden bg-white dark:bg-notion-dark-bg">
+    <div className="w-full h-full min-h-0 overflow-hidden bg-white dark:bg-zinc-950 font-sans">
+      {/* 2단 리사이저블 분할 레이아웃: 좌측 메인 캔버스 75% ↔ 우측 NOA 인스펙터 25% (기본값) */}
       <ResizableSplitLayout
+        side="right"
         defaultRatio={25}
         minRatio={15}
         maxRatio={40}
-        minPixelWidth={230}
-        storageKey="template_builder_resizable_split_v2"
+        minPixelWidth={260}
+        storageKey="template_builder_inspector_split_v1"
         className="h-full min-h-0"
-        leftContent={({ toggleCollapse }) => (
-          <div className="flex flex-col h-full min-h-0 bg-slate-50 dark:bg-slate-900/60 border-r border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200">
-            {/* 좌측 사이드바 상단 헤더 & [◀ 접기] 토글 버튼 */}
-            <div className="h-11 px-3.5 flex items-center justify-between border-b border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xs shrink-0 select-none">
-              <div className="flex items-center space-x-1.5 min-w-0">
-                <SlidersHorizontal className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-                <span className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate whitespace-nowrap">
-                  에이전트 3.0 패널
-                </span>
-              </div>
-              <button
-                type="button"
-                onClick={toggleCollapse}
-                className="flex items-center space-x-1 px-2 py-1 rounded-md text-[11px] font-semibold text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition active:scale-95 cursor-pointer whitespace-nowrap"
-                title="좌측 패널 접기 (전체화면 모드)"
-              >
-                <ChevronLeft className="w-3.5 h-3.5" />
-                <span>접기</span>
-              </button>
-            </div>
-
-            {/* 좌측 패널 스크롤 가능 영역 */}
-            <div className="flex-1 min-h-0 overflow-y-auto p-3.5 space-y-4">
-              {/* 1. 에이전트 3.0 상태 모니터링 카드 */}
-              <div className="rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-3 shadow-xs">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center space-x-1.5">
-                    <Radio className="w-3.5 h-3.5 text-emerald-500 animate-pulse shrink-0" />
-                    <span className="text-xs font-bold text-slate-900 dark:text-slate-100 whitespace-nowrap">
-                      에이전트 3.0 상태
-                    </span>
-                  </div>
-                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 whitespace-nowrap">
-                    ● Active
-                  </span>
-                </div>
-
-                <div className="space-y-1.5 text-[11px] text-slate-600 dark:text-slate-400">
-                  <div className="flex items-center justify-between">
-                    <span className="whitespace-nowrap">전담 서브에이전트</span>
-                    <span className="font-medium text-slate-800 dark:text-slate-200 whitespace-nowrap">총괄 PM 에이전트</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="whitespace-nowrap">트리거 체이닝</span>
-                    <span className="font-medium text-slate-800 dark:text-slate-200 whitespace-nowrap">스케줄(09:00) + 이벤트</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="whitespace-nowrap">감사 로그 상태</span>
-                    <span className="inline-flex items-center text-emerald-600 dark:text-emerald-400 font-semibold whitespace-nowrap">
-                      <CheckCircle2 className="w-2.5 h-2.5 mr-0.5" />
-                      Heartbeat 정상
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="whitespace-nowrap">품질 게이트</span>
-                    <span className="inline-flex items-center text-emerald-600 dark:text-emerald-400 font-semibold whitespace-nowrap">
-                      <ShieldCheck className="w-2.5 h-2.5 mr-0.5" />
-                      Verified 100%
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* 2. 네비게이션 바로가기 (DB 및 섹션 목록) */}
-              <div className="rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-3 shadow-xs">
-                <div className="flex items-center space-x-1.5 mb-2">
-                  <Layers className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-                  <span className="text-xs font-bold text-slate-900 dark:text-slate-100 whitespace-nowrap">
-                    템플릿 DB 바로가기 ({totalDatabases})
-                  </span>
-                </div>
-
-                <div className="space-y-1 max-h-48 overflow-y-auto pr-0.5">
-                  {(editableTemplate?.databases || []).map((db, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => scrollToDb(db.name)}
-                      className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-[11px] text-left transition whitespace-nowrap cursor-pointer ${
-                        selectedDbId === db.name
-                          ? 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white font-bold border border-slate-300 dark:border-slate-700'
-                          : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-slate-100'
-                      }`}
-                    >
-                      <div className="flex items-center space-x-1.5 truncate">
-                        <Database className="w-3 h-3 text-slate-400 shrink-0" />
-                        <span className="truncate">{db.name}</span>
-                      </div>
-                      <span className="text-[9px] px-1.5 py-0.2 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 font-mono shrink-0 whitespace-nowrap">
-                        {getSafeProperties(db.properties).length} 속성
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* 3. 추천 에이전트 스킬 프리셋 */}
-              <div className="rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-3 shadow-xs">
-                <div className="flex items-center space-x-1.5 mb-2">
-                  <Sparkles className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-                  <span className="text-xs font-bold text-slate-900 dark:text-slate-100 whitespace-nowrap">
-                    추천 에이전트 스킬 주입
-                  </span>
-                </div>
-
-                <div className="space-y-1.5">
-                  <button
-                    onClick={() =>
-                      handleApplySkill(
-                        'D-Day 1일 이내 미완료 태스크를 상단 콜아웃에 실시간 긴급 경고 뱃지로 띄우는 알림 스킬을 추가해줘.',
-                        '마감 24h 긴급 알림'
-                      )
-                    }
-                    className="w-full flex items-center justify-between p-2 rounded-lg bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-[11px] font-medium transition cursor-pointer text-left border border-slate-200/60 dark:border-slate-700/60"
-                  >
-                    <div className="flex items-center space-x-1.5 truncate">
-                      <Clock className="w-3 h-3 text-amber-500 shrink-0" />
-                      <span className="truncate whitespace-nowrap">마감 24h 긴급 알림</span>
-                    </div>
-                    <ArrowRight className="w-3 h-3 text-slate-400 shrink-0" />
-                  </button>
-
-                  <button
-                    onClick={() =>
-                      handleApplySkill(
-                        '매일 자정 dateBetween() 수식과 진행률 롤업 게이지를 자동 갱신하고 지연 태스크를 자동 분류하는 수식 스킬을 붙여줘.',
-                        'D-Day 자정 자동 갱신'
-                      )
-                    }
-                    className="w-full flex items-center justify-between p-2 rounded-lg bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-[11px] font-medium transition cursor-pointer text-left border border-slate-200/60 dark:border-slate-700/60"
-                  >
-                    <div className="flex items-center space-x-1.5 truncate">
-                      <Calculator className="w-3 h-3 text-purple-500 shrink-0" />
-                      <span className="truncate whitespace-nowrap">D-Day 자정 자동 갱신</span>
-                    </div>
-                    <ArrowRight className="w-3 h-3 text-slate-400 shrink-0" />
-                  </button>
-
-                  <button
-                    onClick={() =>
-                      handleApplySkill(
-                        '매주 월요일 08:30 지난주 완료 실적과 이번 주 집중 과제 TOP 3을 대시보드 상단에 3줄 요약 브리핑하는 스킬을 장착해줘.',
-                        '주간 결산 브리핑'
-                      )
-                    }
-                    className="w-full flex items-center justify-between p-2 rounded-lg bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-[11px] font-medium transition cursor-pointer text-left border border-slate-200/60 dark:border-slate-700/60"
-                  >
-                    <div className="flex items-center space-x-1.5 truncate">
-                      <Activity className="w-3 h-3 text-blue-500 shrink-0" />
-                      <span className="truncate whitespace-nowrap">주간 결산 브리핑</span>
-                    </div>
-                    <ArrowRight className="w-3 h-3 text-slate-400 shrink-0" />
-                  </button>
-
-                  <button
-                    onClick={() =>
-                      handleApplySkill(
-                        '하단에 Agent_Heartbeat_Log 감사 DB를 연결하고, 모든 자동화 트리거와 무손실 검증 이력을 기록하도록 구성해줘.',
-                        '감사 로그 DB 연동'
-                      )
-                    }
-                    className="w-full flex items-center justify-between p-2 rounded-lg bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-[11px] font-medium transition cursor-pointer text-left border border-slate-200/60 dark:border-slate-700/60"
-                  >
-                    <div className="flex items-center space-x-1.5 truncate">
-                      <ShieldCheck className="w-3 h-3 text-emerald-500 shrink-0" />
-                      <span className="truncate whitespace-nowrap">감사 로그 DB 연동</span>
-                    </div>
-                    <ArrowRight className="w-3 h-3 text-slate-400 shrink-0" />
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-        rightContent={({ isCollapsed, toggleCollapse }) => (
-          <div className="flex flex-col h-full min-h-0 w-full overflow-hidden bg-white dark:bg-notion-dark-bg">
-            {/* 1. 상단 툴바 (뷰 전환 및 공유/배포 액션) - 고정 Header */}
-            <div className="h-11 px-3 sm:px-6 bg-white/95 dark:bg-notion-dark-bg/95 backdrop-blur-md border-b border-neutral-200/80 dark:border-notion-dark-border flex items-center justify-between gap-2 shrink-0 select-none z-20">
+        mainContent={({ isCollapsed, toggleCollapse }) => (
+          <div className="flex flex-col h-full min-h-0 w-full overflow-hidden bg-white dark:bg-zinc-950">
+            {/* 1. 상단 툴바: 은은한 실버/아연 그라데이션 & 메탈릭 미니멀 룩 (뷰 전환 및 공유/배포) */}
+            <div className="h-11 px-3 sm:px-6 bg-gradient-to-r from-zinc-100 via-slate-100 to-zinc-200 dark:from-zinc-900 dark:via-zinc-850 dark:to-zinc-800 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between gap-2 shrink-0 select-none z-20">
               <div className="flex items-center space-x-2 shrink-0">
-                {/* 좌측 패널이 접혔을 때 나타나는 [▶ 펼치기] 버튼 */}
-                {isCollapsed && (
-                  <button
-                    type="button"
-                    onClick={toggleCollapse}
-                    className="flex items-center space-x-1 px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 transition text-xs font-bold whitespace-nowrap cursor-pointer"
-                    title="좌측 에이전트 패널 펼치기"
-                  >
-                    <ChevronRight className="w-3.5 h-3.5" />
-                    <span>패널 열기</span>
-                  </button>
-                )}
-
                 {/* 뷰 모드 전환 토글 (페이지 뷰 vs 구조 트리 뷰) */}
-                <div className="flex items-center bg-slate-100 dark:bg-slate-800/80 p-0.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-medium">
+                <div className="flex items-center bg-white/80 dark:bg-zinc-800/80 p-0.5 rounded-lg border border-zinc-300 dark:border-zinc-700 text-xs font-medium">
                   <button
                     onClick={() => setPreviewMode('notion')}
                     className={`flex items-center space-x-1 px-2.5 py-1 rounded-md transition whitespace-nowrap cursor-pointer ${
                       previewMode === 'notion'
-                        ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white font-bold shadow-xs'
-                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                        ? 'bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 font-bold shadow-xs'
+                        : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200'
                     }`}
                   >
                     <FileText className="w-3.5 h-3.5" />
@@ -550,8 +379,8 @@ export const TemplatePreviewCanvas: React.FC<TemplatePreviewCanvasProps> = ({ te
                     onClick={() => setPreviewMode('tree')}
                     className={`flex items-center space-x-1 px-2.5 py-1 rounded-md transition whitespace-nowrap cursor-pointer ${
                       previewMode === 'tree'
-                        ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white font-bold shadow-xs'
-                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                        ? 'bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 font-bold shadow-xs'
+                        : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200'
                     }`}
                   >
                     <GitBranch className="w-3.5 h-3.5" />
@@ -560,21 +389,20 @@ export const TemplatePreviewCanvas: React.FC<TemplatePreviewCanvasProps> = ({ te
                 </div>
               </div>
 
-              {/* 우측 유틸리티 버튼 (JSON 보기, 배포, 내보내기) */}
+              {/* 우측 유틸리티 버튼 (JSON 보기, 보관함, 배포, 인스펙터 패널 토글) */}
               <div className="flex items-center space-x-1.5 sm:space-x-2 shrink-0">
-                
                 <button
                   onClick={handleSaveToArchive}
-                  className="flex items-center space-x-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 shadow-2xs transition cursor-pointer whitespace-nowrap"
+                  className="flex items-center space-x-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold text-zinc-700 dark:text-zinc-200 bg-white/90 dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700 border border-zinc-300 dark:border-zinc-700 shadow-2xs transition cursor-pointer whitespace-nowrap"
                   title="현재 인라인 수정한 스키마를 내 보관함에 즉시 덮어쓰기(업데이트) 저장합니다"
                 >
-                  <BookmarkCheck className="w-3.5 h-3.5 text-amber-500" />
+                  <BookmarkCheck className="w-3.5 h-3.5 text-zinc-600 dark:text-zinc-300" />
                   <span className="hidden sm:inline">보관함 저장</span>
                 </button>
 
                 <button
                   onClick={() => setIsRawJsonModalOpen(true)}
-                  className="flex items-center space-x-1 px-2.5 py-1 rounded-lg text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 transition cursor-pointer whitespace-nowrap"
+                  className="flex items-center space-x-1 px-2.5 py-1 rounded-lg text-xs font-medium text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200/60 dark:hover:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 transition cursor-pointer whitespace-nowrap"
                   title="템플릿 JSON 원본 코드 확인"
                 >
                   <Code2 className="w-3.5 h-3.5" />
@@ -583,7 +411,7 @@ export const TemplatePreviewCanvas: React.FC<TemplatePreviewCanvasProps> = ({ te
 
                 <button
                   onClick={() => setIsExportModalOpen(true)}
-                  className="flex items-center space-x-1 px-2.5 py-1 rounded-lg text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 transition cursor-pointer whitespace-nowrap"
+                  className="flex items-center space-x-1 px-2.5 py-1 rounded-lg text-xs font-medium text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200/60 dark:hover:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 transition cursor-pointer whitespace-nowrap"
                   title="PDF / 마크다운 / HTML 내보내기"
                 >
                   <Share2 className="w-3.5 h-3.5" />
@@ -593,7 +421,7 @@ export const TemplatePreviewCanvas: React.FC<TemplatePreviewCanvasProps> = ({ te
                 <button
                   onClick={publishToNotion}
                   disabled={isPublishing || !editableTemplate}
-                  className="flex items-center space-x-1.5 px-3 py-1 rounded-lg text-xs font-bold text-white bg-slate-900 hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 shadow-xs transition disabled:opacity-50 cursor-pointer whitespace-nowrap"
+                  className="flex items-center space-x-1.5 px-3 py-1 rounded-lg text-xs font-bold text-white bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white shadow-xs transition disabled:opacity-50 cursor-pointer whitespace-nowrap"
                 >
                   {isPublishing ? (
                     <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -602,74 +430,87 @@ export const TemplatePreviewCanvas: React.FC<TemplatePreviewCanvasProps> = ({ te
                   )}
                   <span>{isPublishing ? '배포 중...' : '노션에 바로 배포'}</span>
                 </button>
+
+                {/* 우측 인스펙터 패널이 접혔을 때 나타나는 [◀ NOA 인스펙터] 버튼 */}
+                {isCollapsed && (
+                  <button
+                    type="button"
+                    onClick={toggleCollapse}
+                    className="flex items-center space-x-1 px-2.5 py-1 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-700 transition text-xs font-bold whitespace-nowrap cursor-pointer shadow-2xs"
+                    title="우측 NOA 인스펙터 챗 펼치기"
+                  >
+                    <ChevronLeft className="w-3.5 h-3.5" />
+                    <span>인스펙터</span>
+                  </button>
+                )}
               </div>
             </div>
 
-            {/* 2. 상단 KPI 요약 헤더 바 - 고정 Subheader */}
-            <div className="h-10 px-4 sm:px-6 bg-slate-50/80 dark:bg-slate-900/40 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between text-xs overflow-x-auto shrink-0 select-none scrollbar-none z-10">
+            {/* 2. 상단 KPI 요약 헤더 바: 실버 & 아연 모노톤 테마 */}
+            <div className="h-10 px-4 sm:px-6 bg-zinc-100/70 dark:bg-zinc-900/50 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between text-xs overflow-x-auto shrink-0 select-none scrollbar-none z-10">
               <div className="flex items-center space-x-3 sm:space-x-5 shrink-0">
                 {/* KPI 1: 설계 진척도 */}
                 <div className="flex items-center space-x-2">
-                  <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 whitespace-nowrap">
+                  <span className="text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 whitespace-nowrap">
                     설계 진척도
                   </span>
                   <div className="flex items-center space-x-1.5">
-                    <div className="w-16 sm:w-24 h-2 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
-                      <div className="h-full bg-slate-800 dark:bg-slate-200 rounded-full w-full" />
+                    <div className="w-16 sm:w-24 h-2 rounded-full bg-zinc-200 dark:bg-zinc-800 overflow-hidden">
+                      <div className="h-full bg-zinc-800 dark:bg-zinc-200 rounded-full w-full" />
                     </div>
-                    <span className="text-[11px] font-mono font-bold text-slate-900 dark:text-slate-100 whitespace-nowrap">
+                    <span className="text-[11px] font-mono font-bold text-zinc-900 dark:text-zinc-100 whitespace-nowrap">
                       100%
                     </span>
                   </div>
                 </div>
 
-                <div className="h-3 w-[1px] bg-slate-300 dark:bg-slate-700 shrink-0" />
+                <div className="h-3 w-[1px] bg-zinc-300 dark:bg-zinc-700 shrink-0" />
 
                 {/* KPI 2: 멀티 DB 수 */}
                 <div className="flex items-center space-x-1 text-[11px] whitespace-nowrap">
-                  <Database className="w-3.5 h-3.5 text-slate-500" />
-                  <span className="text-slate-500 dark:text-slate-400">데이터베이스</span>
-                  <span className="font-bold text-slate-900 dark:text-slate-100 font-mono">{totalDatabases}개</span>
+                  <Database className="w-3.5 h-3.5 text-zinc-500" />
+                  <span className="text-zinc-500 dark:text-zinc-400">데이터베이스</span>
+                  <span className="font-bold text-zinc-900 dark:text-zinc-100 font-mono">{totalDatabases}개</span>
                 </div>
 
-                <div className="h-3 w-[1px] bg-slate-300 dark:bg-slate-700 shrink-0" />
+                <div className="h-3 w-[1px] bg-zinc-300 dark:bg-zinc-700 shrink-0" />
 
                 {/* KPI 3: 속성 수 */}
                 <div className="flex items-center space-x-1 text-[11px] whitespace-nowrap">
-                  <Tag className="w-3.5 h-3.5 text-slate-500" />
-                  <span className="text-slate-500 dark:text-slate-400">총 속성</span>
-                  <span className="font-bold text-slate-900 dark:text-slate-100 font-mono">{totalProperties}개</span>
+                  <Tag className="w-3.5 h-3.5 text-zinc-500" />
+                  <span className="text-zinc-500 dark:text-zinc-400">총 속성</span>
+                  <span className="font-bold text-zinc-900 dark:text-zinc-100 font-mono">{totalProperties}개</span>
                 </div>
 
-                <div className="h-3 w-[1px] bg-slate-300 dark:bg-slate-700 shrink-0" />
+                <div className="h-3 w-[1px] bg-zinc-300 dark:bg-zinc-700 shrink-0" />
 
                 {/* KPI 4: Formulas 2.0 수식 */}
                 <div className="flex items-center space-x-1 text-[11px] whitespace-nowrap">
-                  <Calculator className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
-                  <span className="text-slate-500 dark:text-slate-400">Formulas 2.0</span>
-                  <span className="font-bold text-purple-700 dark:text-purple-300 font-mono">{totalFormulas}개</span>
+                  <Calculator className="w-3.5 h-3.5 text-zinc-600 dark:text-zinc-300" />
+                  <span className="text-zinc-500 dark:text-zinc-400">Formulas 2.0</span>
+                  <span className="font-bold text-zinc-900 dark:text-zinc-100 font-mono">{totalFormulas}개</span>
                 </div>
               </div>
 
               {/* KPI 5: 무손실 검증 상태 뱃지 & Memory Vault 상태 */}
               <div className="flex items-center space-x-2 shrink-0">
-                <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-slate-200/80 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-700 whitespace-nowrap">
-                  <ShieldCheck className="w-3 h-3 mr-1 text-slate-600 dark:text-slate-300" />
+                <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-zinc-200 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 border border-zinc-300 dark:border-zinc-700 whitespace-nowrap">
+                  <ShieldCheck className="w-3 h-3 mr-1 text-zinc-600 dark:text-zinc-300" />
                   무손실 검증: PASS
                 </span>
 
                 <span 
                   title="모든 인라인 스키마 수정 내역이 브라우저 로컬스토리지에 실시간 자동 보존됩니다"
-                  className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 whitespace-nowrap"
+                  className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-zinc-200/90 dark:bg-zinc-800/90 text-zinc-800 dark:text-zinc-200 border border-zinc-300 dark:border-zinc-700 whitespace-nowrap"
                 >
-                  <Database className="w-3 h-3 mr-1 text-purple-600 dark:text-purple-400" />
-                  Memory Vault: 동기화됨 💾
+                  <Database className="w-3 h-3 mr-1 text-zinc-600 dark:text-zinc-300" />
+                  Memory Vault 💾
                 </span>
 
                 <button
                   type="button"
                   onClick={handleResetToOriginal}
-                  className="flex items-center space-x-1 px-1.5 py-0.5 rounded text-[10px] font-medium text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-slate-800 transition cursor-pointer"
+                  className="flex items-center space-x-1 px-1.5 py-0.5 rounded text-[10px] font-medium text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200 hover:bg-zinc-200/60 dark:hover:bg-zinc-800 transition cursor-pointer"
                   title="인라인 편집된 스키마를 원래 템플릿 상태로 복원합니다"
                 >
                   <RotateCcw className="w-2.5 h-2.5" />
@@ -678,56 +519,56 @@ export const TemplatePreviewCanvas: React.FC<TemplatePreviewCanvasProps> = ({ te
               </div>
             </div>
 
-            {/* 3. 세로 휠 스크롤(Vertical Scroll) 해제된 메인 캔버스 뷰 */}
+            {/* 3. 메인 캔버스 뷰 (세로 스크롤 허용) */}
             <div className="w-full h-full min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
               {isGenerating ? (
                 <div className="flex flex-col items-center justify-center min-h-[500px] p-8 text-center animate-fade-in">
                   <div className="relative mb-6">
-                    <div className="w-16 h-16 rounded-full border-4 border-indigo-200 dark:border-indigo-900/60 border-t-indigo-600 animate-spin" />
-                    <Sparkles className="w-7 h-7 text-indigo-600 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 animate-pulse" />
+                    <div className="w-16 h-16 rounded-full border-4 border-zinc-300 dark:border-zinc-700 border-t-zinc-900 dark:border-t-zinc-100 animate-spin" />
+                    <Sparkles className="w-7 h-7 text-zinc-800 dark:text-zinc-200 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 animate-pulse" />
                   </div>
-                  <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 text-xs font-bold mb-3">
+                  <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 border border-zinc-300 dark:border-zinc-700 text-xs font-bold mb-3">
                     <Zap className="w-3.5 h-3.5" />
                     <span>AI 템플릿 아키텍트 실시간 분석 & 설계 중</span>
                   </div>
-                  <h3 className="text-xl sm:text-2xl font-black text-neutral-800 dark:text-neutral-100 mb-2 tracking-tight">
+                  <h3 className="text-xl sm:text-2xl font-black text-zinc-800 dark:text-zinc-100 mb-2 tracking-tight">
                     기존 캔버스 상태를 초기화하고 새 템플릿을 빌드하고 있습니다...
                   </h3>
-                  <p className="text-sm text-neutral-500 dark:text-neutral-400 max-w-md leading-relaxed">
-                    첨부된 엑셀 데이터의 시트 구조, 스마트 헤더 행, 관계형 DB 스키마 및 Formula 2.0 수식을 정밀 분석하여 맞춤형 대시보드 뷰를 생성합니다.
+                  <p className="text-sm text-zinc-500 dark:text-zinc-400 max-w-md leading-relaxed">
+                    데이터 시트 구조, 스마트 헤더 행, 관계형 DB 스키마 및 Formula 2.0 수식을 정밀 분석하여 맞춤형 대시보드 뷰를 생성합니다.
                   </p>
                 </div>
               ) : !editableTemplate ? (
                 <div className="flex flex-col items-center justify-center min-h-[500px] p-8 text-center animate-fade-in">
-                  <div className="w-16 h-16 rounded-2xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200/60 dark:border-indigo-800/60 flex items-center justify-center mb-5 text-2xl shadow-xs">
+                  <div className="w-16 h-16 rounded-2xl bg-zinc-100 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 flex items-center justify-center mb-5 text-2xl shadow-xs">
                     ✨
                   </div>
-                  <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-slate-100 dark:bg-neutral-800 text-slate-700 dark:text-neutral-300 border border-slate-200 dark:border-neutral-700 text-xs font-bold mb-3">
-                    <Sparkles className="w-3.5 h-3.5 text-indigo-500" />
+                  <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-300 dark:border-zinc-700 text-xs font-bold mb-3">
+                    <Sparkles className="w-3.5 h-3.5 text-zinc-500" />
                     <span>새로운 템플릿 제작 대기 중</span>
                   </div>
-                  <h3 className="text-xl sm:text-2xl font-black text-neutral-800 dark:text-neutral-100 mb-2 tracking-tight">
+                  <h3 className="text-xl sm:text-2xl font-black text-zinc-800 dark:text-zinc-100 mb-2 tracking-tight">
                     어떤 노션 시스템을 구축할까요?
                   </h3>
-                  <p className="text-sm text-neutral-500 dark:text-neutral-400 max-w-md leading-relaxed mb-6">
-                    하단 옴니 챗에 원하시는 템플릿 주제를 입력하시거나, 엑셀/HWP/PDF 문서를 첨부하시면 AI 아키텍트가 1장 완결형 노션 대시보드로 즉시 자동 빌드합니다.
+                  <p className="text-sm text-zinc-500 dark:text-zinc-400 max-w-md leading-relaxed mb-6">
+                    하단 옴니 챗에 원하시는 템플릿 주제를 입력하시거나, 엑셀/PDF 문서를 첨부하시면 AI 아키텍트가 1장 완결형 노션 대시보드로 즉시 자동 빌드합니다.
                   </p>
                   <div className="flex flex-wrap gap-2 justify-center max-w-lg">
                     <button 
                       onClick={() => setPendingChatPrompt('원격검침 실시간 모니터링 관리 OS 만들어줘')}
-                      className="text-xs px-3 py-1.5 rounded-lg bg-white dark:bg-neutral-800 border border-slate-200 dark:border-neutral-700 hover:border-indigo-500 text-slate-700 dark:text-neutral-300 transition cursor-pointer"
+                      className="text-xs px-3 py-1.5 rounded-lg bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 hover:border-zinc-500 text-zinc-700 dark:text-zinc-300 transition cursor-pointer"
                     >
                       ⚡ 원격검침 실시간 모니터링
                     </button>
                     <button 
                       onClick={() => setPendingChatPrompt('주민 민원 및 세대 하자 통합 관리 대시보드 만들어줘')}
-                      className="text-xs px-3 py-1.5 rounded-lg bg-white dark:bg-neutral-800 border border-slate-200 dark:border-neutral-700 hover:border-indigo-500 text-slate-700 dark:text-neutral-300 transition cursor-pointer"
+                      className="text-xs px-3 py-1.5 rounded-lg bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 hover:border-zinc-500 text-zinc-700 dark:text-zinc-300 transition cursor-pointer"
                     >
                       🏢 주민 민원 및 세대 하자 대시보드
                     </button>
                     <button 
                       onClick={() => setPendingChatPrompt('자격증/수험생 올인원 합격 스케줄러 만들어줘')}
-                      className="text-xs px-3 py-1.5 rounded-lg bg-white dark:bg-neutral-800 border border-slate-200 dark:border-neutral-700 hover:border-indigo-500 text-slate-700 dark:text-neutral-300 transition cursor-pointer"
+                      className="text-xs px-3 py-1.5 rounded-lg bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 hover:border-zinc-500 text-zinc-700 dark:text-zinc-300 transition cursor-pointer"
                     >
                       🎯 자격증/수험생 합격 스케줄러
                     </button>
@@ -739,7 +580,7 @@ export const TemplatePreviewCanvas: React.FC<TemplatePreviewCanvasProps> = ({ te
                 </div>
               ) : (
                 <div className="pb-32">
-                  {/* [Step 3] 최상단 커스텀 에이전트 3.0 원클릭 셋업 콜아웃 카드 */}
+                  {/* 최상단 커스텀 에이전트 3.0 원클릭 셋업 콜아웃 카드 */}
                   {editableTemplate.agentBlueprint && (
                     <div className="px-4 sm:px-10 md:px-12 pt-4">
                       <AgentBlueprintCallout
@@ -799,9 +640,9 @@ export const TemplatePreviewCanvas: React.FC<TemplatePreviewCanvasProps> = ({ te
                     />
                   </div>
 
-                  {/* 하단 통합 액션 배너 */}
+                  {/* 하단 통합 액션 배너 (메탈릭 실버 & 징크 그라데이션) */}
                   <div className="px-6 sm:px-10 md:px-12 mt-12 mb-8">
-                    <div className="p-5 sm:p-6 rounded-2xl bg-gradient-to-br from-neutral-900 via-indigo-950 to-neutral-900 text-white shadow-xl border border-indigo-800/40 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div className="p-5 sm:p-6 rounded-2xl bg-gradient-to-r from-zinc-900 via-zinc-800 to-neutral-900 text-white shadow-xl border border-zinc-700 flex flex-col md:flex-row md:items-center justify-between gap-4">
                       <div>
                         <div className="flex items-center space-x-2">
                           <span className="text-xl">{editableTemplate.icon || '📑'}</span>
@@ -809,9 +650,8 @@ export const TemplatePreviewCanvas: React.FC<TemplatePreviewCanvasProps> = ({ te
                             {editableTemplate.title}
                           </h4>
                         </div>
-                        <p className="text-xs text-neutral-300 mt-1 max-w-xl leading-relaxed">
-                          이 템플릿을 내 노션에 직접 배포하거나, 하단 옴니 챗과 대화하여 우리 팀만의 전용 필드나 
-                          수식을 손쉽게 추가할 수 있습니다.
+                        <p className="text-xs text-zinc-300 mt-1 max-w-xl leading-relaxed">
+                          우측 NOA 인스펙터 챗을 통해 속성 추가, Formula 2.0 수식 개선, 관계형 롤업을 정밀 지시하거나, 노션에 즉시 생성할 수 있습니다.
                         </p>
                       </div>
 
@@ -821,14 +661,14 @@ export const TemplatePreviewCanvas: React.FC<TemplatePreviewCanvasProps> = ({ te
                           className="flex items-center space-x-1.5 px-4 py-2.5 rounded-xl font-bold text-xs bg-white/10 hover:bg-white/20 text-white border border-white/20 backdrop-blur-md transition active:scale-95 cursor-pointer"
                           title="해당 템플릿 구조를 AI 채팅창에 자동 입력하고 커스텀 수정을 시작합니다"
                         >
-                          <MessageSquare className="w-4 h-4 text-indigo-300" />
+                          <MessageSquare className="w-4 h-4 text-zinc-300" />
                           <span>💬 대화로 수정하기</span>
                         </button>
 
                         <button
                           onClick={publishToNotion}
                           disabled={isPublishing}
-                          className="flex items-center space-x-2 px-4 py-2.5 rounded-xl font-black text-xs text-white bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 shadow-md transition disabled:opacity-50 active:scale-95 cursor-pointer"
+                          className="flex items-center space-x-2 px-4 py-2.5 rounded-xl font-black text-xs text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 shadow-md transition disabled:opacity-50 active:scale-95 cursor-pointer"
                           title="클릭 한 번으로 내 노션 워크스페이스에 전체 페이지와 DB를 즉시 생성합니다"
                         >
                           {isPublishing ? (
@@ -850,6 +690,39 @@ export const TemplatePreviewCanvas: React.FC<TemplatePreviewCanvasProps> = ({ te
               )}
             </div>
           </div>
+        )}
+        sideContent={({ isCollapsed, toggleCollapse }) => (
+          <InspectorChat
+            template={editableTemplate}
+            selectedDbName={selectedDbId}
+            onSelectDbName={(name) => {
+              setSelectedDbId(name);
+              scrollToDb(name);
+            }}
+            onAddProperty={(dbIdx, prop) => {
+              handleAddCustomProperty(dbIdx, prop);
+            }}
+            onUpdatePropertyName={(dbIdx, oldName, newName) => {
+              const safeProps = getSafeProperties(editableTemplate?.databases[dbIdx]?.properties);
+              const pIdx = safeProps.findIndex((p: any) => p.name === oldName);
+              if (pIdx >= 0) handleUpdatePropertyName(dbIdx, pIdx, newName);
+            }}
+            onUpdatePropertyType={(dbIdx, propName, newType) => {
+              const safeProps = getSafeProperties(editableTemplate?.databases[dbIdx]?.properties);
+              const pIdx = safeProps.findIndex((p: any) => p.name === propName);
+              if (pIdx >= 0) handleUpdatePropertyType(dbIdx, pIdx, newType);
+            }}
+            onDeleteProperty={(dbIdx, propName) => {
+              const safeProps = getSafeProperties(editableTemplate?.databases[dbIdx]?.properties);
+              const pIdx = safeProps.findIndex((p: any) => p.name === propName);
+              if (pIdx >= 0) handleDeleteProperty(dbIdx, pIdx);
+            }}
+            onApplyPresetInstruction={(instruction) => {
+              handleApplySkill(instruction, '인스펙터 스키마 지시');
+            }}
+            isCollapsed={isCollapsed}
+            toggleCollapse={toggleCollapse}
+          />
         )}
       />
     </div>
