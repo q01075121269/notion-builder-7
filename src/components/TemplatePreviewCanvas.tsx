@@ -11,7 +11,7 @@ import { StructureTreeView } from './preview/StructureTreeView';
 import { AgentBlueprintCallout } from './preview/AgentBlueprintCallout';
 import { ensureTemplateAgentBlueprint } from '../services/notionDynamicBuilder';
 import { saveArchivedTemplate } from '../services/archiveStorage';
-import { getSafeProperties } from './preview/NotionDatabaseView';
+import { getSafeProperties } from '../lib/templateUtils';
 import { useApp } from '../context/AppContext';
 import {
   Layers,
@@ -171,7 +171,7 @@ export const TemplatePreviewCanvas: React.FC<TemplatePreviewCanvasProps> = ({ te
           return { ...db, name: newName };
         }
         if (oldName) {
-          const updatedProps = getSafeProperties(db.properties).map(p => {
+          const updatedProps = getSafeProperties(db.properties).map((p: any) => {
             if (p.type === 'relation' && p.target === oldName) {
               return { ...p, target: newName };
             }
@@ -238,7 +238,8 @@ export const TemplatePreviewCanvas: React.FC<TemplatePreviewCanvasProps> = ({ te
   // 4. 속성 삭제
   const handleDeleteProperty = (dbIndex: number, propIndex: number) => {
     if (!editableTemplate) return;
-    const targetProp = editableTemplate.databases[dbIndex]?.properties[propIndex];
+    const safeProps = getSafeProperties(editableTemplate.databases[dbIndex]?.properties);
+    const targetProp = safeProps[propIndex];
     if (targetProp?.type === "title") {
       showToast("기본 제목(Title) 속성은 삭제할 수 없습니다.", "info");
       return;
@@ -247,7 +248,7 @@ export const TemplatePreviewCanvas: React.FC<TemplatePreviewCanvasProps> = ({ te
       if (!prev) return null;
       const updatedDbs = [...prev.databases];
       if (!updatedDbs[dbIndex]) return prev;
-      const updatedProps = updatedDbs[dbIndex].properties.filter((_, i) => i !== propIndex);
+      const updatedProps = getSafeProperties(updatedDbs[dbIndex].properties).filter((_: any, i: number) => i !== propIndex);
       updatedDbs[dbIndex] = { ...updatedDbs[dbIndex], properties: updatedProps };
       const res: NotionTemplate = { ...prev, title: prev.title || "", databases: updatedDbs };
       return res;
@@ -262,9 +263,10 @@ export const TemplatePreviewCanvas: React.FC<TemplatePreviewCanvasProps> = ({ te
       if (!prev) return null;
       const updatedDbs = [...prev.databases];
       if (!updatedDbs[dbIndex]) return prev;
-      const newIndex = updatedDbs[dbIndex].properties.length + 1;
+      const currentProps = getSafeProperties(updatedDbs[dbIndex].properties);
+      const newIndex = currentProps.length + 1;
       const newProp: NotionProperty = { name: `새 속성 ${newIndex}`, type: "text" };
-      updatedDbs[dbIndex] = { ...updatedDbs[dbIndex], properties: [...updatedDbs[dbIndex].properties, newProp] };
+      updatedDbs[dbIndex] = { ...updatedDbs[dbIndex], properties: [...currentProps, newProp] };
       const res: NotionTemplate = { ...prev, title: prev.title || "", databases: updatedDbs };
       return res;
     });
@@ -301,7 +303,7 @@ export const TemplatePreviewCanvas: React.FC<TemplatePreviewCanvasProps> = ({ te
   const totalDatabases = editableTemplate ? editableTemplate.databases.length : 0;
   const totalProperties = editableTemplate ? editableTemplate.databases.reduce((sum, db) => sum + getSafeProperties(db.properties).length, 0) : 0;
   const totalFormulas = editableTemplate ? editableTemplate.databases.reduce(
-    (sum, db) => sum + getSafeProperties(db.properties).filter((p) => p.type === 'formula').length,
+    (sum, db) => sum + getSafeProperties(db.properties).filter((p: any) => p.type === 'formula').length,
     0
   ) : 0;
 
@@ -428,7 +430,7 @@ export const TemplatePreviewCanvas: React.FC<TemplatePreviewCanvasProps> = ({ te
                         <span className="truncate">{db.name}</span>
                       </div>
                       <span className="text-[9px] px-1.5 py-0.2 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 font-mono shrink-0 whitespace-nowrap">
-                        {db.properties.length} 속성
+                        {getSafeProperties(db.properties).length} 속성
                       </span>
                     </button>
                   ))}

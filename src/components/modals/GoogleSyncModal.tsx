@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
+import { getSafeProperties } from '../../lib/templateUtils';
 import { 
   X, 
   Calendar, 
@@ -35,7 +36,7 @@ export const GoogleSyncModal: React.FC = () => {
   const datePropertiesList: { dbName: string; propName: string }[] = [];
   if (currentTemplate) {
     currentTemplate.databases.forEach(db => {
-      db.properties.forEach(p => {
+      getSafeProperties(db.properties).forEach(p => {
         if (p.type === 'date') {
           datePropertiesList.push({ dbName: db.name, propName: p.name });
         }

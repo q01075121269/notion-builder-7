@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
+import { getSafeProperties } from '../../lib/templateUtils';
 import { Share2, Copy, Check, FileText, X } from 'lucide-react';
 
 export const ExportModal: React.FC = () => {
@@ -18,7 +19,7 @@ export const ExportModal: React.FC = () => {
       md += `### ${i + 1}. ${db.name}\n`;
       if (db.description) md += `- **설명**: ${db.description}\n`;
       md += `- **속성(Properties)**:\n`;
-      (db.properties || []).forEach(p => {
+      getSafeProperties(db.properties).forEach(p => {
         md += `  - \`${p.name}\` (${p.type}${p.expression ? `: ${p.expression}` : ''}${p.target ? ` -> ${p.target}` : ''})\n`;
       });
       md += '\n';

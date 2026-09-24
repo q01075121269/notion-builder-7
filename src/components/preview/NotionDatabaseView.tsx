@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import type { NotionDatabase, NotionProperty, NotionPropertyType } from '../../types/notion';
+import { getSafeProperties } from '../../lib/templateUtils';
 import { useApp } from '../../context/AppContext';
 import { simulateFormulaValue } from '../../services/formulaEngine';
 import { 
@@ -31,18 +32,6 @@ import {
   Edit2,
   X
 } from 'lucide-react';
-
-export const getSafeProperties = (props: any): NotionProperty[] => {
-  if (Array.isArray(props)) return props;
-  if (props && typeof props === 'object') {
-    return Object.entries(props).map(([name, val]: [string, any]) => ({
-      name,
-      type: typeof val === 'string' ? val : val?.type || 'rich_text',
-      ...(typeof val === 'object' ? val : {})
-    }));
-  }
-  return [];
-};
 
 export interface NotionDatabaseViewProps {
   database: NotionDatabase;
@@ -516,7 +505,7 @@ const BoardView: React.FC<{
 
   return (
     <div className="p-4 flex gap-4 overflow-x-auto min-h-[220px]">
-      {columns.map((colName, idx) => {
+      {columns.map((colName: any, idx: number) => {
         const colRows = rows.filter(r => r[statusProp.name] === colName || (!r[statusProp.name] && idx === 0));
         return (
           <div key={idx} className="w-64 flex-shrink-0 bg-neutral-100/70 dark:bg-neutral-900/60 rounded-lg p-2.5 flex flex-col space-y-2">
@@ -564,7 +553,8 @@ const CalendarView: React.FC<{
   rows: Array<Record<string, any>>;
   titleProp: NotionProperty;
 }> = ({ database, rows, titleProp }) => {
-  const dateProp = database.properties.find(p => p.type === 'date') || { name: '날짜', type: 'date' as const };
+  const safeProps = getSafeProperties(database.properties);
+  const dateProp = safeProps.find(p => p.type === 'date') || { name: '날짜', type: 'date' as const };
   const days = ['일', '월', '화', '수', '목', '금', '토'];
 
   return (
@@ -751,7 +741,8 @@ const DashboardView: React.FC<{
   titleProp?: NotionProperty;
 }> = ({ database, rows, titleProp }) => {
   // 100% 동적 실제 데이터 기반 통계 계산
-  const statusProp = database.properties.find(p => p.type === 'status');
+  const safeProps = getSafeProperties(database.properties);
+  const statusProp = safeProps.find(p => p.type === 'status');
   let inProgressCount = 0;
   let plannedCount = 0;
   let completedCount = 0;
@@ -853,7 +844,7 @@ const DashboardView: React.FC<{
                     {String(rowTitle || '데이터 항목')}
                   </div>
                   <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
-                    {database.properties.slice(1, 4).map((p, pIdx) => (
+                    {getSafeProperties(database.properties).slice(1, 4).map((p, pIdx) => (
                       <div key={pIdx} className="scale-95 origin-left">
                         <PropertyValueCell property={p} value={row[p.name]} row={row} />
                       </div>
@@ -908,7 +899,7 @@ const GalleryView: React.FC<{
 
             {/* 카드 내부 속성 상세 */}
             <div className="p-3.5 space-y-2">
-              {database.properties.slice(1, 6).map((prop, pIdx) => {
+              {getSafeProperties(database.properties).slice(1, 6).map((prop, pIdx) => {
                 const val = row[prop.name];
                 if (val === undefined || val === null || val === '') return null;
                 return (
@@ -956,7 +947,7 @@ const ListView: React.FC<{
 
             {/* 오른쪽: 주요 속성 배지들 */}
             <div className="flex items-center space-x-2 shrink-0">
-              {database.properties.slice(1, 4).map((prop, pIdx) => (
+              {getSafeProperties(database.properties).slice(1, 4).map((prop, pIdx) => (
                 <div key={pIdx} className="hidden sm:block">
                   <PropertyValueCell property={prop} value={row[prop.name]} row={row} />
                 </div>

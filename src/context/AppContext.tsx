@@ -11,6 +11,7 @@ import type { BeginnerGuide, GuideAudience } from '../types/guide';
 import type { AuthUser } from '../types/auth';
 import { PRESET_TEMPLATES } from '../services/presetTemplates';
 import { SEPTEMBER_TOP_10_TEMPLATES } from '../services/curatedTemplates';
+import { normalizeTemplateData } from '../lib/templateUtils';
 import { processConversationWithGemini } from '../services/gemini';
 import { createNotionTemplateInWorkspace, applyPatchToRemoteWorkspace, appendGuideToggleToNotionPage } from '../services/notionApi';
 import { buildMasterWorkspaceInNotion } from '../services/notionMasterWorkspace';
@@ -349,9 +350,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [isExportModalOpen, setIsExportModalOpen] = useState<boolean>(false);
 
   // Template & Chat State
-  const [currentTemplate, setCurrentTemplate] = useState<NotionTemplate | null>(
-    () => SEPTEMBER_TOP_10_TEMPLATES[0]?.template || PRESET_TEMPLATES.college_student
-  );
+  const [currentTemplate, setCurrentTemplateState] = useState<NotionTemplate | null>(() => {
+    const init = SEPTEMBER_TOP_10_TEMPLATES[0]?.template || PRESET_TEMPLATES.college_student;
+    return normalizeTemplateData(init);
+  });
+
+  const setCurrentTemplate = useCallback((tpl: NotionTemplate | null) => {
+    setCurrentTemplateState(normalizeTemplateData(tpl));
+  }, []);
   const [messages, setMessages] = useState<ChatMessage[]>(() => getSavedChatMessages());
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
 

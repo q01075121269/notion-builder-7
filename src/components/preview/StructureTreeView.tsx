@@ -1,7 +1,7 @@
 import React from 'react';
 import type { NotionTemplate } from '../../types/notion';
 import { Database, Layers, FunctionSquare, Calendar, ArrowUpRight, Tag, Type } from 'lucide-react';
-import { getSafeProperties } from './NotionDatabaseView';
+import { getSafeProperties } from '../../lib/templateUtils';
 
 export const StructureTreeView: React.FC<{ template: NotionTemplate }> = ({ template }) => {
   return (
@@ -32,13 +32,13 @@ export const StructureTreeView: React.FC<{ template: NotionTemplate }> = ({ temp
           <div className="p-3 bg-white dark:bg-notion-dark-card rounded-xl border border-neutral-200/60 dark:border-neutral-700/60 text-center">
             <span className="text-xs text-neutral-400 block">캘린더 연동</span>
             <span className="text-lg font-bold text-amber-600 dark:text-amber-400">
-              {template.databases.some(d => getSafeProperties(d.properties).some(p => p.type === 'date')) ? '지원 됨' : '미지원'}
+              {template.databases.some(d => getSafeProperties(d.properties).some((p: any) => p.type === 'date')) ? '지원 됨' : '미지원'}
             </span>
           </div>
           <div className="p-3 bg-white dark:bg-notion-dark-card rounded-xl border border-neutral-200/60 dark:border-neutral-700/60 text-center">
             <span className="text-xs text-neutral-400 block">수식(Formula)</span>
             <span className="text-lg font-bold text-purple-600 dark:text-purple-400">
-              {template.databases.reduce((acc, d) => acc + getSafeProperties(d.properties).filter(p => p.type === 'formula').length, 0)}개
+              {template.databases.reduce((acc, d) => acc + getSafeProperties(d.properties).filter((p: any) => p.type === 'formula').length, 0)}개
             </span>
           </div>
         </div>
@@ -81,7 +81,7 @@ export const StructureTreeView: React.FC<{ template: NotionTemplate }> = ({ temp
                 )}
 
                 <div className="space-y-1.5 pt-1">
-                  {safeProps.map((prop, pIdx) => (
+                  {safeProps.map((prop: any, pIdx: number) => (
                   <div
                     key={pIdx}
                     className="flex items-center justify-between p-2 rounded-lg bg-neutral-50 dark:bg-neutral-850/60 text-xs border border-neutral-100 dark:border-neutral-800"

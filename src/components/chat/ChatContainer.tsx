@@ -1,5 +1,6 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext';
+import { getSafeProperties } from '../../lib/templateUtils';
 import { Sparkles, Database, ArrowUpRight, CheckCircle2, Layers, Cpu, Award } from 'lucide-react';
 import { SEPTEMBER_TOP_10_TEMPLATES } from '../../services/curatedTemplates';
 
@@ -123,7 +124,7 @@ export const ChatContainer: React.FC = () => {
                           <Layers className="w-3 h-3 text-indigo-500 shrink-0" />
                           <span className="font-semibold text-neutral-800 dark:text-neutral-200 truncate">{db.name || db.title}</span>
                         </div>
-                        <span className="text-[10px] text-neutral-500 shrink-0">{db.properties?.length || 0}개 속성</span>
+                        <span className="text-[10px] text-neutral-500 shrink-0">{getSafeProperties(db.properties).length}개 속성</span>
                       </div>
                     ))}
                   </div>

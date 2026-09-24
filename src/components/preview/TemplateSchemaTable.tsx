@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import type { NotionDatabase, NotionProperty, NotionPropertyType } from '../../types/notion';
-import { getSafeProperties } from './NotionDatabaseView';
+import { getSafeProperties } from '../../lib/templateUtils';
 import { 
   Database, 
   Table, 
@@ -254,8 +254,8 @@ export const TemplateSchemaTable: React.FC<TemplateSchemaTableProps> = ({
           const safeProps = getSafeProperties(db.properties);
           const key = db.name || `db-${dbIdx}`;
           const isExpanded = expandedDbs[key] !== false;
-          const formulaCount = safeProps.filter(p => p.type === 'formula').length;
-          const relationCount = safeProps.filter(p => p.type === 'relation').length;
+          const formulaCount = safeProps.filter((p: any) => p.type === 'formula').length;
+          const relationCount = safeProps.filter((p: any) => p.type === 'relation').length;
           const isEditingThisDb = editingDbIdx === dbIdx;
 
           return (
@@ -352,7 +352,7 @@ export const TemplateSchemaTable: React.FC<TemplateSchemaTableProps> = ({
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800">
-                      {safeProps.map((prop, propIdx) => {
+                      {safeProps.map((prop: any, propIdx: number) => {
                         const isEditingThisProp = editingPropKey === `${dbIdx}-${propIdx}`;
 
                         return (
@@ -436,7 +436,7 @@ export const TemplateSchemaTable: React.FC<TemplateSchemaTableProps> = ({
                                 </div>
                               ) : prop.options && prop.options.length > 0 ? (
                                 <div className="flex flex-wrap gap-1.5 items-center">
-                                  {prop.options.map((opt, optIdx) => (
+                                  {prop.options.map((opt: any, optIdx: number) => (
                                     <span 
                                       key={optIdx}
                                       className="px-2 py-0.5 rounded-md text-[11px] font-medium bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 border border-neutral-200/60 dark:border-neutral-700"

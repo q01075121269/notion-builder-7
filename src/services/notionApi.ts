@@ -8,6 +8,7 @@ import type {
   PatchActionResponse
 } from '../types/notion';
 import type { BeginnerGuide } from '../types/guide';
+import { getSafeProperties } from '../lib/templateUtils';
 
 /**
  * 노션 페이지 URL 또는 다양한 포맷의 문자열에서 32자리 UUID를 추출합니다.
@@ -105,7 +106,7 @@ function buildCompactHeaderBlocks(template: NotionTemplate): any[] {
   const blueprint = template.agentBlueprint;
   const dbs = template.databases || [];
   const totalDbs = dbs.length;
-  const totalProps = dbs.reduce((sum, db) => sum + (db.properties?.length || 0), 0);
+  const totalProps = dbs.reduce((sum, db) => sum + (getSafeProperties(db.properties).length), 0);
   const totalRows = dbs.reduce((sum, db) => sum + (db.sample_rows?.length || 0), 0);
   const cleanTitle = template.title || '통합 관제 대시보드';
 
@@ -298,7 +299,7 @@ function buildCompactHeaderBlocks(template: NotionTemplate): any[] {
  */
 function generateIntelligentSampleRows(db: NotionDatabase): Array<Record<string, any>> {
   const dbName = (db.name || '').toLowerCase();
-  const properties = db.properties || [];
+  const properties = getSafeProperties(db.properties);
 
   const today = new Date().toISOString().split('T')[0];
   const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
@@ -480,7 +481,8 @@ async function insertSampleRows(
   const totalRows = rowsToInsert.length;
 
   // DB의 title 속성명 찾기 (기본값: 첫 번째 속성 또는 '이름')
-  const titleProp = db.properties.find(p => p.type === 'title') || db.properties[0] || { name: '이름', type: 'title' };
+  const safeProps = getSafeProperties(db.properties);
+  const titleProp = safeProps.find(p => p.type === 'title') || safeProps[0] || { name: '이름', type: 'title' };
 
   for (let i = 0; i < totalRows; i++) {
     const row = rowsToInsert[i];
@@ -490,7 +492,7 @@ async function insertSampleRows(
 
     const rowProperties: Record<string, any> = {};
 
-    db.properties.forEach(prop => {
+    safeProps.forEach(prop => {
       // 1) 정확한 키 매칭, 2) 공백/특수문자 무시 유연 매칭
       let val = row[prop.name];
       if (val === undefined || val === null || val === '') {

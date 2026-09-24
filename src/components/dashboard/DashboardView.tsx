@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
+import { getSafeProperties } from '../../lib/templateUtils';
 import { Top50ShowcaseCarousel } from './Top50ShowcaseCarousel';
 import { SmartControlBar, type ArchiveViewMode, type SortOption } from './SmartControlBar';
 import { InteractiveCardGridView } from './InteractiveCardGridView';
@@ -649,7 +650,7 @@ export const DashboardView: React.FC = () => {
                         </div>
                         
                         <div className="flex flex-wrap gap-1 pt-1">
-                          {db.properties?.map((prop, pi) => (
+                          {getSafeProperties(db.properties).map((prop, pi) => (
                             <span key={pi} className="px-2 py-0.5 rounded text-[10px] bg-slate-100 dark:bg-neutral-700 text-neutral-700 dark:text-neutral-300 border border-slate-200 dark:border-neutral-600">
                               {prop.name} <span className="text-neutral-400">({prop.type})</span>
                             </span>

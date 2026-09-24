@@ -3,6 +3,7 @@ import {
   SEPTEMBER_TOP_10_TEMPLATES, 
   type CuratedTemplateItem 
 } from '../../services/curatedTemplates';
+import { getSafeProperties } from '../../lib/templateUtils';
 import { 
   Sparkles, 
   TrendingUp, 
@@ -132,7 +133,7 @@ export const CuratedTop10Hub: React.FC<CuratedTop10HubProps> = ({
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-5">
           {filteredTemplates.map((item) => {
             const hasFormula = item.template.databases?.some(db => 
-              db.properties?.some(p => p.type === 'formula')
+              getSafeProperties(db?.properties).some(p => p.type === 'formula')
             );
             const dbCount = item.template.databases?.length || 0;
             const blockCount = item.template.page_layout?.length || 0;

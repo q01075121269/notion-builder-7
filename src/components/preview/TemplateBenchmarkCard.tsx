@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import type { NotionTemplate, NotionDatabase } from '../../types/notion';
+import { getSafeProperties } from '../../lib/templateUtils';
 import {
   Trophy,
   ChevronDown,
@@ -43,7 +44,7 @@ function analyzeTemplate(template: NotionTemplate): {
 
   dbs.forEach((db: NotionDatabase) => {
     if (db.view_type) viewTypes.add(db.view_type);
-    db.properties?.forEach((prop) => {
+    getSafeProperties(db.properties).forEach((prop) => {
       if (prop.type === 'formula' && prop.expression) {
         formulas.push(prop.expression);
       }
