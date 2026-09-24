@@ -96,6 +96,8 @@ export function simulateFormulaValue(
     expr.includes('progress') || 
     name.includes('진행률') || 
     name.includes('진행도') || 
+    name.includes('진척률') || 
+    name.includes('진척도') || 
     name.includes('게이지') ||
     name.includes('달성률')
   ) {

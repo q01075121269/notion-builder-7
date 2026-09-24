@@ -87,16 +87,16 @@ const ORCHESTRATOR_SYSTEM_PROMPT = `
        }
 
 
-[핵심 규칙 1: 실무 다중 관계형(2~4개 DB) 스키마 생성 표준 및 양방향 Relation/Rollup 매핑]
+[핵심 규칙 1: 실무 다중 관계형(2~4개 DB) 스키마 생성 표준 및 양방향 Relation/Rollup 체이닝]
 - 단일 DB 생성을 엄격히 지양하고, 업무 맥락에 부합하는 2~4개의 상용급 관계형 데이터베이스 세트를 표준 생성하십시오:
   * 예시 세트: [마스터 프로젝트/목표 DB] ↔ [세부 실행 과제(Action Items) DB] ↔ [일정/마일스톤 DB]
   * 각 DB 간 `relation` 속성 및 `rollup` 필드를 자동으로 양방향 매핑하십시오:
     1) 마스터 DB:
-       - "세부 실행 과제" (type: "relation", relation: { database: "세부 실행 과제 DB" })
-       - "완료 과제 수" (type: "rollup", rollup: { relation_property_name: "세부 실행 과제", rollup_property_name: "상태", function: "count_values" })
-       - "진행률 게이지" (type: "formula", expression: lets(...) 기반 진행률 게이지)
+       - "세부 과제" (type: "relation", relation: { database: "세부 실행 과제 DB" })
+       - "완료 과제 수" (type: "rollup", rollup: { relation_property_name: "세부 과제", rollup_property_name: "상태", function: "count_values" })
+       - "진척률 (수식)" (type: "formula", expression: lets(...) 기반 진행률 게이지)
     2) 세부 실행 과제 DB:
-       - "연계 프로젝트" (type: "relation", relation: { database: "마스터 프로젝트 DB" })
+       - "상위 프로젝트" (type: "relation", relation: { database: "마스터 프로젝트 DB" })
        - "상태" (type: "status", options: ["시작 전", "진행 중", "완료"])
        - "마감일" (type: "date")
        - "D-Day" (type: "formula", expression: let(...) 기반 스마트 D-Day)
@@ -105,6 +105,10 @@ const ORCHESTRATOR_SYSTEM_PROMPT = `
        - "목표 프로젝트" (type: "relation")
        - "일정 기간" (type: "date")
        - "진행 상태" (type: "status")
+  * [중요: 관계형 시드 데이터 상호 체이닝(Mutual Linking)]
+    - 상위 DB의 sample_rows 내 relation 속성에는 하위 과제명 배열(예: ["제품 UI/UX 디자인 시안 최종 확정", "베타 테스터 모집..."])을 반드시 실제 값으로 채워 넣으십시오.
+    - 하위 DB의 sample_rows 내 relation 속성에도 해당 상위 프로젝트명을 반드시 실제 값으로 매핑하여, 캔버스에서 양방향 연결 칩이 확실히 표시되도록 하십시오.
+    - 상위 DB의 "진척률 (수식)" 값도 하위 과제 완료율에 맞추어 "■■■■□ 67%" 형태로 시드 데이터에 계산하여 포함하십시오.
 
 [핵심 규칙 2: 최신 Notion Formulas 2.0 수식 엔진 표준 장착 (lets / let 기반)]
 - 템플릿 생성 시 최신 let() / lets() 기반의 실무 시각화 수식 필드를 기본 내장하십시오:

@@ -162,7 +162,7 @@ export const NotionDatabaseView: React.FC<NotionDatabaseViewProps> = ({
           </div>
         </div>
 
-        {/* View Tabs (6대 다각화 뷰 인터랙티브 스위처 - Google AI Studio 감성 모노톤) */}
+        {/* View Tabs (6대 다각화 뷰 인터랙티브 스위처 - 단일 시스템 아이콘 + 순수 한글 텍스트) */}
         <div className="flex items-center space-x-1.5 -mb-2 border-b border-transparent overflow-x-auto no-scrollbar py-0.5">
           <button
             type="button"
@@ -174,7 +174,7 @@ export const NotionDatabaseView: React.FC<NotionDatabaseViewProps> = ({
             }`}
           >
             <TableIcon className="w-3.5 h-3.5" />
-            <span>▦ 표</span>
+            <span>표</span>
           </button>
           <button
             type="button"
@@ -186,7 +186,7 @@ export const NotionDatabaseView: React.FC<NotionDatabaseViewProps> = ({
             }`}
           >
             <Kanban className="w-3.5 h-3.5" />
-            <span>📋 보드</span>
+            <span>보드</span>
           </button>
           <button
             type="button"
@@ -198,7 +198,7 @@ export const NotionDatabaseView: React.FC<NotionDatabaseViewProps> = ({
             }`}
           >
             <Clock className="w-3.5 h-3.5" />
-            <span>⏱️ 타임라인</span>
+            <span>타임라인</span>
           </button>
           <button
             type="button"
@@ -210,7 +210,7 @@ export const NotionDatabaseView: React.FC<NotionDatabaseViewProps> = ({
             }`}
           >
             <CalendarIcon className="w-3.5 h-3.5" />
-            <span>📅 캘린더</span>
+            <span>캘린더</span>
           </button>
           <button
             type="button"
@@ -222,7 +222,7 @@ export const NotionDatabaseView: React.FC<NotionDatabaseViewProps> = ({
             }`}
           >
             <LayoutDashboard className="w-3.5 h-3.5" />
-            <span>📊 대시보드</span>
+            <span>대시보드</span>
           </button>
           <button
             type="button"
@@ -234,7 +234,7 @@ export const NotionDatabaseView: React.FC<NotionDatabaseViewProps> = ({
             }`}
           >
             <LayoutGrid className="w-3.5 h-3.5" />
-            <span>🖼️ 갤러리</span>
+            <span>갤러리</span>
           </button>
           <button
             type="button"
@@ -246,7 +246,7 @@ export const NotionDatabaseView: React.FC<NotionDatabaseViewProps> = ({
             }`}
           >
             <List className="w-3.5 h-3.5" />
-            <span>📑 리스트</span>
+            <span>리스트</span>
           </button>
         </div>
       </div>
@@ -744,6 +744,36 @@ const PropertyValueCell: React.FC<{
           readOnly 
           className="rounded border-neutral-300 text-indigo-600 focus:ring-indigo-500 h-3.5 w-3.5" 
         />
+      );
+
+    case 'relation': {
+      const items = Array.isArray(displayVal) 
+        ? displayVal 
+        : typeof displayVal === 'string' && displayVal.includes(',')
+        ? displayVal.split(',').map(s => s.trim())
+        : [displayVal];
+
+      return (
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {items.map((it: any, iIdx: number) => (
+            <span
+              key={iIdx}
+              className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-md text-[11px] font-medium bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200/80 dark:border-purple-800/80 shadow-2xs hover:bg-purple-100 dark:hover:bg-purple-900/60 transition"
+              title="연결된 관계형 데이터베이스 레코드"
+            >
+              <ArrowUpRight className="w-3 h-3 text-purple-500 shrink-0" />
+              <span className="truncate max-w-[150px]">{String(it)}</span>
+            </span>
+          ))}
+        </div>
+      );
+    }
+
+    case 'rollup':
+      return (
+        <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-md text-[11px] font-mono font-bold bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 border border-amber-200/60 dark:border-amber-900/60">
+          <span>{String(displayVal)}</span>
+        </span>
       );
 
     case 'number':

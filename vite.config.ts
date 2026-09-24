@@ -227,12 +227,14 @@ function geminiApiProxyPlugin(): Plugin {
 }
 
 [핵심 규칙 - 실무 다중 관계형 스키마, Formulas 2.0, Vision 분석 및 캔버스 스키마 수정]
-1. 실무 다중 관계형(2~4개 DB) 스키마 생성 표준:
+1. 실무 다중 관계형(2~4개 DB) 스키마 생성 표준 및 양방향 Relation/Rollup 체이닝:
    - 단일 DB 생성을 지양하고, 업무 맥락에 부합하는 2~4개의 상용급 관계형 데이터베이스 세트를 표준 생성하십시오:
-     * 예시: [마스터 프로젝트/목표 DB] ↔ [세부 실행 과제(Action Items) DB] ↔ [일정/마일스톤 DB]
+     * 예시: [마스터 프로젝트 DB] ↔ [세부 실행 과제 DB] ↔ [일정/마일스톤 DB]
    - 각 DB 간 'relation' 속성 및 'rollup' 필드를 자동으로 양방향 매핑하십시오.
+   - 상위 DB의 sample_rows 내 relation 속성에는 하위 과제명 배열을, 하위 DB의 relation 속성에는 상위 프로젝트명을 실제 값으로 매핑하여 캔버스에서 양방향 연결 칩이 확실히 표시되도록 하십시오.
+   - 상위 DB에는 [진척률 (수식)] 속성을 기본 장착하여 하위 과제 완료율에 맞추어 '■■■■□ 67%' 형태의 비주얼 게이지를 출력하십시오.
 2. 최신 Notion Formulas 2.0 수식 엔진 표준 장착 (lets / let 기반):
-   - 진행률 게이지 수식: lets(total, if(empty(prop("세부 실행 과제")), 1, prop("세부 실행 과제").length()), done, if(empty(prop("세부 실행 과제")), if(prop("상태") == "완료", 1, 0), prop("세부 실행 과제").filter(current.prop("상태") == "완료").length()), rate, if(total > 0, round(done / total * 100), 0), filled, round(rate / 20), slice("■■■■■", 0, filled) + slice("□□□□□", 0, 5 - filled) + " " + rate + "%")
+   - 진행률 게이지 수식: lets(total, if(empty(prop("세부 과제")), 1, prop("세부 과제").length()), done, if(empty(prop("세부 과제")), if(prop("상태") == "완료", 1, 0), prop("세부 과제").filter(current.prop("상태") == "완료").length()), rate, if(total > 0, round(done / total * 100), 0), filled, round(rate / 20), slice("■■■■■", 0, filled) + slice("□□□□□", 0, 5 - filled) + " " + rate + "%")
    - 스마트 D-Day 수식: let(days, dateBetween(prop("마감일"), now(), "days"), if(empty(prop("마감일")), "📅 일정 미정", if(prop("상태") == "완료", "✅ 완료", if(days == 0, "🔥 오늘 마감!", if(days < 0, "🚨 D+" + abs(days) + " (지연)", "D-" + days)))))
    - 품질 검수 상태 태그 수식: lets(s, prop("상태"), hasDate, not(empty(prop("마감일"))), if(s == "완료", "🟢 검수 합격", if(s == "진행 중" and hasDate, "🟡 정상 진행", if(s == "시작 전", "⚪ 대기 중", "🔴 점검 필요"))))
 3. 사용자가 화면 캡처, 표 이미지 등을 첨부했거나 캔버스 스키마 수정을 요청한 경우:
