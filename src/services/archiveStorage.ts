@@ -393,6 +393,9 @@ export const saveArchivedTemplate = (template: ArchivedTemplate): ArchivedTempla
   }
 
   localStorage.setItem(STORAGE_KEYS.TEMPLATES, JSON.stringify(updated));
+  try {
+    localStorage.setItem('saved_templates', JSON.stringify(updated));
+  } catch {}
   return updated;
 };
 

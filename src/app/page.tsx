@@ -129,15 +129,15 @@ export const HomePage: React.FC = () => {
     sendMessage(promptText);
   };
 
-  // 입력 전송 핸들러 (전송 즉시 자동 초기화)
+  // 입력 전송 핸들러 (전송 즉시 자동 1라인 초기화)
   const handleSend = () => {
     const trimmed = inputPrompt.trim();
     if ((!trimmed && attachedFiles.length === 0) || isGenerating) return;
-    stopListening();
     const promptToSend = inputPrompt;
     const filesToSend = [...attachedFiles];
-    setInputPrompt('');
+    setInputPrompt(''); // API 호출 전 첫 줄에서 즉시 빈칸 리셋
     setAttachedFiles([]);
+    stopListening();
     sendMessage(promptToSend, filesToSend);
   };
 
@@ -446,12 +446,12 @@ export const HomePage: React.FC = () => {
 
             {/* 입력 텍스트 에어리어 */}
             <textarea
-              rows={2}
+              rows={1}
               value={inputPrompt}
               onChange={(e) => setInputPrompt(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder="노아(NOA)에게 어떤 업무를 도와드릴지 편하게 말씀해 주세요..."
-              className="w-full bg-transparent text-sm text-neutral-900 dark:text-white placeholder-neutral-400 focus:outline-none resize-none leading-relaxed"
+              className="w-full bg-transparent text-sm text-neutral-900 dark:text-white placeholder-neutral-400 focus:outline-none resize-none leading-relaxed min-h-[40px]"
             />
 
             {/* 하단 버튼 툴바 */}

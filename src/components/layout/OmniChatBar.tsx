@@ -477,6 +477,12 @@ export const OmniChatBar: React.FC = () => {
     const text = cleanDuplicateSpeech(raw);
     if ((!text && attachedFiles.length === 0) || isLoadingRef.current) return;
 
+    // API 호출 전 핸들러 최상단 1라인에서 즉시 입력창 초기화
+    setInputValue('');
+    if (!overrideText) {
+      setAttachedFiles([]);
+    }
+
     // 만약 음성 입력 중이었다면 마이크 중단
     if (isListeningRef.current) {
       isListeningRef.current = false;

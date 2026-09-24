@@ -4,7 +4,7 @@ import { useApp } from '../../context/AppContext';
 import { Bot, User, Database, ArrowRight, LayoutTemplate, Sparkles } from 'lucide-react';
 
 export const ChatMessageItem: React.FC<{ message: ChatMessage }> = ({ message }) => {
-  const { setCurrentTemplate, setActiveMobileTab, currentTemplate, sendMessage } = useApp();
+  const { setCurrentTemplate, setActiveMobileTab, currentTemplate, sendMessage, showToast } = useApp();
   const isUser = message.role === 'user';
 
   const handleApplyTemplate = () => {
@@ -28,6 +28,7 @@ export const ChatMessageItem: React.FC<{ message: ChatMessage }> = ({ message })
   );
 
   const handleConfirmGenerate = () => {
+    showToast('✨ 제안된 구조로 템플릿 실물 생성을 시작합니다...', 'info');
     sendMessage("위에서 제안된 구조와 기획안대로 템플릿 바로 생성해줘");
   };
 

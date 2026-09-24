@@ -600,10 +600,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         setCurrentGuide(createFallbackGuide(template, 'general'));
         setIsViewingCurationHub(false);
 
-        // 템플릿 보관함(localStorage)에 자동 수집 적재
+        // 1. 템플릿 보관함(localStorage saved_templates)에 자동 영구 적재
         try {
           saveArchivedTemplate({
-            id: `archived-${Date.now()}`,
+            id: template.id || `archived-${Date.now()}`,
             title: template.title,
             description: template.description || explanation.slice(0, 80),
             icon: template.icon || '📄',
@@ -617,8 +617,30 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           console.warn('[VaultSync] Failed to auto-archive template:', err);
         }
 
+        // 2. 생성 완료 즉시 사용자를 작업실 캔버스(builder workspace)로 자동 이동
+        setCurrentView('builder');
         if (window.innerWidth < 768) {
           setActiveMobileTab('preview');
+        }
+
+        // 3. Notion API가 연결된 경우 실제 노션 부모 페이지에 템플릿 자동 생성 및 URL 반환
+        let notionNotice = '';
+        if (notionApiKey && notionParentPageId) {
+          try {
+            showToast('🚀 노션 워크스페이스에 템플릿 페이지 생성을 시작합니다...', 'info');
+            const result = await createNotionTemplateInWorkspace(
+              template,
+              notionApiKey,
+              notionParentPageId
+            );
+            if (result && result.pageUrl) {
+              setCreatedNotionResource(result);
+              notionNotice = `\n\n🎉 **노션 워크스페이스 실물 배포 완료!**\n- 🔗 **생성된 노션 페이지**: [${result.pageTitle}](${result.pageUrl})`;
+            }
+          } catch (notionErr: any) {
+            console.warn('노션 자동 배포 실패:', notionErr);
+            notionNotice = `\n\n⚠️ 노션 자동 배포 실패: ${notionErr?.message || '권한을 확인해 주세요.'}`;
+          }
         }
 
         setMessages(prev =>
@@ -627,13 +649,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               ? {
                   ...msg,
                   isLoading: false,
-                  content: `${explanation}\n\n- **데이터베이스**: ${template.databases.map(d => `\`${d.name}\``).join(', ')}\n- **속성 구성**: 날짜(일정), 상태, 수식, 연관관계 속성 자동 구성.\n\n우측 상단의 **[내 노션에 템플릿 생성하기]**를 눌러 워크스페이스에 직접 배포해 보세요!`,
+                  content: `${explanation}\n\n- **데이터베이스**: ${template.databases.map(d => `\`${d.name}\``).join(', ')}\n- **속성 구성**: 날짜(일정), 상태, 수식, 연관관계 속성 자동 구성.${notionNotice}`,
                   templateData: template
                 }
               : msg
           )
         );
-        showToast(`✨ "${template.title}" 템플릿 생성이 완료되고 보관함에 적재되었습니다!`, 'success');
+        showToast(`✨ "${template.title}" 템플릿이 생성되고 작업실로 즉시 이동하였습니다!`, 'success');
       }
 
     } catch (err: any) {
