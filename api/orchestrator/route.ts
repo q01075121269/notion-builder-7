@@ -101,8 +101,12 @@ const ORCHESTRATOR_SYSTEM_PROMPT = `
 
 [핵심 규칙 2: Title Sanitizer (제목 도배 및 서술어 회귀 원천 차단)]
 - "suggested_title" 및 payload 내 "title" 작성 시:
-  * 절대로 사용자의 발화 전체나 서술어("만들어 줘", "반영해 주고", "해줘", "짜줘", "제작해줘"), 요청어("첨부", "참고하여"), 파일명("ardenhill.xlsx", ".csv" 등)을 제목에 그대로 넣지 마십시오!
-  * 무조건 핵심 업무 도메인만을 담은 1줄의 고품격 공식 명사형(예: "[아덴힐 리조트] 객실 시설관리 통합 관제 OS", "[스마트 파이낸스] 회계 결산 지출 내역서 관제 OS", "[프로젝트 OS] 애자일 스프린트 마일스톤 OS")으로만 정제하여 출력하십시오.
+  * 절대로 사용자의 발화 전체나 서술어("만들어 줘", "반영해 주고", "해줘", "짜줘", "제작해줘"), 요청어("첨부", "참고하여"), 파일명(".xlsx", ".csv" 등)을 제목에 그대로 넣지 마십시오!
+  * 무조건 핵심 업무 도메인만을 담은 1줄의 고품격 공식 명사형(예: "[통합 시설관리] 객실 및 시설 점검 마스터 OS", "[스마트 파이낸스] 회계 결산 지출 내역서 관제 OS", "[프로젝트 OS] 애자일 스프린트 마일스톤 OS")으로만 정제하여 출력하십시오.
+
+[핵심 규칙 3: Gemini Vision 시각 분석 및 캔버스 정밀 비교]
+- 사용자가 화면 캡처나 표 이미지를 첨부하고 수정을 요청한 경우, 전달된 이미지의 시각적 요소(컬럼명, 데이터 값, 레이아웃, 오탈자 등)를 현재 캔버스 템플릿(currentTemplate)과 정밀 비교 분석하여 사용자가 의도한 수정 사항을 도출하고 템플릿 스키마를 갱신하라.
+- 수정 사항이 발생한 경우, 갱신된 db_schema(속성명, 타입, 샘플 행)를 payload 내에 정확히 포함하여 반환하십시오.
 
 [최종 출력 규격]
 반드시 마크다운 따옴표(\`\`\`json) 없이 오직 파싱 가능한 순수 JSON 객체 1개만 출력하세요:
@@ -120,7 +124,9 @@ async function callGeminiForOrchestrator(
   userText: string,
   history: Array<{ role: string; content: string }> = [],
   apiKey: string,
-  requestedModel: string = 'gemini-3.8-flash'
+  requestedModel: string = 'gemini-3.8-flash',
+  images: Array<{ mimeType: string; data: string }> = [],
+  currentTemplate?: any
 ): Promise<OrchestratorResponse> {
   let cleanRequested = (requestedModel || 'gemini-2.5-flash').replace(/^models\//, '').trim();
   if (cleanRequested.includes('1.5') || cleanRequested.includes('1.0')) {
@@ -143,10 +149,30 @@ async function callGeminiForOrchestrator(
     });
   }
 
-  // 현재 입력
+  // 현재 사용자 입력 파트 (멀티모달 이미지 파트 결합)
+  const userParts: any[] = [];
+  if (Array.isArray(images) && images.length > 0) {
+    images.forEach((img) => {
+      if (img.data && img.mimeType) {
+        userParts.push({
+          inlineData: {
+            mimeType: img.mimeType,
+            data: img.data.replace(/^data:image\/[^;]+;base64,/, '')
+          }
+        });
+      }
+    });
+  }
+
+  let finalUserText = userText;
+  if (currentTemplate) {
+    finalUserText = `[CURRENT_CANVAS_TEMPLATE_CONTEXT]\n제목: ${currentTemplate.title}\nDB목록: ${JSON.stringify(currentTemplate.databases?.map((d: any) => ({ name: d.name, properties: d.properties })) || [])}\n[/CURRENT_CANVAS_TEMPLATE_CONTEXT]\n\n${userText}`;
+  }
+  userParts.push({ text: finalUserText });
+
   contents.push({
     role: 'user',
-    parts: [{ text: userText }]
+    parts: userParts
   });
 
   const requestPayload = {
@@ -316,7 +342,9 @@ export async function POST(req: Request): Promise<Response> {
     }
 
     const reqModel = body.model || body.selectedModel || 'gemini-3.8-flash';
-    const result = await callGeminiForOrchestrator(userText, history, apiKey, reqModel);
+    const images = body.images || [];
+    const currentTemplate = body.current_template || null;
+    const result = await callGeminiForOrchestrator(userText, history, apiKey, reqModel, images, currentTemplate);
 
     return new Response(JSON.stringify(result), {
       status: 200,
@@ -392,7 +420,9 @@ export default async function handler(req: any, res: any) {
     }
 
     const reqModel = body.model || body.selectedModel || 'gemini-3.8-flash';
-    const result = await callGeminiForOrchestrator(userText, history, apiKey, reqModel);
+    const images = body.images || [];
+    const currentTemplate = body.current_template || null;
+    const result = await callGeminiForOrchestrator(userText, history, apiKey, reqModel, images, currentTemplate);
 
     return res.status(200).json(result);
   } catch (err: any) {

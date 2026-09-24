@@ -24,6 +24,12 @@ export interface ChatMessage {
   notionUrl?: string | null;
 }
 
+export interface AttachedImageData {
+  mimeType: string;
+  data: string; // Base64 문자열
+  name?: string;
+}
+
 // 1. 오케스트레이터 API 호출 함수
 export async function sendToOrchestrator(
   text: string,
@@ -33,7 +39,9 @@ export async function sendToOrchestrator(
   model?: GeminiModelType,
   currentMode?: string,
   fileContextList?: FileContextItem[],
-  thinking?: boolean
+  thinking?: boolean,
+  images?: AttachedImageData[],
+  currentTemplate?: any
 ): Promise<OrchestratorResponse> {
   const geminiKey = apiKey || (typeof window !== 'undefined' ? localStorage.getItem('gemini_api_key') || '' : '');
   const notionKey = typeof window !== 'undefined' ? localStorage.getItem('notion_api_key') || '' : '';
@@ -76,6 +84,8 @@ export async function sendToOrchestrator(
   const payload = {
     text: enrichedText,
     file_context_list: fileContextList,
+    images: images || [],
+    current_template: currentTemplate || null,
     model: model || 'auto',
     thinking: isThinking,
     current_mode: currentMode || 'builder',

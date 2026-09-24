@@ -720,6 +720,9 @@ export const TemplatePreviewCanvas: React.FC<TemplatePreviewCanvasProps> = ({ te
             onApplyPresetInstruction={(instruction) => {
               handleApplySkill(instruction, '인스펙터 스키마 지시');
             }}
+            onApplyTemplateUpdate={(updatedTemplate) => {
+              setEditableTemplate(updatedTemplate);
+            }}
             isCollapsed={isCollapsed}
             toggleCollapse={toggleCollapse}
           />
