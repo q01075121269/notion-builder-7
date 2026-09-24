@@ -2,6 +2,7 @@ import React from 'react';
 import type { NotionTemplate } from '../../types/notion';
 import { Database, Layers, FunctionSquare, Calendar, ArrowUpRight, Tag, Type } from 'lucide-react';
 import { getSafeProperties } from '../../lib/templateUtils';
+import { extractCleanDbTitleAndIcon } from '../../utils/notionIconUtils';
 
 export const StructureTreeView: React.FC<{ template: NotionTemplate }> = ({ template }) => {
   return (
@@ -54,6 +55,7 @@ export const StructureTreeView: React.FC<{ template: NotionTemplate }> = ({ temp
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {template.databases.map((db, idx) => {
             const safeProps = getSafeProperties(db.properties);
+            const { icon: cleanIcon, title: cleanTitle } = extractCleanDbTitleAndIcon(db);
             return (
               <div
                 key={idx}
@@ -62,8 +64,8 @@ export const StructureTreeView: React.FC<{ template: NotionTemplate }> = ({ temp
                 <div className="flex items-start justify-between border-b border-neutral-100 dark:border-neutral-800 pb-2.5">
                   <div>
                     <h3 className="font-bold text-sm text-neutral-900 dark:text-white flex items-center space-x-1.5">
-                      <span>🗂️</span>
-                      <span>{db.name}</span>
+                      <span className="select-none">{cleanIcon}</span>
+                      <span>{cleanTitle}</span>
                     </h3>
                     <span className="text-[11px] text-neutral-400 block mt-0.5">
                       기본 뷰: {db.view_type || 'table'}

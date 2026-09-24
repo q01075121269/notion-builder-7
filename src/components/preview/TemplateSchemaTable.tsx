@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import type { NotionDatabase, NotionProperty, NotionPropertyType } from '../../types/notion';
 import { getSafeProperties } from '../../lib/templateUtils';
+import { extractCleanDbTitleAndIcon } from '../../utils/notionIconUtils';
 import { 
   Database, 
   Table, 
@@ -252,7 +253,8 @@ export const TemplateSchemaTable: React.FC<TemplateSchemaTableProps> = ({
       <div className="space-y-6">
         {databases.map((db, dbIdx) => {
           const safeProps = getSafeProperties(db.properties);
-          const key = db.name || `db-${dbIdx}`;
+          const { icon: cleanIcon, title: cleanTitle } = extractCleanDbTitleAndIcon(db);
+          const key = cleanTitle || db.name || `db-${dbIdx}`;
           const isExpanded = expandedDbs[key] !== false;
           const formulaCount = safeProps.filter((p: any) => p.type === 'formula').length;
           const relationCount = safeProps.filter((p: any) => p.type === 'relation').length;
@@ -269,8 +271,8 @@ export const TemplateSchemaTable: React.FC<TemplateSchemaTableProps> = ({
                 className="flex items-center justify-between px-5 py-4 bg-neutral-50/80 dark:bg-neutral-800/50 hover:bg-neutral-100/80 dark:hover:bg-neutral-800/80 cursor-pointer select-none transition border-b border-neutral-200/80 dark:border-neutral-800"
               >
                 <div className="flex items-center space-x-3 flex-1 min-w-0 mr-4">
-                  <div className="p-2 rounded-xl bg-white dark:bg-neutral-700 shadow-2xs shrink-0">
-                    {renderViewTypeIcon(db.view_type)}
+                  <div className="p-2 rounded-xl bg-white dark:bg-neutral-700 shadow-2xs shrink-0 flex items-center justify-center min-w-[32px] min-h-[32px]">
+                    {cleanIcon ? <span className="text-base">{cleanIcon}</span> : renderViewTypeIcon(db.view_type)}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center space-x-2 flex-wrap gap-y-1">
@@ -295,7 +297,7 @@ export const TemplateSchemaTable: React.FC<TemplateSchemaTableProps> = ({
                           title="클릭하여 데이터베이스 명칭 변경"
                         >
                           <span className="text-sm font-bold text-neutral-900 dark:text-neutral-100 group-hover:text-purple-600 dark:group-hover:text-purple-400">
-                            {db.name}
+                            {cleanTitle}
                           </span>
                           <Edit2 className="w-3 h-3 text-slate-400 opacity-0 group-hover:opacity-100 transition shrink-0" />
                         </div>

@@ -33,6 +33,8 @@ import {
   X
 } from 'lucide-react';
 
+import { extractCleanDbTitleAndIcon } from '../../utils/notionIconUtils';
+
 export interface NotionDatabaseViewProps {
   database: NotionDatabase;
   dbIndex?: number;
@@ -74,6 +76,7 @@ export const NotionDatabaseView: React.FC<NotionDatabaseViewProps> = ({
 
   const safeProperties = getSafeProperties(database?.properties);
   const titleProp = safeProperties.find(p => p.type === 'title') || safeProperties[0] || { name: '이름', type: 'title' };
+  const { icon: cleanIcon, title: cleanTitle } = extractCleanDbTitleAndIcon(database);
 
   const handleSaveDbName = () => {
     if (editingDbName.trim() && onUpdateDatabaseName && dbIndex !== undefined) {
@@ -125,15 +128,15 @@ export const NotionDatabaseView: React.FC<NotionDatabaseViewProps> = ({
                 onClick={() => {
                   if (onUpdateDatabaseName && dbIndex !== undefined) {
                     setIsEditingDbName(true);
-                    setEditingDbName(database.name);
+                    setEditingDbName(cleanTitle);
                   }
                 }}
                 className="font-bold text-base text-neutral-900 dark:text-neutral-100 flex items-center space-x-2 group cursor-pointer"
                 title="클릭하여 데이터베이스 명칭 변경"
               >
-                <span>🗄️</span>
-                <span className="group-hover:text-purple-600 dark:group-hover:text-purple-400">{database.name}</span>
-                <Edit2 className="w-3 h-3 text-slate-400 opacity-0 group-hover:opacity-100 transition" />
+                <span className="text-base select-none shrink-0">{cleanIcon}</span>
+                <span className="group-hover:text-purple-600 dark:group-hover:text-purple-400">{cleanTitle}</span>
+                <Edit2 className="w-3 h-3 text-slate-400 opacity-0 group-hover:opacity-100 transition shrink-0" />
               </h3>
             )}
             {database.description && (

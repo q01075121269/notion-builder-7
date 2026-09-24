@@ -16,7 +16,6 @@ import { getSafeProperties } from '../lib/templateUtils';
 import { normalizeTemplatePayload } from '../utils/schemaAdapter';
 import { useApp } from '../context/AppContext';
 import {
-  BookmarkCheck,
   Sparkles,
   Database,
   ShieldCheck,
@@ -28,14 +27,12 @@ import {
   FileText,
   GitBranch,
   Code2,
-  Share2,
   ChevronLeft,
   RotateCcw,
   Undo2,
   Save,
   History,
-  Clock,
-  Check
+  Clock
 } from 'lucide-react';
 
 export interface TemplatePreviewCanvasProps {
@@ -63,7 +60,6 @@ export const TemplatePreviewCanvas: React.FC<TemplatePreviewCanvasProps> = ({ te
     previewMode,
     setPreviewMode,
     setIsRawJsonModalOpen,
-    setIsExportModalOpen,
     isGenerating,
   } = useApp();
 
@@ -90,16 +86,14 @@ export const TemplatePreviewCanvas: React.FC<TemplatePreviewCanvasProps> = ({ te
     return ensureTemplateAgentBlueprint(template);
   });
 
-  // ─── [작업 히스토리 스택 (Undo / Version History) 상태 신설] ─────────────────
+  // ─── [작업 히스토리 스택 (Undo / Version History) 상태 관리] ─────────────────
   const [templateHistory, setTemplateHistory] = useState<TemplateHistoryEntry[]>([]);
   const [historyIndex, setHistoryIndex] = useState<number>(-1);
-  const [lastSavedNotice, setLastSavedNotice] = useState<string | null>(null);
+  const [lastSavedTime, setLastSavedTime] = useState<string | null>(null);
   const [isVersionDropdownOpen, setIsVersionDropdownOpen] = useState<boolean>(false);
-  const [recoveryDraft, setRecoveryDraft] = useState<{
-    template: NotionTemplate;
-    savedAt: number;
-    timeString: string;
-  } | null>(null);
+
+  const isInternalActionRef = React.useRef<boolean>(false);
+  const lastTemplateIdRef = React.useRef<string | null>(null);
 
   // [Clean Wipe & Canvas Reset Listener]
   useEffect(() => {
@@ -107,6 +101,7 @@ export const TemplatePreviewCanvas: React.FC<TemplatePreviewCanvasProps> = ({ te
       setEditableTemplate(null);
       setTemplateHistory([]);
       setHistoryIndex(-1);
+      lastTemplateIdRef.current = null;
       try {
         localStorage.removeItem(VAULT_STORAGE_KEY);
         localStorage.removeItem('notion_template_cache');
@@ -121,7 +116,17 @@ export const TemplatePreviewCanvas: React.FC<TemplatePreviewCanvasProps> = ({ te
   const pushHistoryEntry = (newTpl: NotionTemplate, label: string) => {
     const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     setTemplateHistory(prev => {
-      const base = historyIndex >= 0 ? prev.slice(0, historyIndex + 1) : [];
+      let base = historyIndex >= 0 ? prev.slice(0, historyIndex + 1) : [];
+      // 만약 이전 히스토리가 비어있다면 현재 editableTemplate을 최초 원본으로 먼저 확보
+      if (base.length === 0 && editableTemplate) {
+        base = [{
+          id: `v1-${Date.now() - 1000}`,
+          version: 1,
+          label: '최초 원본',
+          timestamp: timeStr,
+          template: JSON.parse(JSON.stringify(editableTemplate))
+        }];
+      }
       const nextVer = (base[base.length - 1]?.version || 0) + 1;
       const newEntry: TemplateHistoryEntry = {
         id: `v${nextVer}-${Date.now()}`,
@@ -130,19 +135,31 @@ export const TemplatePreviewCanvas: React.FC<TemplatePreviewCanvasProps> = ({ te
         timestamp: timeStr,
         template: JSON.parse(JSON.stringify(newTpl))
       };
-      const nextHistory = [...base, newEntry].slice(-25); // 최대 25개 보관
+      const nextHistory = [...base, newEntry].slice(-30); // 최대 30개 보관
       setHistoryIndex(nextHistory.length - 1);
       return nextHistory;
     });
   };
 
-  // [최초 자동 저장]: 템플릿이 처음 로드되거나 신규 생성되는 순간 history[0] (v1 - 초기 원본)으로 스냅샷 등록
+  // [최초 자동 저장]: 신규 템플릿 로드 시에만 history[0] 스냅샷 등록 (내부 수정 시 리셋 방지)
   useEffect(() => {
     if (!template) {
       setEditableTemplate(null);
       setTemplateHistory([]);
       setHistoryIndex(-1);
-    } else {
+      lastTemplateIdRef.current = null;
+      return;
+    }
+
+    // 내부 변경(Undo 또는 인스펙터 수정)에 의한 prop 갱신일 경우 히스토리 리셋 차단!
+    if (isInternalActionRef.current) {
+      isInternalActionRef.current = false;
+      return;
+    }
+
+    const currentId = template.id || template.title;
+    if (lastTemplateIdRef.current !== currentId) {
+      lastTemplateIdRef.current = currentId;
       const updated = ensureTemplateAgentBlueprint(template);
       setEditableTemplate(updated);
       if (updated.databases.length > 0) {
@@ -161,25 +178,7 @@ export const TemplatePreviewCanvas: React.FC<TemplatePreviewCanvasProps> = ({ te
     }
   }, [template]);
 
-  // [새로고침/재진입 감지]: 이전 작업 초안 세이프가드 감지
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(DRAFT_STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (parsed?.template && parsed.template.title) {
-          // 기존 원본과 제목이나 구조가 다를 때 복구 배너 노출
-          if (!template || JSON.stringify(parsed.template) !== JSON.stringify(template)) {
-            setRecoveryDraft(parsed);
-          }
-        }
-      }
-    } catch (e) {
-      console.warn('Recovery draft check failed', e);
-    }
-  }, []);
-
-  // [2초 디바운스 자동 세이프가드]: 템플릿 변경 시 로컬 초안에 자동 동기화
+  // [2초 디바운스 자동 세이프가드]: 템플릿 변경 시 조용히 백그라운드 로컬스토리지에만 저장 (배너 미표시)
   useEffect(() => {
     if (!editableTemplate) return;
     const timer = setTimeout(() => {
@@ -191,7 +190,7 @@ export const TemplatePreviewCanvas: React.FC<TemplatePreviewCanvasProps> = ({ te
           timeString: timeStr
         };
         localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(payload));
-        setLastSavedNotice(`임시 저장됨 (${timeStr})`);
+        localStorage.setItem(VAULT_STORAGE_KEY, JSON.stringify(editableTemplate));
       } catch (e) {
         console.warn('Auto draft sync failed', e);
       }
@@ -205,30 +204,52 @@ export const TemplatePreviewCanvas: React.FC<TemplatePreviewCanvasProps> = ({ te
       const prevIdx = historyIndex - 1;
       const targetEntry = templateHistory[prevIdx];
       if (targetEntry) {
+        isInternalActionRef.current = true;
         setHistoryIndex(prevIdx);
-        setEditableTemplate(JSON.parse(JSON.stringify(targetEntry.template)));
+        const snapshotCopy = JSON.parse(JSON.stringify(targetEntry.template));
+        setEditableTemplate(snapshotCopy);
         showToast(`↩️ '${targetEntry.label}' (v${targetEntry.version}) 시점으로 되돌렸습니다.`, 'info');
       }
     }
   };
 
-  // [💾 중간 저장 (Save) 핸들러]: 현재 상태를 localStorage에 즉시 저장
-  const handleSaveCheckpoint = () => {
+  // [💾 저장하기 (Save) 단일 통합 핸들러]: 로컬 초안 및 내 보관함에 타임스탬프와 함께 동시 저장
+  const handleSaveAll = () => {
     if (!editableTemplate) return;
     const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     try {
+      // 1. 로컬스토리지 저장
       const payload = {
         template: editableTemplate,
         savedAt: Date.now(),
         timeString: timeStr
       };
       localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(payload));
-      setLastSavedNotice(`임시 저장되었습니다 (${timeStr})`);
-      pushHistoryEntry(editableTemplate, '중간 저장본');
-      showToast(`💾 임시 저장되었습니다 (${timeStr})`, 'success');
+      localStorage.setItem(VAULT_STORAGE_KEY, JSON.stringify(editableTemplate));
+
+      // 2. 내 보관함에 덮어쓰기/신규 동시 저장
+      const targetId = editableTemplate.id || template?.id || `arch-${Date.now()}`;
+      const targetTitle = editableTemplate.title.trim();
+      saveArchivedTemplate({
+        id: targetId,
+        title: targetTitle,
+        description: editableTemplate.description || '캔버스 작업실 템플릿',
+        icon: editableTemplate.icon || '📑',
+        cover_url: editableTemplate.cover_url || 'https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=1600&q=80',
+        tags: ['#내가만든템플릿', '#캔버스저장', '#NOA인스펙터'],
+        templateData: editableTemplate,
+        source: 'created',
+        createdAt: Date.now(),
+        updatedAt: Date.now()
+      });
+
+      // 3. 상태 갱신 및 히스토리 체크포인트 등록
+      setLastSavedTime(timeStr);
+      pushHistoryEntry(editableTemplate, '저장 체크포인트');
+      showToast(`💾 템플릿이 로컬 및 내 보관함에 안전하게 저장되었습니다 (${timeStr})`, 'success');
     } catch (e) {
-      console.error('Failed to save checkpoint', e);
-      showToast('임시 저장에 실패했습니다.', 'error');
+      console.error('Failed to save template', e);
+      showToast('저장에 실패했습니다.', 'error');
     }
   };
 
@@ -236,8 +257,10 @@ export const TemplatePreviewCanvas: React.FC<TemplatePreviewCanvasProps> = ({ te
   const handleRestoreVersion = (index: number) => {
     const target = templateHistory[index];
     if (target) {
+      isInternalActionRef.current = true;
       setHistoryIndex(index);
-      setEditableTemplate(JSON.parse(JSON.stringify(target.template)));
+      const snapshotCopy = JSON.parse(JSON.stringify(target.template));
+      setEditableTemplate(snapshotCopy);
       setIsVersionDropdownOpen(false);
       showToast(`⏱️ '${target.label}' (v${target.version}) 시점으로 복원되었습니다.`, 'success');
     }
@@ -257,34 +280,7 @@ export const TemplatePreviewCanvas: React.FC<TemplatePreviewCanvasProps> = ({ te
     }
   }, [editableTemplate]);
 
-  // 인라인 수정한 스키마를 보관함에 덮어쓰기 저장
-  const handleSaveToArchive = () => {
-    if (!editableTemplate) return;
 
-    const targetId = editableTemplate.id || template?.id || `arch-${Date.now()}`;
-    const targetTitle = editableTemplate.title.trim();
-
-    const updatedTemplate: NotionTemplate = {
-      ...editableTemplate,
-      id: targetId,
-      title: targetTitle
-    };
-
-    saveArchivedTemplate({
-      id: targetId,
-      title: targetTitle,
-      description: updatedTemplate.description || '캔버스 인라인 편집 템플릿',
-      icon: updatedTemplate.icon || '📑',
-      cover_url: updatedTemplate.cover_url || 'https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=1600&q=80',
-      tags: ['#내가만든템플릿', '#캔버스편집', '#NOA인스펙터'],
-      templateData: updatedTemplate,
-      source: 'created',
-      createdAt: Date.now(),
-      updatedAt: Date.now()
-    });
-
-    showToast(`"${targetTitle}" 템플릿이 내 보관함에 안전하게 덮어쓰기(업데이트) 저장되었습니다!`, 'success');
-  };
 
   const handleResetToOriginal = () => {
     try {
@@ -498,306 +494,250 @@ export const TemplatePreviewCanvas: React.FC<TemplatePreviewCanvasProps> = ({ te
         minPixelWidth={260}
         storageKey="template_builder_inspector_split_v1"
         className="h-full min-h-0"
-        mainContent={({ isCollapsed, toggleCollapse }) => (
-          <div className="flex flex-col h-full min-h-0 w-full overflow-hidden bg-white dark:bg-zinc-950">
-            {/* [세이프가드 복구 배너]: 이전에 작업 중이던 템플릿 초안 감지 시 노출 */}
-            {recoveryDraft && (
-              <div className="px-4 py-2 bg-gradient-to-r from-amber-500/15 via-zinc-100 dark:via-zinc-800 to-transparent border-b border-amber-400/40 dark:border-amber-500/30 flex items-center justify-between text-xs text-zinc-800 dark:text-zinc-200 z-30 shrink-0">
-                <div className="flex items-center space-x-2">
-                  <RotateCcw className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 animate-pulse" />
-                  <span>
-                    이전에 작업 중이던 템플릿 초안(<strong>{recoveryDraft.template.title}</strong>, {recoveryDraft.timeString || '최근 저장'})이 있습니다. 불러오시겠습니까?
-                  </span>
-                </div>
+        mainContent={({ isCollapsed, toggleCollapse }) => {
+          const currentVersion = historyIndex >= 0 && templateHistory[historyIndex] ? templateHistory[historyIndex].version : (templateHistory.length || 1);
+
+          return (
+            <div className="flex flex-col h-full min-h-0 w-full overflow-hidden bg-white dark:bg-zinc-950">
+              {/* 1. 상단 툴바: 표준 클린 모노톤 & 메탈릭 미니멀 룩 */}
+              <div className="h-11 px-3 sm:px-6 bg-gradient-to-r from-zinc-100 via-slate-100 to-zinc-200 dark:from-zinc-900 dark:via-zinc-850 dark:to-zinc-800 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between gap-2 shrink-0 select-none z-20">
+                {/* [좌측]: [ 노션 페이지 뷰 ] [ 구조 트리 ] | [ ↩️ 되돌리기 ] [ ⏱️ 버전 v1 ] */}
                 <div className="flex items-center space-x-2 shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const restored = normalizeTemplatePayload(recoveryDraft.template);
-                      if (restored) {
-                        pushHistoryEntry(restored, '복구된 초안');
-                        setEditableTemplate(restored);
-                        showToast('이전 작업 초안을 성공적으로 불러왔습니다.', 'success');
-                      }
-                      setRecoveryDraft(null);
-                    }}
-                    className="px-2.5 py-1 rounded-md bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 text-[11px] font-bold hover:opacity-90 transition cursor-pointer shadow-xs"
-                  >
-                    초안 불러오기
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setRecoveryDraft(null);
-                      try {
-                        localStorage.removeItem(DRAFT_STORAGE_KEY);
-                      } catch {}
-                    }}
-                    className="px-2 py-1 rounded-md text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200 text-[11px] transition cursor-pointer"
-                  >
-                    닫기
-                  </button>
-                </div>
-              </div>
-            )}
+                  {/* 뷰 모드 전환 토글 */}
+                  <div className="flex items-center bg-white/80 dark:bg-zinc-800/80 p-0.5 rounded-lg border border-zinc-300 dark:border-zinc-700 text-xs font-medium">
+                    <button
+                      onClick={() => setPreviewMode('notion')}
+                      className={`flex items-center space-x-1 px-2.5 py-1 rounded-md transition whitespace-nowrap cursor-pointer ${
+                        previewMode === 'notion'
+                          ? 'bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 font-bold shadow-xs'
+                          : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200'
+                      }`}
+                    >
+                      <FileText className="w-3.5 h-3.5" />
+                      <span>노션 페이지</span>
+                    </button>
+                    <button
+                      onClick={() => setPreviewMode('tree')}
+                      className={`flex items-center space-x-1 px-2.5 py-1 rounded-md transition whitespace-nowrap cursor-pointer ${
+                        previewMode === 'tree'
+                          ? 'bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 font-bold shadow-xs'
+                          : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200'
+                      }`}
+                    >
+                      <GitBranch className="w-3.5 h-3.5" />
+                      <span>구조 트리</span>
+                    </button>
+                  </div>
 
-            {/* 1. 상단 툴바: 은은한 실버/아연 그라데이션 & 메탈릭 미니멀 룩 (뷰 전환 및 공유/배포) */}
-            <div className="h-11 px-3 sm:px-6 bg-gradient-to-r from-zinc-100 via-slate-100 to-zinc-200 dark:from-zinc-900 dark:via-zinc-850 dark:to-zinc-800 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between gap-2 shrink-0 select-none z-20">
-              <div className="flex items-center space-x-2 shrink-0">
-                {/* 뷰 모드 전환 토글 (페이지 뷰 vs 구조 트리 뷰) */}
-                <div className="flex items-center bg-white/80 dark:bg-zinc-800/80 p-0.5 rounded-lg border border-zinc-300 dark:border-zinc-700 text-xs font-medium">
-                  <button
-                    onClick={() => setPreviewMode('notion')}
-                    className={`flex items-center space-x-1 px-2.5 py-1 rounded-md transition whitespace-nowrap cursor-pointer ${
-                      previewMode === 'notion'
-                        ? 'bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 font-bold shadow-xs'
-                        : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200'
-                    }`}
-                  >
-                    <FileText className="w-3.5 h-3.5" />
-                    <span>노션 페이지</span>
-                  </button>
-                  <button
-                    onClick={() => setPreviewMode('tree')}
-                    className={`flex items-center space-x-1 px-2.5 py-1 rounded-md transition whitespace-nowrap cursor-pointer ${
-                      previewMode === 'tree'
-                        ? 'bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 font-bold shadow-xs'
-                        : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200'
-                    }`}
-                  >
-                    <GitBranch className="w-3.5 h-3.5" />
-                    <span>구조 트리</span>
-                  </button>
-                </div>
+                  {/* 세로 구분선 */}
+                  <div className="h-4 w-[1px] bg-zinc-300 dark:bg-zinc-700 mx-0.5" />
 
-                {/* [↩️ 되돌리기] & [💾 중간 저장] & [⏱️ 버전 이력] 액션 바 */}
-                <div className="flex items-center space-x-1 bg-white/80 dark:bg-zinc-800/80 p-0.5 rounded-lg border border-zinc-300 dark:border-zinc-700">
-                  {/* [↩️ 되돌리기 (Undo)] */}
-                  <button
-                    type="button"
-                    onClick={handleUndo}
-                    disabled={historyIndex <= 0}
-                    className="flex items-center space-x-1 px-2 py-1 rounded-md text-xs font-semibold text-zinc-700 dark:text-zinc-200 hover:bg-zinc-200/60 dark:hover:bg-zinc-700 disabled:opacity-35 disabled:cursor-not-allowed transition cursor-pointer"
-                    title={historyIndex > 0 ? "직전 변경 상태로 되돌리기 (Undo)" : "되돌릴 변경 이력이 없습니다"}
-                  >
-                    <Undo2 className="w-3.5 h-3.5" />
-                    <span className="hidden sm:inline">되돌리기</span>
-                  </button>
-
-                  {/* [💾 중간 저장 (Save)] */}
-                  <button
-                    type="button"
-                    onClick={handleSaveCheckpoint}
-                    className="flex items-center space-x-1 px-2.5 py-1 rounded-md text-xs font-semibold text-zinc-700 dark:text-zinc-200 hover:bg-zinc-200/60 dark:hover:bg-zinc-700 transition cursor-pointer"
-                    title="현재 템플릿 상태를 로컬 체크포인트에 즉시 저장합니다"
-                  >
-                    <Save className="w-3.5 h-3.5 text-zinc-600 dark:text-zinc-300" />
-                    <span className="hidden sm:inline">중간 저장</span>
-                  </button>
-
-                  {/* [⏱️ 버전 복구 (Restore)] 드롭다운 */}
-                  <div className="relative">
+                  {/* 되돌리기 & 버전 이력 그룹 */}
+                  <div className="flex items-center space-x-1.5">
+                    {/* [ ↩️ 되돌리기 (Undo) ] */}
                     <button
                       type="button"
-                      onClick={() => setIsVersionDropdownOpen(prev => !prev)}
-                      className="flex items-center space-x-1 px-2 py-1 rounded-md text-xs font-semibold text-zinc-700 dark:text-zinc-200 hover:bg-zinc-200/60 dark:hover:bg-zinc-700 transition cursor-pointer"
-                      title="버전 히스토리 확인 및 원하는 시점으로 복원"
+                      onClick={handleUndo}
+                      disabled={historyIndex <= 0}
+                      className={`flex items-center space-x-1 px-2.5 py-1 rounded-lg text-xs transition cursor-pointer border ${
+                        historyIndex > 0
+                          ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-bold border-zinc-400 dark:border-zinc-500 shadow-xs hover:bg-zinc-100 dark:hover:bg-zinc-700'
+                          : 'bg-zinc-100/50 dark:bg-zinc-900/30 text-zinc-400 dark:text-zinc-600 border-zinc-200 dark:border-zinc-800 opacity-40 cursor-not-allowed'
+                      }`}
+                      title={historyIndex > 0 ? "직전 템플릿 스냅샷으로 즉시 롤백합니다" : "되돌릴 변경 이력이 없습니다"}
                     >
-                      <History className="w-3.5 h-3.5 text-zinc-600 dark:text-zinc-300" />
-                      <span className="hidden md:inline">버전 이력</span>
-                      {templateHistory.length > 0 && (
-                        <span className="ml-0.5 px-1.5 py-0.2 rounded-full bg-zinc-200 dark:bg-zinc-700 text-[10px] font-mono font-bold">
-                          v{historyIndex >= 0 && templateHistory[historyIndex] ? templateHistory[historyIndex].version : templateHistory.length}
-                        </span>
-                      )}
+                      <Undo2 className="w-3.5 h-3.5" />
+                      <span>되돌리기</span>
                     </button>
 
-                    {isVersionDropdownOpen && (
-                      <div className="absolute left-0 top-full mt-1.5 w-72 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl shadow-xl z-50 p-2 text-xs divide-y divide-zinc-100 dark:divide-zinc-800">
-                        <div className="p-2 font-bold text-zinc-700 dark:text-zinc-200 flex items-center justify-between">
-                          <span className="flex items-center space-x-1.5">
-                            <Clock className="w-3.5 h-3.5 text-zinc-500" />
-                            <span>버전 이력 ({templateHistory.length})</span>
-                          </span>
-                          <span className="text-[10px] text-zinc-400 font-normal">선택 시 즉각 복원</span>
+                    {/* [ ⏱️ 버전 v1 ] 드롭다운 */}
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => setIsVersionDropdownOpen(prev => !prev)}
+                        className="flex items-center space-x-1 px-2.5 py-1 rounded-lg text-xs font-semibold text-zinc-700 dark:text-zinc-200 bg-white/90 dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700 border border-zinc-300 dark:border-zinc-700 shadow-2xs transition cursor-pointer"
+                        title="버전 이력 확인 및 특정 시점 복원"
+                      >
+                        <History className="w-3.5 h-3.5 text-zinc-600 dark:text-zinc-300" />
+                        <span>버전 v{currentVersion}</span>
+                      </button>
+
+                      {isVersionDropdownOpen && (
+                        <div className="absolute left-0 top-full mt-1.5 w-72 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl shadow-xl z-50 p-2 text-xs divide-y divide-zinc-100 dark:divide-zinc-800">
+                          <div className="p-2 font-bold text-zinc-700 dark:text-zinc-200 flex items-center justify-between">
+                            <span className="flex items-center space-x-1.5">
+                              <Clock className="w-3.5 h-3.5 text-zinc-500" />
+                              <span>버전 히스토리 ({templateHistory.length})</span>
+                            </span>
+                            <span className="text-[10px] text-zinc-400 font-normal">선택 시 즉각 복원</span>
+                          </div>
+                          <div className="max-h-60 overflow-y-auto py-1 space-y-1">
+                            {templateHistory.length === 0 ? (
+                              <div className="p-3 text-center text-zinc-400">기록된 버전이 없습니다.</div>
+                            ) : (
+                              templateHistory.map((item, idx) => {
+                                const isCurrent = idx === historyIndex;
+                                return (
+                                  <button
+                                    key={item.id}
+                                    type="button"
+                                    onClick={() => handleRestoreVersion(idx)}
+                                    className={`w-full text-left px-2.5 py-1.5 rounded-lg flex items-center justify-between transition cursor-pointer ${
+                                      isCurrent
+                                        ? 'bg-zinc-100 dark:bg-zinc-800 font-bold text-zinc-900 dark:text-white ring-1 ring-zinc-300 dark:ring-zinc-600'
+                                        : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800/60'
+                                    }`}
+                                  >
+                                    <div className="flex items-center space-x-1.5 truncate">
+                                      <span className="px-1.5 py-0.5 rounded bg-zinc-200 dark:bg-zinc-700 text-[10px] font-mono shrink-0">
+                                        v{item.version}
+                                      </span>
+                                      <span className="truncate">{item.label}</span>
+                                    </div>
+                                    <div className="flex items-center space-x-1.5 shrink-0 text-[10px] text-zinc-400">
+                                      <span>{item.timestamp}</span>
+                                      {isCurrent && <span className="text-emerald-500 font-bold text-xs">●</span>}
+                                    </div>
+                                  </button>
+                                );
+                              })
+                            )}
+                          </div>
                         </div>
-                        <div className="max-h-60 overflow-y-auto py-1 space-y-1">
-                          {templateHistory.length === 0 ? (
-                            <div className="p-3 text-center text-zinc-400">기록된 버전이 없습니다.</div>
-                          ) : (
-                            templateHistory.map((item, idx) => {
-                              const isCurrent = idx === historyIndex;
-                              return (
-                                <button
-                                  key={item.id}
-                                  type="button"
-                                  onClick={() => handleRestoreVersion(idx)}
-                                  className={`w-full text-left px-2.5 py-1.5 rounded-lg flex items-center justify-between transition cursor-pointer ${
-                                    isCurrent
-                                      ? 'bg-zinc-100 dark:bg-zinc-800 font-bold text-zinc-900 dark:text-white ring-1 ring-zinc-300 dark:ring-zinc-600'
-                                      : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800/60'
-                                  }`}
-                                >
-                                  <div className="flex items-center space-x-1.5 truncate">
-                                    <span className="px-1.5 py-0.5 rounded bg-zinc-200 dark:bg-zinc-700 text-[10px] font-mono shrink-0">
-                                      v{item.version}
-                                    </span>
-                                    <span className="truncate">{item.label}</span>
-                                  </div>
-                                  <div className="flex items-center space-x-1.5 shrink-0 text-[10px] text-zinc-400">
-                                    <span>{item.timestamp}</span>
-                                    {isCurrent && <span className="text-emerald-500 font-bold text-xs">●</span>}
-                                  </div>
-                                </button>
-                              );
-                            })
-                          )}
-                        </div>
-                      </div>
-                    )}
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              {/* 우측 유틸리티 버튼 (JSON 보기, 보관함, 배포, 인스펙터 패널 토글) */}
-              <div className="flex items-center space-x-1.5 sm:space-x-2 shrink-0">
-                <button
-                  onClick={handleSaveToArchive}
-                  className="flex items-center space-x-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold text-zinc-700 dark:text-zinc-200 bg-white/90 dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700 border border-zinc-300 dark:border-zinc-700 shadow-2xs transition cursor-pointer whitespace-nowrap"
-                  title="현재 인라인 수정한 스키마를 내 보관함에 즉시 덮어쓰기(업데이트) 저장합니다"
-                >
-                  <BookmarkCheck className="w-3.5 h-3.5 text-zinc-600 dark:text-zinc-300" />
-                  <span className="hidden sm:inline">보관함 저장</span>
-                </button>
+                {/* [우측]: [최근 저장: 19:05] [ 💾 저장하기 ] [ </> JSON ] [ ⚡ 노션에 배포 ] */}
+                <div className="flex items-center space-x-1.5 sm:space-x-2 shrink-0">
+                  {/* 최근 저장: HH:mm */}
+                  <span className="text-[11px] text-zinc-500 dark:text-zinc-400 font-mono hidden md:inline px-1">
+                    최근 저장: {lastSavedTime || '미저장'}
+                  </span>
 
-                <button
-                  onClick={() => setIsRawJsonModalOpen(true)}
-                  className="flex items-center space-x-1 px-2.5 py-1 rounded-lg text-xs font-medium text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200/60 dark:hover:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 transition cursor-pointer whitespace-nowrap"
-                  title="템플릿 JSON 원본 코드 확인"
-                >
-                  <Code2 className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">JSON</span>
-                </button>
-
-                <button
-                  onClick={() => setIsExportModalOpen(true)}
-                  className="flex items-center space-x-1 px-2.5 py-1 rounded-lg text-xs font-medium text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200/60 dark:hover:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 transition cursor-pointer whitespace-nowrap"
-                  title="PDF / 마크다운 / HTML 내보내기"
-                >
-                  <Share2 className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">내보내기</span>
-                </button>
-
-                <button
-                  onClick={publishToNotion}
-                  disabled={isPublishing || !editableTemplate}
-                  className="flex items-center space-x-1.5 px-3 py-1 rounded-lg text-xs font-bold text-white bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white shadow-xs transition disabled:opacity-50 cursor-pointer whitespace-nowrap"
-                >
-                  {isPublishing ? (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  ) : (
-                    <Zap className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
-                  )}
-                  <span>{isPublishing ? '배포 중...' : '노션에 바로 배포'}</span>
-                </button>
-
-                {/* 우측 인스펙터 패널이 접혔을 때 나타나는 [◀ NOA 인스펙터] 버튼 */}
-                {isCollapsed && (
+                  {/* [ 💾 저장하기 ] 단일 통합 버튼 */}
                   <button
                     type="button"
-                    onClick={toggleCollapse}
-                    className="flex items-center space-x-1 px-2.5 py-1 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-700 transition text-xs font-bold whitespace-nowrap cursor-pointer shadow-2xs"
-                    title="우측 NOA 인스펙터 챗 펼치기"
+                    onClick={handleSaveAll}
+                    className="flex items-center space-x-1.5 px-3 py-1 rounded-lg text-xs font-bold text-zinc-800 dark:text-zinc-100 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700 border border-zinc-300 dark:border-zinc-700 shadow-2xs transition cursor-pointer whitespace-nowrap"
+                    title="현재 템플릿을 로컬 초안 및 내 보관함에 즉시 동시 저장합니다"
                   >
-                    <ChevronLeft className="w-3.5 h-3.5" />
-                    <span>인스펙터</span>
+                    <Save className="w-3.5 h-3.5 text-zinc-700 dark:text-zinc-200" />
+                    <span>저장하기</span>
                   </button>
-                )}
-              </div>
-            </div>
 
-            {/* 2. 상단 KPI 요약 헤더 바: 실버 & 아연 모노톤 테마 */}
-            <div className="h-10 px-4 sm:px-6 bg-zinc-100/70 dark:bg-zinc-900/50 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between text-xs overflow-x-auto shrink-0 select-none scrollbar-none z-10">
-              <div className="flex items-center space-x-3 sm:space-x-5 shrink-0">
-                {/* KPI 1: 설계 진척도 */}
-                <div className="flex items-center space-x-2">
-                  <span className="text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 whitespace-nowrap">
-                    설계 진척도
-                  </span>
-                  <div className="flex items-center space-x-1.5">
-                    <div className="w-16 sm:w-24 h-2 rounded-full bg-zinc-200 dark:bg-zinc-800 overflow-hidden">
-                      <div className="h-full bg-zinc-800 dark:bg-zinc-200 rounded-full w-full" />
-                    </div>
-                    <span className="text-[11px] font-mono font-bold text-zinc-900 dark:text-zinc-100 whitespace-nowrap">
-                      100%
+                  {/* [ </> JSON ] 버튼 */}
+                  <button
+                    onClick={() => setIsRawJsonModalOpen(true)}
+                    className="flex items-center space-x-1 px-2.5 py-1 rounded-lg text-xs font-medium text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200/60 dark:hover:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 transition cursor-pointer whitespace-nowrap"
+                    title="템플릿 JSON 원본 코드 확인"
+                  >
+                    <Code2 className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">JSON</span>
+                  </button>
+
+                  {/* [ ⚡ 노션에 바로 배포 ] 버튼 */}
+                  <button
+                    onClick={publishToNotion}
+                    disabled={isPublishing || !editableTemplate}
+                    className="flex items-center space-x-1.5 px-3 py-1 rounded-lg text-xs font-bold text-white bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white shadow-xs transition disabled:opacity-50 cursor-pointer whitespace-nowrap"
+                  >
+                    {isPublishing ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Zap className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
+                    )}
+                    <span>{isPublishing ? '배포 중...' : '노션에 바로 배포'}</span>
+                  </button>
+
+                  {/* 우측 인스펙터 패널이 접혔을 때 나타나는 [◀ NOA 인스펙터] 버튼 */}
+                  {isCollapsed && (
+                    <button
+                      type="button"
+                      onClick={toggleCollapse}
+                      className="flex items-center space-x-1 px-2.5 py-1 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-700 transition text-xs font-bold whitespace-nowrap cursor-pointer shadow-2xs"
+                      title="우측 NOA 인스펙터 챗 펼치기"
+                    >
+                      <ChevronLeft className="w-3.5 h-3.5" />
+                      <span>인스펙터</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* 2. 상단 KPI 요약 헤더 바: 실버 & 아연 모노톤 테마 */}
+              <div className="h-10 px-4 sm:px-6 bg-zinc-100/70 dark:bg-zinc-900/50 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between text-xs overflow-x-auto shrink-0 select-none scrollbar-none z-10">
+                <div className="flex items-center space-x-3 sm:space-x-5 shrink-0">
+                  {/* KPI 1: 설계 진척도 */}
+                  <div className="flex items-center space-x-2">
+                    <span className="text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 whitespace-nowrap">
+                      설계 진척도
                     </span>
+                    <div className="flex items-center space-x-1.5">
+                      <div className="w-16 sm:w-24 h-2 rounded-full bg-zinc-200 dark:bg-zinc-800 overflow-hidden">
+                        <div className="h-full bg-zinc-800 dark:bg-zinc-200 rounded-full w-full" />
+                      </div>
+                      <span className="text-[11px] font-mono font-bold text-zinc-900 dark:text-zinc-100 whitespace-nowrap">
+                        100%
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="h-3 w-[1px] bg-zinc-300 dark:bg-zinc-700 shrink-0" />
+
+                  {/* KPI 2: 멀티 DB 수 */}
+                  <div className="flex items-center space-x-1 text-[11px] whitespace-nowrap">
+                    <Database className="w-3.5 h-3.5 text-zinc-500" />
+                    <span className="text-zinc-500 dark:text-zinc-400">데이터베이스</span>
+                    <span className="font-bold text-zinc-900 dark:text-zinc-100 font-mono">{totalDatabases}개</span>
+                  </div>
+
+                  <div className="h-3 w-[1px] bg-zinc-300 dark:bg-zinc-700 shrink-0" />
+
+                  {/* KPI 3: 속성 수 */}
+                  <div className="flex items-center space-x-1 text-[11px] whitespace-nowrap">
+                    <Tag className="w-3.5 h-3.5 text-zinc-500" />
+                    <span className="text-zinc-500 dark:text-zinc-400">총 속성</span>
+                    <span className="font-bold text-zinc-900 dark:text-zinc-100 font-mono">{totalProperties}개</span>
+                  </div>
+
+                  <div className="h-3 w-[1px] bg-zinc-300 dark:bg-zinc-700 shrink-0" />
+
+                  {/* KPI 4: Formulas 2.0 수식 */}
+                  <div className="flex items-center space-x-1 text-[11px] whitespace-nowrap">
+                    <Calculator className="w-3.5 h-3.5 text-zinc-600 dark:text-zinc-300" />
+                    <span className="text-zinc-500 dark:text-zinc-400">Formulas 2.0</span>
+                    <span className="font-bold text-zinc-900 dark:text-zinc-100 font-mono">{totalFormulas}개</span>
                   </div>
                 </div>
 
-                <div className="h-3 w-[1px] bg-zinc-300 dark:bg-zinc-700 shrink-0" />
-
-                {/* KPI 2: 멀티 DB 수 */}
-                <div className="flex items-center space-x-1 text-[11px] whitespace-nowrap">
-                  <Database className="w-3.5 h-3.5 text-zinc-500" />
-                  <span className="text-zinc-500 dark:text-zinc-400">데이터베이스</span>
-                  <span className="font-bold text-zinc-900 dark:text-zinc-100 font-mono">{totalDatabases}개</span>
-                </div>
-
-                <div className="h-3 w-[1px] bg-zinc-300 dark:bg-zinc-700 shrink-0" />
-
-                {/* KPI 3: 속성 수 */}
-                <div className="flex items-center space-x-1 text-[11px] whitespace-nowrap">
-                  <Tag className="w-3.5 h-3.5 text-zinc-500" />
-                  <span className="text-zinc-500 dark:text-zinc-400">총 속성</span>
-                  <span className="font-bold text-zinc-900 dark:text-zinc-100 font-mono">{totalProperties}개</span>
-                </div>
-
-                <div className="h-3 w-[1px] bg-zinc-300 dark:bg-zinc-700 shrink-0" />
-
-                {/* KPI 4: Formulas 2.0 수식 */}
-                <div className="flex items-center space-x-1 text-[11px] whitespace-nowrap">
-                  <Calculator className="w-3.5 h-3.5 text-zinc-600 dark:text-zinc-300" />
-                  <span className="text-zinc-500 dark:text-zinc-400">Formulas 2.0</span>
-                  <span className="font-bold text-zinc-900 dark:text-zinc-100 font-mono">{totalFormulas}개</span>
-                </div>
-              </div>
-
-              {/* KPI 5: 무손실 검증 상태 뱃지 & Memory Vault 상태 */}
-              <div className="flex items-center space-x-2 shrink-0">
-                {lastSavedNotice && (
-                  <span 
-                    className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-emerald-100/90 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800 whitespace-nowrap animate-fade-in"
-                    title={lastSavedNotice}
-                  >
-                    <Check className="w-3 h-3 mr-1 text-emerald-600 dark:text-emerald-400" />
-                    {lastSavedNotice}
+                {/* KPI 5: 무손실 검증 상태 뱃지 & Memory Vault 상태 */}
+                <div className="flex items-center space-x-2 shrink-0">
+                  <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-zinc-200 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 border border-zinc-300 dark:border-zinc-700 whitespace-nowrap">
+                    <ShieldCheck className="w-3 h-3 mr-1 text-zinc-600 dark:text-zinc-300" />
+                    무손실 검증: PASS
                   </span>
-                )}
 
-                <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-zinc-200 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 border border-zinc-300 dark:border-zinc-700 whitespace-nowrap">
-                  <ShieldCheck className="w-3 h-3 mr-1 text-zinc-600 dark:text-zinc-300" />
-                  무손실 검증: PASS
-                </span>
+                  <span 
+                    title="모든 인라인 스키마 수정 내역이 브라우저 로컬스토리지에 실시간 자동 보존됩니다"
+                    className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-zinc-200/90 dark:bg-zinc-800/90 text-zinc-800 dark:text-zinc-200 border border-zinc-300 dark:border-zinc-700 whitespace-nowrap"
+                  >
+                    <Database className="w-3 h-3 mr-1 text-zinc-600 dark:text-zinc-300" />
+                    Memory Vault 💾
+                  </span>
 
-                <span 
-                  title="모든 인라인 스키마 수정 내역이 브라우저 로컬스토리지에 실시간 자동 보존됩니다"
-                  className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-zinc-200/90 dark:bg-zinc-800/90 text-zinc-800 dark:text-zinc-200 border border-zinc-300 dark:border-zinc-700 whitespace-nowrap"
-                >
-                  <Database className="w-3 h-3 mr-1 text-zinc-600 dark:text-zinc-300" />
-                  Memory Vault 💾
-                </span>
-
-                <button
-                  type="button"
-                  onClick={handleResetToOriginal}
-                  className="flex items-center space-x-1 px-1.5 py-0.5 rounded text-[10px] font-medium text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200 hover:bg-zinc-200/60 dark:hover:bg-zinc-800 transition cursor-pointer"
-                  title="인라인 편집된 스키마를 원래 템플릿 상태로 복원합니다"
-                >
-                  <RotateCcw className="w-2.5 h-2.5" />
-                  <span>초기화</span>
-                </button>
+                  <button
+                    type="button"
+                    onClick={handleResetToOriginal}
+                    className="flex items-center space-x-1 px-1.5 py-0.5 rounded text-[10px] font-medium text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200 hover:bg-zinc-200/60 dark:hover:bg-zinc-800 transition cursor-pointer"
+                    title="인라인 편집된 스키마를 원래 템플릿 상태로 복원합니다"
+                  >
+                    <RotateCcw className="w-2.5 h-2.5" />
+                    <span>초기화</span>
+                  </button>
+                </div>
               </div>
-            </div>
 
             {/* 3. 메인 캔버스 뷰 (세로 스크롤 허용) */}
             <div className="w-full h-full min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
@@ -970,7 +910,8 @@ export const TemplatePreviewCanvas: React.FC<TemplatePreviewCanvasProps> = ({ te
               )}
             </div>
           </div>
-        )}
+        );
+      }}
         sideContent={({ isCollapsed, toggleCollapse }) => (
           <InspectorChat
             template={editableTemplate}
