@@ -41,6 +41,7 @@ export interface FileContextItem {
   extension: string;
   category: FileTypeCategory;
   parsedContent?: string;
+  textContent?: string;
   sheets?: ParsedSheetData[];
   summaryBadge?: string;
 }

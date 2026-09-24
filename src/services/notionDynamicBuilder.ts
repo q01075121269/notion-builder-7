@@ -15,7 +15,9 @@ export const INSTRUCTION_ECHO_PATTERNS = [
   /\/?문서의\s*실제\s*시트명[^\s]*\s*/gi,
   /컬럼\s*헤더[^\s]*\s*/gi,
   /어\s*현재\s*템플릿을[^\s]*\s*/gi,
-  /(?:천북|첨부)?\s*파일(?:을|의|에)?\s*(?:반영|참고|분석|기반)[^\s]*\s*/gi,
+  /(?:천북|첨부)?\s*파일(?:이|을|의|에)?\s*(?:반영된|참고된|분석된|기반|반영)[^\s]*\s*/gi,
+  /실무\s*작업\s*(?:에)?\s*활용할\s*수\s*있는[^\s]*\s*/gi,
+  /(?:만들어|작성해|생성해|설계해)\s*(?:주세요|줘|주십시오)[^\s]*\s*/gi,
   /지침\s*:\s*/gi,
   /\[지침\]\s*/gi,
   /사용자(?:가|의)?\s*(?:첨부한|입력한|요청한)?\s*(?:표|문서|파일|데이터|프롬프트)?(?:의|를)?\s*/gi,
@@ -23,7 +25,6 @@ export const INSTRUCTION_ECHO_PATTERNS = [
   /노션\s*DB\s*속성[^\s]*\s*/gi,
   /(?:반영|참고|대조)하여\s*(?:설계|생성|구축|작성)하십시오\s*/gi,
   /(?:설계|생성|구축|작성)하십시오\s*/gi,
-  /(?:만들어|작성해|생성해)\s*(?:주세요|줘)\s*/gi,
   /다음은\s*사용자의\s*/gi,
   /프롬프트\s*:\s*/gi,
   /명령어\s*:\s*/gi,
@@ -57,9 +58,9 @@ export function sanitizeTextContent(raw?: string): string {
 export function sanitizeTemplateTitle(rawTitle?: string, fallback = '마스터 워크스페이스'): string {
   if (!rawTitle) return fallback;
 
-  // 1. 업무일지 키워드 감지 시 30자 이내 정제된 공식 명사형 제목 강제 부여
-  if (/업무일지|일지|일일\s*업무/i.test(rawTitle)) {
-    return '[일일 업무일지] 업무 진행 및 실행 관제 OS';
+  // 1. 업무일지 / 점검 / 시설 / 소방 키워드 감지 시 [시설관리] 정제 제목 강제 부여
+  if (/업무일지|일지|점검|시설|소방|점검내용|특이사항/i.test(rawTitle)) {
+    return '[시설관리] 일일 업무일지 및 설비 안전 관제 OS';
   }
 
   // 2. 프롬프트 지시어 및 Echo 패턴 정규식으로 차단
@@ -178,60 +179,60 @@ export function ensureTemplateAgentBlueprint(template: NotionTemplate): NotionTe
 export function buildDynamicDatabases(title: string, description?: string): NotionDatabase[] {
   const cleanTitle = sanitizeTemplateTitle(title);
   
-  // 업무일지 감지: 레거시 품질검수(Quality_Status, Verified) 대신 실무 업무일지 컬럼 스키마 구성
-  const isDailyReport = /업무일지|일지|일일\s*업무|작성자|업무내용|특이사항/i.test(title + ' ' + (description || ''));
+  // 업무일지/시설점검/소방 감지: 레거시 PARA 속성(Quality_Status, Verified) 차단 및 3대 전용 스키마 강제 매핑
+  const isFacilityOrDailyReport = /업무일지|일지|점검|시설|소방|점검내용|특이사항|결함|설비/i.test(title + ' ' + (description || ''));
 
-  if (isDailyReport) {
+  if (isFacilityOrDailyReport) {
     const todayStr = new Date().toISOString().split('T')[0];
     return [
       {
         name: `📌 [일일 업무일지] 마스터 관제 트래커`,
-        description: description || `일일 업무 진행 상황, 작성자 및 특이사항 통합 관리 DB`,
+        description: description || `일일 업무 진행 상황, 작성자/결재자 및 특이사항 통합 관제 DB`,
         view_type: 'table',
         properties: [
           { name: '업무 내용', type: 'title' },
-          { name: '작성일자', type: 'date' },
-          { name: '작성자', type: 'text' },
-          { name: '업무 분류', type: 'select', options: ['기획/분석', '개발/구현', '운영/관리', '회의/협의', '기타'] },
+          { name: '일자', type: 'date' },
+          { name: '작성자/결재자', type: 'text' },
+          { name: '업무 구분', type: 'select', options: ['시설점검', '소방안전', '보수공사', '정기검사', '일반업무'] },
           { name: '진행상태', type: 'status', options: ['대기', '진행중', '검토중', '완료'] },
-          { name: '우선순위', type: 'select', options: ['높음 (P1)', '보통 (P2)', '낮음 (P3)'] },
-          { name: '소요시간(h)', type: 'number' },
-          { name: '특이사항 및 이슈', type: 'text' }
+          { name: '특이사항', type: 'text' }
         ],
         sample_rows: [
-          { '업무 내용': '주간 개발 모듈 리팩토링 및 릴리즈 검수', '작성일자': todayStr, '작성자': '홍길동', '업무 분류': '개발/구현', '진행상태': '완료', '우선순위': '높음 (P1)', '소요시간(h)': 4, '특이사항 및 이슈': '성능 이슈 1건 수정 완료' },
-          { '업무 내용': '신규 노션 빌더 AI 프롬프트 지시어 정제', '작성일자': todayStr, '작성자': '김철수', '업무 분류': '기획/분석', '진행상태': '진행중', '우선순위': '높음 (P1)', '소요시간(h)': 3, '특이사항 및 이슈': '정규식 필터링 테스트 수행 중' }
+          { '업무 내용': '지하 1층 기계실 급수 펌프 및 전기 제어반 정기 점검', '일자': todayStr, '작성자/결재자': '홍길동 소장', '업무 구분': '시설점검', '진행상태': '완료', '특이사항': '급수 펌프 2호기 미세 진동 확인 및 구리스 주입 완료' },
+          { '업무 내용': '소방 수신기 및 유도등 예비전원 결함 점검', '일자': todayStr, '작성자/결재자': '김철수 기사', '업무 구분': '소방안전', '진행상태': '진행중', '특이사항': '3층 복도 비상 유도등 배터리 방전건 교체 긴급 티켓 발행' }
         ]
       },
       {
-        name: `📋 세부 실행 과제 & 이슈 타임라인`,
-        description: `업무일지 연관 세부 과제 및 데드라인 관리 DB`,
+        name: `📋 시설물 일일점검 리스트`,
+        description: `시간대별 시설물/소방/전기/기계 점검 항목 및 점검상태(○/△/×) 관리 DB`,
         view_type: 'table',
         properties: [
-          { name: '세부 과제명', type: 'title' },
-          { name: '관련 업무일지', type: 'relation', target: `📌 [일일 업무일지] 마스터 관제 트래커` },
-          { name: '마감일', type: 'date' },
-          { name: '담당자', type: 'text' },
-          { name: '상태', type: 'status', options: ['시작전', '진행중', '완료'] },
+          { name: '점검항목', type: 'title' },
+          { name: '점검시간', type: 'text' },
+          { name: '점검구역', type: 'select', options: ['기계실', '전기실', '방재실', '옥상', '외곽'] },
+          { name: '점검상태', type: 'select', options: ['정상(○)', '요주의(△)', '결함(×)'] },
+          { name: '점검자', type: 'text' },
           { name: '비고', type: 'text' }
         ],
         sample_rows: [
-          { '세부 과제명': '파서 모듈 바이너리 쓰레기값 검증 로직 반영', '담당자': '홍길동', '상태': '진행중', '비고': 'Garbage Guard 20% 적용 완료' }
+          { '점검항목': '주 배전반 공기차단기(ACB) 동작 및 전압 레벨', '점검시간': '09:30', '점검구역': '전기실', '점검상태': '정상(○)', '점검자': '김철수', '비고': '상전압 220V/380V 정상 계측' },
+          { '점검항목': '3층 소방 감지기 수신 반응 및 비상 유도등', '점검시간': '11:00', '점검구역': '방재실', '점검상태': '결함(×)', '점검자': '홍길동', '비고': '유도등 예비전원 방전 확인 (긴급 조치 필요)' }
         ]
       },
       {
-        name: `📂 업무 자료 & 산출물 아카이브`,
-        description: `업무일지 관련 첨부 파일, 참조 링크 및 보고서 보관 DB`,
+        name: `🚨 긴급 결함 & 소방 조치 티켓`,
+        description: `시설물 결함, 소방 안전 위험도 및 조치 현황 관리 DB`,
         view_type: 'table',
         properties: [
-          { name: '자료명', type: 'title' },
-          { name: '관련 업무일지', type: 'relation', target: `📌 [일일 업무일지] 마스터 관제 트래커` },
-          { name: '구분', type: 'select', options: ['보고서', '참조문서', '산출물', '기타'] },
-          { name: '첨부/링크', type: 'url' },
-          { name: '비고', type: 'text' }
+          { name: '티켓명/설비명', type: 'title' },
+          { name: '관련 점검', type: 'relation', target: `📋 시설물 일일점검 리스트` },
+          { name: '위험도', type: 'select', options: ['긴급(P1)', '주의(P2)', '일반(P3)'] },
+          { name: '조치 내용', type: 'text' },
+          { name: '상태', type: 'status', options: ['접수', '조치중', '완료'] },
+          { name: '조치일자', type: 'date' }
         ],
         sample_rows: [
-          { '자료명': '일일 업무 현황 리포트 문서', '구분': '보고서', '비고': 'PDF 파싱 검증 완료본' }
+          { '티켓명/설비명': '3층 복도 비상유도등 배터리 방전 및 소방 자재 교체', '위험도': '긴급(P1)', '조치 내용': '예비 배터리 신규 수급 및 교체 설치 완료', '상태': '완료', '조치일자': todayStr }
         ]
       }
     ];
@@ -333,12 +334,16 @@ export function buildDynamicTemplateFromPayload(payload: DynamicPayloadInput): N
   const cover_url = data.cover_url || payload.cover_url || 'https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=1600&q=80';
   const tags = data.tags || payload.tags || ['#동적워크스페이스', '#노션빌더', '#AI에이전트3.0'];
 
-  // 2. 데이터베이스 구성 (전달받은 데이터 우선 사용)
-  const rawDatabases: NotionDatabase[] = (data.databases && data.databases.length > 0)
-    ? data.databases
-    : (payload.databases && payload.databases.length > 0)
-      ? payload.databases
-      : buildDynamicDatabases(cleanTitle, description);
+  const isFacilityOrDailyReport = /업무일지|일지|점검|시설|소방|점검내용|특이사항|결함|설비/i.test(cleanTitle + ' ' + (payload.initialPrompt || ''));
+
+  // 2. 데이터베이스 구성 (업무일지/시설점검 키워드 감지 시 3대 강제 스키마 매핑)
+  const rawDatabases: NotionDatabase[] = isFacilityOrDailyReport
+    ? buildDynamicDatabases(cleanTitle, description)
+    : (data.databases && data.databases.length > 0)
+      ? data.databases
+      : (payload.databases && payload.databases.length > 0)
+        ? payload.databases
+        : buildDynamicDatabases(cleanTitle, description);
 
   // 데이터베이스 이름, 설명 및 sample_rows 지시문 echo 정제
   const databases: NotionDatabase[] = rawDatabases.map((db) => {

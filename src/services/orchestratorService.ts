@@ -54,15 +54,15 @@ export async function sendToOrchestrator(
     headers['x-current-mode'] = currentMode;
   }
 
-  // 다중 첨부 파일(fileContextList) 페이로드 명확히 조립
+  // 다중 첨부 파일(fileContextList) 페이로드 명확히 조립 (최우선 context 주입)
   let enrichedText = text;
   if (fileContextList && fileContextList.length > 0) {
     const multiFileBlocks = fileContextList.map(fc => {
-      let contentStr = fc.parsedContent || '';
+      let contentStr = fc.textContent || fc.parsedContent || '';
       if (fc.sheets && fc.sheets.length > 0) {
         contentStr += '\n' + fc.sheets.map(s => s.markdownTable).join('\n\n');
       }
-      return `[ATTACHED_DOCUMENT_DATA]\n파일명: ${fc.fileName}\n확장자: ${fc.extension}\n카테고리: ${fc.category}\n내용:\n${contentStr}\n[/ATTACHED_DOCUMENT_DATA]`;
+      return `사용자가 첨부한 문서 원본 내용:\n[ATTACHED_DOCUMENT_DATA]\n파일명: ${fc.fileName}\n확장자: ${fc.extension}\n카테고리: ${fc.category}\n본문 텍스트:\n${contentStr}\n[/ATTACHED_DOCUMENT_DATA]`;
     }).join('\n\n');
     
     if (!enrichedText.includes('[ATTACHED_DOCUMENT_DATA]')) {

@@ -526,6 +526,7 @@ export const OmniChatBar: React.FC = () => {
         extension: a.name.split('.').pop()?.toLowerCase() || '',
         category: a.sheets && a.sheets.length > 0 ? 'spreadsheet' : 'document',
         parsedContent: a.parsedContent,
+        textContent: a.parsedContent,
         sheets: a.sheets,
         summaryBadge: a.summaryBadge
       }));
