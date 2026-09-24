@@ -94,6 +94,7 @@ export const InspectorChat: React.FC<InspectorChatProps> = ({
   const [inputVal, setInputVal] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [isNewTemplateMode, setIsNewTemplateMode] = useState(false);
 
   // 첨부 이미지 및 문서 상태
   const [attachedImages, setAttachedImages] = useState<AttachedImageItem[]>([]);
@@ -134,6 +135,27 @@ export const InspectorChat: React.FC<InspectorChatProps> = ({
       onSelectDbName(currentDb.name);
     }
   }, [currentDb, selectedDbName, onSelectDbName]);
+
+  // [+ 새 템플릿 만들기] 액션: 캔버스 및 대화창 초기화, 신규 생성 모드 진입
+  const handleNewTemplate = () => {
+    setIsNewTemplateMode(true);
+    if (onApplyTemplateUpdate) {
+      onApplyTemplateUpdate(null as any);
+    }
+    setCurrentTemplate(null);
+    setMessages([
+      {
+        id: `new-init-${Date.now()}`,
+        sender: 'inspector',
+        content: '새로운 템플릿 설계를 시작합니다. 구상하시는 업무나 엑셀 파일, 스크린샷 캡처(Ctrl+V), 음성으로 자유롭게 지시해 주세요.',
+        timestamp: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }),
+      },
+    ]);
+    setInputVal('');
+    setAttachedImages([]);
+    setAttachedDocs([]);
+    setTimeout(() => textareaRef.current?.focus(), 50);
+  };
 
   // ── 1. Web Speech API 인라인 연속 음성 인식 (Continuous STT) ───────────────
   useEffect(() => {
@@ -236,10 +258,8 @@ export const InspectorChat: React.FC<InspectorChatProps> = ({
       };
 
       setAttachedImages((prev) => [...prev, newImg]);
-      showToast(`📸 [${newImg.name}] 이미지가 첨부되었습니다.`, 'info');
     } catch (err) {
       console.error('Image encoding failed:', err);
-      showToast('이미지 변환 중 오류가 발생했습니다.', 'error');
     }
   };
 
@@ -249,8 +269,6 @@ export const InspectorChat: React.FC<InspectorChatProps> = ({
     if (!validation.valid) {
       if (validation.reason === 'hwp') {
         showToast(HWP_CONVERSION_GUIDE_MSG, 'warning');
-      } else {
-        showToast(`지원하지 않는 파일 형식입니다: ${file.name}`, 'error');
       }
       return;
     }
@@ -282,9 +300,8 @@ export const InspectorChat: React.FC<InspectorChatProps> = ({
           fileContext,
         },
       ]);
-      showToast(`📄 [${parsed.name}] 문서 분석 완료 (${parsed.summaryBadge || '추출 성공'})`, 'success');
     } catch (err: any) {
-      showToast(`파일 처리 실패: ${err?.message || '알 수 없는 오류'}`, 'error');
+      console.error('File parsing failed:', err);
     } finally {
       setIsParsingFiles(false);
     }
@@ -398,17 +415,17 @@ export const InspectorChat: React.FC<InspectorChatProps> = ({
 
       const fileContextList: FileContextItem[] = currentDocs.map((d) => d.fileContext);
 
-      // 타깃 DB 맥락과 사용자 지시사항 결합
+      // 타깃 DB 맥락 및 신규 템플릿 모드 분기
       let promptText = text;
-      if (currentDb) {
+      let templatePayload = template;
+
+      if (isNewTemplateMode) {
+        templatePayload = null;
+        promptText = `[NEW_TEMPLATE_MODE: 기존 템플릿과 무관하게 완전히 새로운 노션 워크스페이스 템플릿을 신규 생성해줘.]\n${text || '새로운 맞춤형 노션 워크스페이스를 기획하고 생성해줘.'}`;
+      } else if (currentDb) {
         promptText = `[TARGET_DB_CONTEXT: 현재 포커스된 DB는 "${currentDb.name}"입니다.]\n${text || '화면 캡처 이미지의 표/데이터를 분석하여 캔버스 스키마에 반영해줘.'}`;
       } else if (!promptText) {
         promptText = '첨부된 화면 캡처 이미지의 표/컬럼/데이터를 정밀 판독하고 현재 노션 템플릿 스키마에 즉시 반영해줘.';
-      }
-
-      // 오케스트레이터 호출 안내
-      if (currentImages.length > 0) {
-        showToast('🧠 Gemini Vision 시각 분석 엔진이 이미지와 캔버스 스키마를 정밀 대조 중입니다...', 'info');
       }
 
       const response = await sendToOrchestrator(
@@ -426,7 +443,7 @@ export const InspectorChat: React.FC<InspectorChatProps> = ({
         fileContextList,
         isThinkingEnabled,
         imagesPayload,
-        template
+        templatePayload
       );
 
       const actionResult = response.reply_message || `[${targetDbTitle}] 스키마 수정 작업이 완료되었습니다.`;
@@ -454,7 +471,9 @@ export const InspectorChat: React.FC<InspectorChatProps> = ({
             onApplyTemplateUpdate(normalized);
           }
           setCurrentTemplate(normalized);
-          showToast('✨ Gemini 분석 결과가 중앙 캔버스 스키마에 즉시 동기화되었습니다!', 'success');
+          if (isNewTemplateMode) {
+            setIsNewTemplateMode(false);
+          }
         }
       }
 
@@ -516,28 +535,58 @@ export const InspectorChat: React.FC<InspectorChatProps> = ({
           </div>
         </div>
 
-        {/* 타깃 DB 선택 배지 / 드롭다운 */}
-        {databases.length > 0 && (
-          <div className="flex items-center space-x-1 max-w-[150px]">
-            <Database className="w-3 h-3 text-zinc-500 shrink-0" />
-            <select
-              value={currentDb?.name || ''}
-              onChange={(e) => onSelectDbName(e.target.value)}
-              className="text-[11px] font-bold bg-white/80 dark:bg-zinc-800/80 text-zinc-800 dark:text-zinc-200 border border-zinc-300 dark:border-zinc-700 rounded-md px-1.5 py-0.5 outline-none cursor-pointer truncate max-w-[130px]"
-              title="수정할 타깃 데이터베이스 선택"
-            >
-              {databases.map((db, idx) => (
-                <option key={idx} value={db.name}>
-                  {db.name}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
+        {/* 상단 우측 액션: [+ 새 템플릿] 버튼 및 타깃 DB 드롭다운 */}
+        <div className="flex items-center space-x-1.5 shrink-0">
+          <button
+            type="button"
+            onClick={handleNewTemplate}
+            className={`flex items-center space-x-1 px-2 py-1 rounded-lg text-[10px] font-bold border transition active:scale-95 cursor-pointer shrink-0 shadow-2xs ${
+              isNewTemplateMode
+                ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 border-zinc-900 dark:border-zinc-100'
+                : 'bg-white/90 dark:bg-zinc-800/90 text-zinc-700 dark:text-zinc-300 border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-700 hover:text-zinc-900 dark:hover:text-white'
+            }`}
+            title="현재 캔버스를 초기화하고 새로운 템플릿 설계 시작"
+          >
+            <Plus className="w-3 h-3" />
+            <span>새 템플릿</span>
+          </button>
+
+          {/* 타깃 DB 선택 배지 / 드롭다운 */}
+          {databases.length > 0 && !isNewTemplateMode ? (
+            <div className="flex items-center space-x-1 max-w-[125px]">
+              <Database className="w-3 h-3 text-zinc-500 shrink-0" />
+              <select
+                value={currentDb?.name || ''}
+                onChange={(e) => onSelectDbName(e.target.value)}
+                disabled={isNewTemplateMode}
+                className="text-[11px] font-bold bg-white/80 dark:bg-zinc-800/80 text-zinc-800 dark:text-zinc-200 border border-zinc-300 dark:border-zinc-700 rounded-md px-1.5 py-0.5 outline-none cursor-pointer truncate max-w-[105px]"
+                title="수정할 타깃 데이터베이스 선택"
+              >
+                {databases.map((db, idx) => (
+                  <option key={idx} value={db.name}>
+                    {db.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : isNewTemplateMode ? (
+            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-zinc-200 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300 border border-zinc-300 dark:border-zinc-600">
+              신규 생성 모드
+            </span>
+          ) : null}
+        </div>
       </div>
 
-      {/* 2. 타깃 DB 스키마 맥락 현황 바 */}
-      {currentDb && (
+      {/* 2. 타깃 DB 스키마 맥락 현황 바 (또는 신규 생성 모드 안내 바) */}
+      {isNewTemplateMode ? (
+        <div className="px-3 py-1.5 bg-zinc-100/90 dark:bg-zinc-800/60 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between text-[11px] shrink-0 text-zinc-700 dark:text-zinc-300">
+          <div className="flex items-center space-x-1.5 truncate">
+            <Sparkles className="w-3 h-3 text-zinc-500 shrink-0" />
+            <span className="font-semibold truncate">신규 템플릿 기획 모드</span>
+          </div>
+          <span className="text-[10px] font-mono opacity-70">빈 캔버스</span>
+        </div>
+      ) : currentDb ? (
         <div className="px-3 py-2 bg-zinc-100/70 dark:bg-zinc-800/50 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between text-[11px] shrink-0">
           <div className="flex items-center space-x-1.5 truncate">
             <Tag className="w-3 h-3 text-zinc-500 shrink-0" />
@@ -549,7 +598,7 @@ export const InspectorChat: React.FC<InspectorChatProps> = ({
             {currentDb.properties?.length || 0}개 속성
           </span>
         </div>
-      )}
+      ) : null}
 
       {/* 3. 추천 스키마 정밀 지시 퀵 액션 칩 (모노톤 & 메탈릭 버튼) */}
       <div className="p-2.5 bg-zinc-50 dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 shrink-0">
