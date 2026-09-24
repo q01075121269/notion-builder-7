@@ -18,7 +18,7 @@ import { fetchNotionDatabases } from '../services/notionDatabaseSync';
 import { getGoogleSyncConfig, saveGoogleSyncConfig, saveArchivedTemplate } from '../services/archiveStorage';
 import { DEFAULT_GUIDES, generateGuideWithGemini, createFallbackGuide } from '../services/guideGenerator';
 import { getAuthSession, saveAuthSession, clearAllAuthAndCredentials, isUserAdmin } from '../services/authStorage';
-import { getSavedChatMessages, saveChatMessages, clearSavedChatMessages, INITIAL_CHAT_MESSAGES } from '../services/chatStorage';
+import { getSavedChatMessages, saveChatMessages, createNewSession, INITIAL_CHAT_MESSAGES } from '../services/chatStorage';
 import confetti from 'canvas-confetti';
 
 export type ViewType = 'home' | 'builder' | 'life' | 'devlab' | 'media_lab' | 'dashboard' | 'quick_capture';
@@ -440,8 +440,15 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const clearChatHistory = () => {
-    const reset = clearSavedChatMessages();
-    setMessages(reset);
+    const newSession = createNewSession();
+    setMessages(newSession.messages);
+    setCurrentTemplate(null);
+    clearRecentModifications();
+    try {
+      localStorage.removeItem('notion_template_cache');
+      localStorage.removeItem('notion_template_vault_draft');
+    } catch {}
+    showToast('✨ 새 Co-Thinking 대화 세션이 시작되었습니다.', 'info');
   };
 
   const triggerCelebration = () => {
@@ -593,6 +600,23 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         setCurrentGuide(createFallbackGuide(template, 'general'));
         setIsViewingCurationHub(false);
 
+        // 템플릿 보관함(localStorage)에 자동 수집 적재
+        try {
+          saveArchivedTemplate({
+            id: `archived-${Date.now()}`,
+            title: template.title,
+            description: template.description || explanation.slice(0, 80),
+            icon: template.icon || '📄',
+            cover_url: template.cover_url || 'https://images.unsplash.com/photo-1507842229451-7f01be8860ee?auto=format&fit=crop&w=1600&q=80',
+            tags: ['#노아자동생성', '#CoThinking'],
+            templateData: template,
+            createdAt: Date.now(),
+            updatedAt: Date.now()
+          });
+        } catch (err) {
+          console.warn('[VaultSync] Failed to auto-archive template:', err);
+        }
+
         if (window.innerWidth < 768) {
           setActiveMobileTab('preview');
         }
@@ -609,7 +633,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               : msg
           )
         );
-        showToast(`"${template.title}" 템플릿 생성이 완료되었습니다!`, 'success');
+        showToast(`✨ "${template.title}" 템플릿 생성이 완료되고 보관함에 적재되었습니다!`, 'success');
       }
 
     } catch (err: any) {

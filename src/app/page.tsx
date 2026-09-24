@@ -41,7 +41,9 @@ export const HomePage: React.FC = () => {
     messages,
     sendMessage,
     isGenerating,
-    showToast
+    showToast,
+    setCurrentTemplate,
+    clearRecentModifications
   } = useApp();
 
   const isNotionConnected = Boolean(notionApiKey && (createdNotionResource || notionParentPageId));
@@ -84,12 +86,21 @@ export const HomePage: React.FC = () => {
     }
   }, [messages, activeSessionId]);
 
-  // 새로운 대화 생성
+  // 새로운 대화 생성 (Clean Reset)
   const handleNewChat = () => {
     const newSession = createNewSession();
     setSessions(getSavedSessions());
     setActiveSessionIdState(newSession.id);
-    showToast('✨ 새 Co-Thinking 대화가 시작되었습니다.', 'info');
+    setCurrentTemplate(null);
+    clearRecentModifications();
+    setInputPrompt('');
+    setAttachedFiles([]);
+    try {
+      localStorage.removeItem('notion_template_cache');
+      localStorage.removeItem('notion_template_vault_draft');
+    } catch {}
+    showToast('✨ 새 Co-Thinking 대화 세션이 시작되었습니다.', 'info');
+    window.location.reload();
   };
 
   // 특정 세션 선택

@@ -1,10 +1,10 @@
 import React from 'react';
 import type { ChatMessage } from '../../types/chat';
 import { useApp } from '../../context/AppContext';
-import { Bot, User, Database, ArrowRight, LayoutTemplate } from 'lucide-react';
+import { Bot, User, Database, ArrowRight, LayoutTemplate, Sparkles } from 'lucide-react';
 
 export const ChatMessageItem: React.FC<{ message: ChatMessage }> = ({ message }) => {
-  const { setCurrentTemplate, setActiveMobileTab, currentTemplate } = useApp();
+  const { setCurrentTemplate, setActiveMobileTab, currentTemplate, sendMessage } = useApp();
   const isUser = message.role === 'user';
 
   const handleApplyTemplate = () => {
@@ -17,6 +17,19 @@ export const ChatMessageItem: React.FC<{ message: ChatMessage }> = ({ message })
   };
 
   const isCurrentTemplate = currentTemplate && message.templateData && currentTemplate.title === message.templateData.title;
+
+  // AI 답변 내 확정 유도 키워드가 존재하고 아직 templateData가 없는 경우 액션 버튼 노출
+  const showGenerateButton = !isUser && !message.isLoading && !message.templateData && (
+    message.content.includes('템플릿을 제작할까요') ||
+    message.content.includes('템플릿 생성하기') ||
+    message.content.includes('만들어줘') ||
+    message.content.includes('구체적 프롬프트') ||
+    message.content.includes('제작해 줄까요')
+  );
+
+  const handleConfirmGenerate = () => {
+    sendMessage("위에서 제안된 구조와 기획안대로 템플릿 바로 생성해줘");
+  };
 
   return (
     <div className={`flex w-full space-x-3 text-sm animate-fadeIn ${isUser ? 'justify-end' : 'justify-start'}`}>
@@ -77,7 +90,23 @@ export const ChatMessageItem: React.FC<{ message: ChatMessage }> = ({ message })
               </span>
             </div>
           ) : (
-            <div>{message.content}</div>
+            <div>
+              {message.content}
+
+              {/* Co-Thinking 템플릿 생성 확정 유도 실제 UI 액션 버튼 */}
+              {showGenerateButton && (
+                <div className="pt-3 mt-2 border-t border-neutral-100 dark:border-neutral-800/80">
+                  <button
+                    onClick={handleConfirmGenerate}
+                    className="flex items-center space-x-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 via-emerald-500 to-indigo-600 text-white font-extrabold text-xs shadow-md hover:shadow-lg hover:scale-[1.01] active:scale-98 transition cursor-pointer"
+                  >
+                    <Sparkles className="w-4 h-4 text-amber-300 animate-pulse" />
+                    <span>✨ 이 제안 구조로 템플릿 생성하기</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
+            </div>
           )}
         </div>
 
