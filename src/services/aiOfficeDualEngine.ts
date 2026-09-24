@@ -1,6 +1,8 @@
 // src/services/aiOfficeDualEngine.ts
 // 제3챕터 AI 오피스 스튜디오 듀얼 생성 엔진 (CREATIVE ↔ FIXED_FORM) 및 수식 유효성 가드레일
 
+import { sanitizeTemplateTitle } from './notionDynamicBuilder';
+
 export type DualEngineMode = 'CREATIVE' | 'FIXED_FORM';
 
 export interface OfficeDocPayload {
@@ -81,7 +83,8 @@ export function validateSheetFormulas(formula: string, maxRowIndex: number): { i
 
 // 2. 모드 A: 젠스파크(Genspark)형 자유 기획 모드 (CREATIVE)
 export function generateCreativeOfficeDoc(prompt: string): OfficeDocPayload {
-  const cleanPrompt = prompt.trim() || '2026 하반기 신규 AI 서비스 론칭 제안';
+  const sanitizedTitle = sanitizeTemplateTitle(prompt, '신규 AI 서비스 론칭 제안');
+  const cleanPrompt = sanitizedTitle;
 
   const rows = [
     { item: `${cleanPrompt} AI 코어 엔진 설계`, qty: 1, price: 500000, tax: 50000, total: 550000, note: 'Gemini 3.6 Flash' },

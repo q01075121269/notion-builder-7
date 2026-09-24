@@ -15,25 +15,30 @@ export const INSTRUCTION_ECHO_PATTERNS = [
   /\/?문서의\s*실제\s*시트명[^\s]*\s*/gi,
   /컬럼\s*헤더[^\s]*\s*/gi,
   /어\s*현재\s*템플릿을[^\s]*\s*/gi,
-  /(?:천북|첨부)?\s*파일(?:이|을|의|에)?\s*(?:반영된|참고된|분석된|기반|반영)[^\s]*\s*/gi,
+  /(?:천북|첨부)\s*파일(?:이|을|의|에)?\s*(?:반영한|반영하여|반영된|참고한|참고된|분석한|분석된|기반|반영)[^\s]*\s*/gi,
+  /(?:천북|첨부)\s*파일[^\s]*\s*/gi,
   /실무\s*작업\s*(?:에)?\s*활용할\s*수\s*있는[^\s]*\s*/gi,
   /(?:만들어|작성해|생성해|설계해)\s*(?:주세요|줘|주십시오)[^\s]*\s*/gi,
+  /지침\s*:\s*사용자(?:가|의)?\s*(?:첨부한|입력한)?\s*(?:표|문서|파일|데이터)?[^\s]*/gi,
   /지침\s*:\s*/gi,
   /\[지침\]\s*/gi,
   /사용자(?:가|의)?\s*(?:첨부한|입력한|요청한)?\s*(?:표|문서|파일|데이터|프롬프트)?(?:의|를)?\s*/gi,
-  /1\s*:\s*1(?:로)?\s*(?:노션\s*DB|속성|데이터베이스)?\s*/gi,
+  /1\s*:\s*1\s*(?:로)?\s*(?:노션\s*DB|속성|데이터베이스)?[^\s]*/gi,
   /노션\s*DB\s*속성[^\s]*\s*/gi,
   /(?:반영|참고|대조)하여\s*(?:설계|생성|구축|작성)하십시오\s*/gi,
-  /(?:설계|생성|구축|작성)하십시오\s*/gi,
+  /(?:반영하여\s*)?설계하십시오\s*/gi,
   /다음은\s*사용자의\s*/gi,
   /프롬프트\s*:\s*/gi,
   /명령어\s*:\s*/gi,
   /아래\s*지침에\s*따라\s*/gi,
+  /아래\s*지침[^\s]*\s*/gi,
   /다음\s*지침을\s*준수하여\s*/gi,
+  /다음\s*지침[^\s]*\s*/gi,
   /입력된\s*파일\s*/gi,
+  /입력\s*데이터[^\s]*\s*/gi,
   /첨부된\s*문서\s*/gi,
   /템플릿\s*제작[^\s]*\s*/gi,
-  /템플릿을\s*(?:만들어|생성)\s*/gi,
+  /템플릿을?\s*(?:만들어|생성|설계|작성)[^\s]*/gi,
   /노션\s*(?:템플릿|페이지|워크스페이스)를?\s*/gi,
   /기반으로\s*(?:작성|생성|설계)\s*/gi,
 ];
@@ -55,12 +60,12 @@ export function sanitizeTextContent(raw?: string): string {
  * - 프롬프트 지시문/명령어 문자열 완전 제거
  * - 30자 이내의 핵심 도메인 명사형 제목만 추출하여 할당
  */
-export function sanitizeTemplateTitle(rawTitle?: string, fallback = '마스터 워크스페이스'): string {
+export function sanitizeTemplateTitle(rawTitle?: string, fallback = '[스마트 대시보드] 데이터 통합 관제 OS'): string {
   if (!rawTitle) return fallback;
 
   // 1. 업무일지 / 점검 / 시설 / 소방 키워드 감지 시 [시설관리] 정제 제목 강제 부여
-  if (/업무일지|일지|점검|시설|소방|점검내용|특이사항/i.test(rawTitle)) {
-    return '[시설관리] 일일 업무일지 및 설비 안전 관제 OS';
+  if (/업무일지|일지|점검|시설|소방|점검내용|특이사항|결함|설비/i.test(rawTitle)) {
+    return '[일일 업무일지] 업무 진행 및 실행 관제 OS';
   }
 
   // 2. 프롬프트 지시어 및 Echo 패턴 정규식으로 차단
@@ -73,8 +78,9 @@ export function sanitizeTemplateTitle(rawTitle?: string, fallback = '마스터 �
     .replace(/^[\s:\-\.=]+|[\s:\-\.=]+$/g, '')
     .trim();
 
-  // 4. 문장형 서술어 제거 및 핵심 도메인 명사구 정제
+  // 4. 문장형 서술어/지시어 제거 및 핵심 도메인 명사구 정제
   cleaned = cleaned
+    .replace(/(?:해\s*줘|만들어\s*줘|작성해\s*줘|생성해\s*줘|구축해\s*줘|설계해\s*줘|반영해\s*줘|추가해\s*줘|넣어\s*줘)$/g, '')
     .replace(/(?:을|를)\s*위한\s*/g, ' ')
     .replace(/(?:에|의)\s*관한\s*/g, ' ')
     .replace(/(?:에|의)\s*대한\s*/g, ' ')
@@ -91,8 +97,8 @@ export function sanitizeTemplateTitle(rawTitle?: string, fallback = '마스터 �
   }
 
   // 6. 정제 후 비어있거나 무의미한 지시문이었던 경우 fallback 리턴
-  if (!cleaned || cleaned.length < 2 || /^(프롬프트|명령어|지침|템플릿|파일|문서)$/i.test(cleaned)) {
-    const validFallback = fallback && fallback !== rawTitle ? sanitizeTemplateTitle(fallback, '마스터 워크스페이스') : '마스터 워크스페이스';
+  if (!cleaned || cleaned.length < 2 || /^(프롬프트|명령어|지침|템플릿|파일|문서|데이터|속성)$/i.test(cleaned)) {
+    const validFallback = fallback && fallback !== rawTitle ? sanitizeTemplateTitle(fallback, '[스마트 대시보드] 데이터 통합 관제 OS') : '[스마트 대시보드] 데이터 통합 관제 OS';
     return validFallback;
   }
 
