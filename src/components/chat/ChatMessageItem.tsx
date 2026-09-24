@@ -98,11 +98,11 @@ export const ChatMessageItem: React.FC<{ message: ChatMessage }> = ({ message })
                 <div className="pt-3 mt-2 border-t border-neutral-100 dark:border-neutral-800/80">
                   <button
                     onClick={handleConfirmGenerate}
-                    className="flex items-center space-x-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 via-emerald-500 to-indigo-600 text-white font-extrabold text-xs shadow-md hover:shadow-lg hover:scale-[1.01] active:scale-98 transition cursor-pointer"
+                    className="mt-3 inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-slate-900 bg-gradient-to-b from-slate-100 via-slate-200 to-slate-300 border border-slate-300 shadow-sm hover:from-white hover:to-slate-200 transition-all active:scale-[0.98] cursor-pointer font-sans tracking-tight"
                   >
-                    <Sparkles className="w-4 h-4 text-amber-300 animate-pulse" />
+                    <Sparkles className="w-4 h-4 text-slate-700 shrink-0" />
                     <span>✨ 이 제안 구조로 템플릿 생성하기</span>
-                    <ArrowRight className="w-3.5 h-3.5" />
+                    <ArrowRight className="w-4 h-4 text-slate-700 shrink-0" />
                   </button>
                 </div>
               )}

@@ -6,7 +6,6 @@ import {
   getSavedSessions, 
   getActiveSessionId, 
   setActiveSessionId, 
-  createNewSession, 
   deleteSession,
   updateSessionMessages
 } from '../services/chatStorage';
@@ -43,7 +42,8 @@ export const HomePage: React.FC = () => {
     isGenerating,
     showToast,
     setCurrentTemplate,
-    clearRecentModifications
+    clearRecentModifications,
+    clearChatHistory
   } = useApp();
 
   const isNotionConnected = Boolean(notionApiKey && (createdNotionResource || notionParentPageId));
@@ -88,9 +88,9 @@ export const HomePage: React.FC = () => {
 
   // 새로운 대화 생성 (Clean Reset)
   const handleNewChat = () => {
-    const newSession = createNewSession();
+    clearChatHistory();
     setSessions(getSavedSessions());
-    setActiveSessionIdState(newSession.id);
+    setActiveSessionIdState(getActiveSessionId());
     setCurrentTemplate(null);
     clearRecentModifications();
     setInputPrompt('');
