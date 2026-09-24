@@ -35,6 +35,7 @@ import { buildDynamicTemplateFromPayload, sanitizeTemplateTitle } from '../../se
 import { parseUploadedFile } from '../../services/fileParserService';
 import { createNotionTemplateInWorkspace } from '../../services/notionApi';
 import type { NotionTemplate } from '../../types/notion';
+import type { FileContextItem } from '../../types/fileAttachment';
 
 // ─── 실행 영수증 카드 타입 ──────────────────────────────────────────────────
 type ReceiptType = 'builder' | 'life' | 'devlab';
@@ -446,11 +447,13 @@ export const OmniChatBar: React.FC = () => {
     } catch {}
 
     // [빈 껍데기 파일 파싱 실패 전송 방어 및 명확한 에러 경고]
-    const invalidFile = attachedFiles.find((a) => a.error || (!a.parsedContent && (!a.sheets || a.sheets.length === 0)));
+    const invalidFile = attachedFiles.find((a) => a.error || a.isUnsupportedHwp || (!a.parsedContent && (!a.sheets || a.sheets.length === 0)));
     if (invalidFile && !text) {
       isLoadingRef.current = false;
       setIsGenerating(false);
-      showToast(invalidFile.error || '⚠️ 파일 본문을 추출할 수 없습니다. 텍스트가 포함된 정상적인 문서인지 확인해 주세요.', 'error');
+      setCurrentTemplate(null);
+      const warnMsg = invalidFile.warning || invalidFile.error || '구형 HWP 파일은 보안 바이너리 포맷입니다. 정확한 데이터 분석을 위해 PDF 또는 Word(DOCX)로 변환해 첨부해주세요.';
+      showToast(warnMsg, 'warning');
       return;
     }
 
@@ -458,9 +461,21 @@ export const OmniChatBar: React.FC = () => {
     if (!text && !hasValidContent) {
       isLoadingRef.current = false;
       setIsGenerating(false);
-      showToast('⚠️ 파일 본문을 추출할 수 없습니다. 텍스트가 포함된 정상적인 문서인지 확인해 주세요.', 'error');
+      setCurrentTemplate(null);
+      showToast('구형 HWP 파일은 보안 바이너리 포맷입니다. 정확한 데이터 분석을 위해 PDF 또는 Word(DOCX)로 변환해 첨부해주세요.', 'warning');
       return;
     }
+
+    const fileContextList: FileContextItem[] = attachedFiles
+      .filter((a) => !a.error && (a.parsedContent || (a.sheets && a.sheets.length > 0)))
+      .map((a) => ({
+        fileName: a.name,
+        extension: a.name.split('.').pop()?.toLowerCase() || '',
+        category: a.sheets && a.sheets.length > 0 ? 'spreadsheet' : 'document',
+        parsedContent: a.parsedContent,
+        sheets: a.sheets,
+        summaryBadge: a.summaryBadge
+      }));
 
     const pureText = text;
     const attachedDataBlocks = attachedFiles
@@ -657,7 +672,7 @@ export const OmniChatBar: React.FC = () => {
         return;
       }
 
-      const response: OrchestratorResponse = await sendToOrchestrator(fullMessageText, [...messages, userMsg], apiKey, authUser?.email, selectedModel, activeMode);
+      const response: OrchestratorResponse = await sendToOrchestrator(fullMessageText, [...messages, userMsg], apiKey, authUser?.email, selectedModel, activeMode, fileContextList);
 
       // [🚨 핵심 방어: 템플릿 마스터 우선주의 및 오피스 스튜디오 오라우팅 원천 차단]
       const isBuilderChipActive = activeMode === 'builder';

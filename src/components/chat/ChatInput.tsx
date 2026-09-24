@@ -19,7 +19,7 @@ export const ChatInput: React.FC<{ inputPrompt?: string; onClearPrompt?: () => v
   inputPrompt,
   onClearPrompt
 }) => {
-  const { sendMessage, isGenerating } = useApp();
+  const { sendMessage, isGenerating, showToast, setCurrentTemplate } = useApp();
   const [text, setText] = useState<string>('');
   const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
   const [isDragOver, setIsDragOver] = useState(false);
@@ -93,13 +93,13 @@ export const ChatInput: React.FC<{ inputPrompt?: string; onClearPrompt?: () => v
     }
   };
 
-  // 파일 파싱 및 추가 핸들러
+  // 다중 파일(Multiple Files) 동시 파싱 핸들러 (Promise.all 적용)
   const handleAddFiles = async (fileList: FileList | null) => {
     if (!fileList || fileList.length === 0) return;
 
     const filesArray = Array.from(fileList);
     
-    // 임시 로딩 항목 먼저 추가
+    // 임시 로딩 항목 먼저 생성
     const tempEntries: AttachedFile[] = filesArray.map(file => {
       const ext = file.name.split('.').pop()?.toLowerCase() || '';
       return {
@@ -117,15 +117,24 @@ export const ChatInput: React.FC<{ inputPrompt?: string; onClearPrompt?: () => v
 
     setAttachedFiles(prev => [...prev, ...tempEntries]);
 
-    // 순차 파싱 처리
-    for (let i = 0; i < filesArray.length; i++) {
-      const file = filesArray[i];
-      const parsed = await parseUploadedFile(file);
-      
-      setAttachedFiles(prev => 
-        prev.map(item => item.id === tempEntries[i].id ? parsed : item)
-      );
-    }
+    // Promise.all로 모든 파일의 파싱 결과를 동시 처리
+    const parsedResults = await Promise.all(
+      filesArray.map(file => parseUploadedFile(file))
+    );
+
+    setAttachedFiles(prev =>
+      prev.map(item => {
+        const idx = tempEntries.findIndex(t => t.id === item.id);
+        if (idx !== -1) {
+          const parsed = parsedResults[idx];
+          if (parsed.warning || parsed.error) {
+            showToast(parsed.warning || parsed.error || '파일 파싱에 주의가 필요합니다.', 'warning');
+          }
+          return parsed;
+        }
+        return item;
+      })
+    );
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -162,16 +171,25 @@ export const ChatInput: React.FC<{ inputPrompt?: string; onClearPrompt?: () => v
   const handleSubmit = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     
-    // 텍스트와 첨부 파일 모두 없을 때 전송 방지
+    // 유효한 파싱 데이터가 있는 첨부파일만 선별
+    const validFiles = attachedFiles.filter(f => !f.error && (f.parsedContent || f.sheets || f.previewUrl));
+    const hasFailedFiles = attachedFiles.some(f => Boolean(f.error) || f.isUnsupportedHwp);
+
+    if (hasFailedFiles && validFiles.length === 0 && !text.trim()) {
+      showToast('구형 HWP 파일은 보안 바이너리 포맷입니다. 정확한 데이터 분석을 위해 PDF 또는 Word(DOCX)로 변환해 첨부해주세요.', 'warning');
+      setCurrentTemplate(null);
+      return;
+    }
+
     const hasText = Boolean(text.trim());
-    const hasFiles = attachedFiles.length > 0;
+    const hasFiles = validFiles.length > 0;
     if ((!hasText && !hasFiles) || isGenerating) return;
 
     // 첨부 파일이 있을 때 텍스트가 비어있으면 자동 기본 프롬프트 설정
     let finalPrompt = text.trim();
     if (!finalPrompt && hasFiles) {
-      const isImage = attachedFiles.some(f => f.category === 'image');
-      const isExcel = attachedFiles.some(f => f.category === 'spreadsheet');
+      const isImage = validFiles.some(f => f.category === 'image');
+      const isExcel = validFiles.some(f => f.category === 'spreadsheet');
       if (isExcel) {
         finalPrompt = '첨부된 엑셀 표 양식과 수식을 분석하여 동일한 구조의 노션 데이터베이스로 만들어줘';
       } else if (isImage) {
@@ -181,7 +199,7 @@ export const ChatInput: React.FC<{ inputPrompt?: string; onClearPrompt?: () => v
       }
     }
 
-    sendMessage(finalPrompt, attachedFiles);
+    sendMessage(finalPrompt, validFiles);
     setText('');
     setAttachedFiles([]);
     if (textareaRef.current) {

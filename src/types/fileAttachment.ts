@@ -34,3 +34,13 @@ export interface AttachedFile {
   isUnsupportedHwp?: boolean;
   warning?: string;
 }
+
+export interface FileContextItem {
+  fileName: string;
+  extension: string;
+  category: FileTypeCategory;
+  parsedContent?: string;
+  sheets?: ParsedSheetData[];
+  summaryBadge?: string;
+}
+

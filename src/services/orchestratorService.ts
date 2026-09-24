@@ -5,6 +5,8 @@ import { processOfficeOrchestration } from './aiOfficeDualEngine';
 import type { GeminiModelType } from '../types/chat';
 import { sanitizeTemplateTitle } from './notionDynamicBuilder';
 
+import type { FileContextItem } from '../types/fileAttachment';
+
 export interface OrchestratorResponse {
   intent: 'CHAT' | 'LIFE' | 'DEVLAB' | 'BUILDER';
   reply_message: string;
@@ -32,7 +34,8 @@ export async function sendToOrchestrator(
   apiKey?: string,
   userEmail?: string,
   model?: GeminiModelType,
-  currentMode?: string
+  currentMode?: string,
+  fileContextList?: FileContextItem[]
 ): Promise<OrchestratorResponse> {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -51,8 +54,25 @@ export async function sendToOrchestrator(
     headers['x-current-mode'] = currentMode;
   }
 
+  // 다중 첨부 파일(fileContextList) 페이로드 명확히 조립
+  let enrichedText = text;
+  if (fileContextList && fileContextList.length > 0) {
+    const multiFileBlocks = fileContextList.map(fc => {
+      let contentStr = fc.parsedContent || '';
+      if (fc.sheets && fc.sheets.length > 0) {
+        contentStr += '\n' + fc.sheets.map(s => s.markdownTable).join('\n\n');
+      }
+      return `[ATTACHED_DOCUMENT_DATA]\n파일명: ${fc.fileName}\n확장자: ${fc.extension}\n카테고리: ${fc.category}\n내용:\n${contentStr}\n[/ATTACHED_DOCUMENT_DATA]`;
+    }).join('\n\n');
+    
+    if (!enrichedText.includes('[ATTACHED_DOCUMENT_DATA]')) {
+      enrichedText = `${multiFileBlocks}\n\n${text}`;
+    }
+  }
+
   const payload = {
-    text,
+    text: enrichedText,
+    file_context_list: fileContextList,
     model: model || 'auto',
     current_mode: currentMode || 'builder',
     conversation_history: history.slice(-6).map((h) => ({

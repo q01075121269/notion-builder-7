@@ -121,8 +121,8 @@ interface AppContextType {
   setPendingChatPrompt: (prompt: string) => void;
 
   // 전역 알림 토스트 (Runtime Defense & Alerts)
-  toast: { message: string; type: 'success' | 'error' | 'info' } | null;
-  showToast: (message: string, type?: 'success' | 'error' | 'info') => void;
+  toast: { message: string; type: 'success' | 'error' | 'info' | 'warning' } | null;
+  showToast: (message: string, type?: 'success' | 'error' | 'info' | 'warning') => void;
   hideToast: () => void;
 }
 
@@ -429,8 +429,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   // 전역 토스트 상태 (런타임 알림)
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
-  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' | 'warning' } | null>(null);
+  const showToast = (message: string, type: 'success' | 'error' | 'info' | 'warning' = 'info') => {
     setToast({ message, type });
   };
   const hideToast = () => setToast(null);

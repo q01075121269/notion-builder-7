@@ -272,8 +272,20 @@ function fallbackRuleBasedOrchestrator(userText: string, errorHint?: string): Or
 export async function POST(req: Request): Promise<Response> {
   try {
     const body = await req.json();
-    const userText = (body.text || body.message || body.prompt || '').trim();
+    let userText = (body.text || body.message || body.prompt || '').trim();
     const history = body.conversation_history || [];
+    const fileContextList = body.file_context_list || [];
+
+    if (Array.isArray(fileContextList) && fileContextList.length > 0 && !userText.includes('[ATTACHED_DOCUMENT_DATA]')) {
+      const multiFileBlocks = fileContextList.map((fc: any) => {
+        let contentStr = fc.parsedContent || '';
+        if (fc.sheets && fc.sheets.length > 0) {
+          contentStr += '\n' + fc.sheets.map((s: any) => s.markdownTable).join('\n\n');
+        }
+        return `[ATTACHED_DOCUMENT_DATA]\n파일명: ${fc.fileName}\n확장자: ${fc.extension}\n카테고리: ${fc.category}\n내용:\n${contentStr}\n[/ATTACHED_DOCUMENT_DATA]`;
+      }).join('\n\n');
+      userText = `${multiFileBlocks}\n\n${userText}`;
+    }
 
     if (!userText) {
       return new Response(
@@ -342,8 +354,20 @@ export default async function handler(req: any, res: any) {
 
   try {
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body || {};
-    const userText = (body.text || body.message || body.prompt || '').trim();
+    let userText = (body.text || body.message || body.prompt || '').trim();
     const history = body.conversation_history || [];
+    const fileContextList = body.file_context_list || [];
+
+    if (Array.isArray(fileContextList) && fileContextList.length > 0 && !userText.includes('[ATTACHED_DOCUMENT_DATA]')) {
+      const multiFileBlocks = fileContextList.map((fc: any) => {
+        let contentStr = fc.parsedContent || '';
+        if (fc.sheets && fc.sheets.length > 0) {
+          contentStr += '\n' + fc.sheets.map((s: any) => s.markdownTable).join('\n\n');
+        }
+        return `[ATTACHED_DOCUMENT_DATA]\n파일명: ${fc.fileName}\n확장자: ${fc.extension}\n카테고리: ${fc.category}\n내용:\n${contentStr}\n[/ATTACHED_DOCUMENT_DATA]`;
+      }).join('\n\n');
+      userText = `${multiFileBlocks}\n\n${userText}`;
+    }
 
     if (!userText) {
       return res.status(400).json({ error: '입력 텍스트(text)가 필요합니다.' });

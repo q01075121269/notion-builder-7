@@ -770,8 +770,9 @@ export async function parseUploadedFile(file: File): Promise<AttachedFile> {
             attached.summaryBadge = 'HWPX 본문 추출 완료';
           } catch (hwpxErr: any) {
             console.warn('[HWPX Parse Warning]', hwpxErr);
-            attached.parsedContent = `📄 [한글(HWPX) 문서: "${file.name}"] (텍스트 추출 일부 완료)`;
-            attached.summaryBadge = 'HWPX 파싱 완료';
+            attached.error = 'HWPX 파일 구조 파싱 실패. PDF나 Word(DOCX)로 변환해 첨부해주세요.';
+            attached.parsedContent = undefined;
+            attached.summaryBadge = 'HWPX 파싱 실패';
           }
         } else {
           // .hwp 바이너리 안전 파서
@@ -779,9 +780,12 @@ export async function parseUploadedFile(file: File): Promise<AttachedFile> {
           if (result.hasExtractedText && result.text) {
             attached.parsedContent = result.text;
             attached.summaryBadge = 'HWP 텍스트 추출 완료';
+            if (result.warning) attached.warning = result.warning;
           } else {
             attached.isUnsupportedHwp = true;
-            attached.error = "구형 HWP 파일은 웹에서 직접 텍스트 추출이 어렵습니다. 한글 프로그램에서 [다른 이름으로 저장 -> PDF 또는 Word(DOCX)]로 변환 후 올려주세요.";
+            const hwpWarnMsg = "구형 HWP 파일은 보안 바이너리 포맷입니다. 정확한 데이터 분석을 위해 PDF 또는 Word(DOCX)로 변환해 첨부해주세요.";
+            attached.warning = hwpWarnMsg;
+            attached.error = hwpWarnMsg;
             attached.parsedContent = undefined;
             attached.summaryBadge = 'HWP 변환 필요';
           }

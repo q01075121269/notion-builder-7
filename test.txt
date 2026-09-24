@@ -1,0 +1,21 @@
+// src/services/notionDynamicBuilder.ts
+// AI Orchestrator payload and chat commands to NotionTemplate
+// [Step 4]: Dynamic Payload driven multi-relational DB & Notion Agent 3.0 skillpack fusion
+
+import type {
+  NotionTemplate,
+  NotionDatabase,
+  NotionProperty,
+  NotionBlock,
+  AgentBlueprint
+} from '../types/notion';
+
+export interface DynamicBuildParams {
+  topic: string;
+  title: string;
+  initialPrompt?: string;
+  dbSchemas?: any[];
+  formulas?: any[];
+  valueAdd?: string[];
+  complexity?: string;
+}

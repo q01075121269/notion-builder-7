@@ -78,7 +78,7 @@ export async function executeGeminiCall(req: AIPluginRequest): Promise<GeminiCon
     }
   }
 
-  console.warn('[GeminiExecutor] 모든 Gemini 모델 통신 실패 -> 지능형 로컬 스마트 템플릿 생성기로 즉시 전환');
+  console.warn('[GeminiExecutor] 모든 Gemini 모델 통신 실패 -> Fail-Fast & Honest 정책에 따라 정직한 안내 메시지 반환');
   return generateLocalFallbackResponse(req.prompt, req.currentTemplate || null);
 }
 

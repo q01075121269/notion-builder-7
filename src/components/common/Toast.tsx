@@ -1,10 +1,10 @@
 import React, { useEffect } from 'react';
-import { CheckCircle2, AlertCircle, Info, X } from 'lucide-react';
+import { CheckCircle2, AlertCircle, AlertTriangle, Info, X } from 'lucide-react';
 
 export interface ToastProps {
   toast: {
     message: string;
-    type: 'success' | 'error' | 'info';
+    type: 'success' | 'error' | 'info' | 'warning';
   } | null;
   onClose: () => void;
 }
@@ -14,7 +14,7 @@ export const Toast: React.FC<ToastProps> = ({ toast, onClose }) => {
     if (!toast) return;
     const timer = setTimeout(() => {
       onClose();
-    }, 3500);
+    }, 4500);
     return () => clearTimeout(timer);
   }, [toast, onClose]);
 
@@ -22,6 +22,7 @@ export const Toast: React.FC<ToastProps> = ({ toast, onClose }) => {
 
   const isSuccess = toast.type === 'success';
   const isError = toast.type === 'error';
+  const isWarning = toast.type === 'warning';
 
   return (
     <div className="fixed bottom-6 right-6 z-50 max-w-sm w-full animate-bounce-short pointer-events-auto">
@@ -31,6 +32,8 @@ export const Toast: React.FC<ToastProps> = ({ toast, onClose }) => {
             ? 'bg-emerald-950/90 border-emerald-700/60 text-emerald-100 shadow-emerald-950/40'
             : isError
             ? 'bg-rose-950/90 border-rose-700/60 text-rose-100 shadow-rose-950/40'
+            : isWarning
+            ? 'bg-amber-950/90 border-amber-600/70 text-amber-100 shadow-amber-950/40'
             : 'bg-neutral-900/90 border-neutral-700/60 text-white shadow-black/40'
         }`}
       >
@@ -39,6 +42,8 @@ export const Toast: React.FC<ToastProps> = ({ toast, onClose }) => {
             <CheckCircle2 className="w-5 h-5 text-emerald-400" />
           ) : isError ? (
             <AlertCircle className="w-5 h-5 text-rose-400" />
+          ) : isWarning ? (
+            <AlertTriangle className="w-5 h-5 text-amber-400" />
           ) : (
             <Info className="w-5 h-5 text-blue-400" />
           )}
@@ -56,3 +61,4 @@ export const Toast: React.FC<ToastProps> = ({ toast, onClose }) => {
     </div>
   );
 };
+
