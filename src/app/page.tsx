@@ -24,8 +24,7 @@ import {
   CalendarDays, 
   Wallet,
   X,
-  Loader2,
-  Square
+  Loader2
 } from 'lucide-react';
 import { parseUploadedFile } from '../services/fileParserService';
 import type { AttachedFile } from '../types/fileAttachment';
@@ -217,7 +216,6 @@ export const HomePage: React.FC = () => {
 
     if (isListening) {
       stopListening();
-      showToast('⏹️ 음성 인식이 중지되었습니다.', 'info');
       return;
     }
 
@@ -234,7 +232,6 @@ export const HomePage: React.FC = () => {
 
       recognition.onstart = () => {
         setIsListening(true);
-        showToast('🎙️ 음성을 듣고 있습니다... (말이 끊겨도 계속 녹음됩니다)', 'info');
       };
 
       recognition.onresult = (event: any) => {
@@ -374,7 +371,7 @@ export const HomePage: React.FC = () => {
       </header>
 
       {/* 2. 중앙 대형 대화·기획 캔버스 메인 영역 (max-w-4xl mx-auto) */}
-      <main className="flex-1 flex flex-col w-full max-w-4xl mx-auto overflow-hidden px-4 py-4 sm:px-6">
+      <main className="flex-1 flex flex-col w-full max-w-4xl mx-auto overflow-hidden px-4 pt-3 pb-3 sm:px-6">
         
         {/* 대화 스크롤 본문 */}
         <div 
@@ -445,47 +442,66 @@ export const HomePage: React.FC = () => {
           </div>
         </div>
 
-        {/* 3. 하단 중앙 대화 입력 영역 (ChatGPT / NotebookLM 스타일) */}
-        <div className="pt-3 pb-2 shrink-0">
-          <div className="relative rounded-2xl bg-white dark:bg-notion-dark-card border border-neutral-300 dark:border-neutral-700 shadow-xl focus-within:border-amber-500 dark:focus-within:border-amber-400 transition-all p-3 space-y-2">
+        {/* 3. 하단 중앙 단일 대화 입력 영역 (Google AI Studio 감성 헤어라인 & 프로스트 글래스) */}
+        <div className="pt-2 pb-3 sm:pb-4 shrink-0">
+          <div className="relative rounded-2xl bg-white/70 dark:bg-[#111214]/70 backdrop-blur-md border border-neutral-200/80 dark:border-white/10 shadow-lg shadow-black/5 dark:shadow-none focus-within:border-amber-500/80 dark:focus-within:border-amber-400/80 transition-all p-3 space-y-2">
             
-            {/* 첨부된 파일 바 렌더링 */}
+            {/* 첨부된 파일 및 캡처 이미지 미니 썸네일 뱃지 렌더링 */}
             {attachedFiles.length > 0 && (
-              <div className="flex flex-wrap gap-2 pb-2 border-b border-neutral-100 dark:border-neutral-800">
-                {attachedFiles.map((att, idx) => (
-                  <div 
-                    key={idx}
-                    className="flex items-center space-x-1.5 px-2.5 py-1 rounded-xl text-xs bg-neutral-100 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 border border-neutral-200 dark:border-neutral-700"
-                  >
-                    <span>📎</span>
-                    <span className="font-semibold max-w-[120px] truncate">{att.name}</span>
-                    <button 
-                      onClick={() => setAttachedFiles(prev => prev.filter((_, i) => i !== idx))}
-                      className="text-neutral-400 hover:text-red-500 transition"
+              <div className="flex flex-wrap gap-1.5 pb-2 border-b border-neutral-200/60 dark:border-white/10">
+                {attachedFiles.map((att, idx) => {
+                  const isImage = att.category === 'image' || att.previewUrl || /\.(png|jpe?g|webp|gif)$/i.test(att.name);
+                  return (
+                    <div 
+                      key={idx}
+                      className="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-neutral-100/90 dark:bg-neutral-800/90 text-neutral-800 dark:text-neutral-200 border border-neutral-200/80 dark:border-white/10 shadow-2xs backdrop-blur-xs"
                     >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                ))}
+                      {isImage && att.previewUrl ? (
+                        <img
+                          src={att.previewUrl}
+                          alt={att.name}
+                          className="w-4 h-4 rounded object-cover border border-neutral-300 dark:border-neutral-700"
+                        />
+                      ) : (
+                        <span>{isImage ? '🖼️' : '📎'}</span>
+                      )}
+                      <span className="font-semibold max-w-[140px] truncate text-[11px]">{att.name}</span>
+                      <button 
+                        type="button"
+                        onClick={() => setAttachedFiles(prev => prev.filter((_, i) => i !== idx))}
+                        className="text-neutral-400 hover:text-rose-500 transition cursor-pointer ml-0.5"
+                        title="첨부 파일 제거"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
             )}
 
-            {/* 입력 텍스트 에어리어 */}
+            {/* 입력 텍스트 에어리어 (Ctrl+V 클립보드 이미지 캡처 지원) */}
             <textarea
               rows={1}
               value={inputPrompt}
               onChange={(e) => setInputPrompt(e.target.value)}
               onKeyDown={handleKeyDown}
               onPaste={handlePaste}
-              placeholder="노아(NOA)에게 어떤 업무를 도와드릴지 편하게 말씀해 주세요..."
-              className="w-full bg-transparent text-sm text-neutral-900 dark:text-white placeholder-neutral-400 focus:outline-none resize-none leading-relaxed min-h-[40px]"
+              placeholder={
+                isListening
+                  ? '🎙️ 실시간 음성 인식 중... (말씀을 멈춰도 유지됩니다)'
+                  : attachedFiles.length > 0
+                  ? '📸 첨부 데이터 분석 요청: 변경할 스키마 지시를 입력하세요...'
+                  : '노아(NOA)에게 어떤 업무를 도와드릴지 편하게 말씀해 주세요...'
+              }
+              className="w-full bg-transparent text-sm text-neutral-900 dark:text-white placeholder-neutral-400 dark:placeholder-neutral-500 focus:outline-none resize-none leading-relaxed min-h-[40px]"
             />
 
             {/* 하단 버튼 툴바 */}
-            <div className="flex items-center justify-between pt-1 border-t border-neutral-100 dark:border-neutral-800/60">
+            <div className="flex items-center justify-between pt-1 border-t border-neutral-200/60 dark:border-white/10">
               
               {/* 좌측 첨부 & 음성 버튼 */}
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center space-x-1.5">
                 <input
                   type="file"
                   ref={fileInputRef}
@@ -495,28 +511,27 @@ export const HomePage: React.FC = () => {
                   className="hidden"
                 />
                 <button
+                  type="button"
                   onClick={() => fileInputRef.current?.click()}
                   disabled={isParsingFile}
                   className="p-2 rounded-xl text-neutral-500 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 transition cursor-pointer"
-                  title="파일 첨부 (엑셀, 워드, PDF, 이미지)"
+                  title="파일/이미지 첨부 (엑셀, 워드, PDF, 이미지, 텍스트)"
                 >
                   {isParsingFile ? <Loader2 className="w-4 h-4 animate-spin text-amber-500" /> : <Paperclip className="w-4 h-4" />}
                 </button>
 
                 <button
+                  type="button"
                   onClick={toggleListening}
-                  className={`flex items-center space-x-1 px-2.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                  className={`flex items-center justify-center p-2 rounded-xl text-xs font-bold transition-all duration-150 cursor-pointer ${
                     isListening
-                      ? 'bg-red-500 text-white animate-pulse shadow-md'
+                      ? 'bg-rose-500 text-white animate-pulse ring-4 ring-rose-200 dark:ring-rose-950/50 shadow-md shadow-rose-500/30'
                       : 'text-neutral-500 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800'
                   }`}
-                  title={isListening ? '녹음 중지 (클릭 시 종료)' : '음성 지속 입력 (클릭 시 시작)'}
+                  title={isListening ? '음성 인식 중지' : '음성 지속 입력 (Push-to-Dictate STT)'}
                 >
                   {isListening ? (
-                    <>
-                      <Square className="w-3.5 h-3.5 fill-current" />
-                      <span className="text-[11px]">녹음 중지</span>
-                    </>
+                    <Mic className="w-4 h-4 text-white animate-pulse" />
                   ) : (
                     <Mic className="w-4 h-4" />
                   )}
@@ -525,13 +540,15 @@ export const HomePage: React.FC = () => {
 
               {/* 우측 전송 버튼 */}
               <button
+                type="button"
                 onClick={handleSend}
                 disabled={(!inputPrompt.trim() && attachedFiles.length === 0) || isGenerating}
-                className={`flex items-center space-x-1.5 px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
+                className={`flex items-center space-x-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all duration-150 active:scale-95 cursor-pointer ${
                   (inputPrompt.trim() || attachedFiles.length > 0) && !isGenerating
-                    ? 'bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 shadow-md hover:bg-neutral-800 dark:hover:bg-neutral-100'
+                    ? 'bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 shadow-md hover:bg-neutral-800 dark:hover:bg-neutral-100 hover:shadow-lg'
                     : 'bg-neutral-200 text-neutral-400 dark:bg-neutral-800 dark:text-neutral-600 cursor-not-allowed'
                 }`}
+                title="전송 (Enter)"
               >
                 <span>전송</span>
                 {isGenerating ? <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-500" /> : <Send className="w-3.5 h-3.5" />}

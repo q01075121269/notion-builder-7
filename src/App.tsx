@@ -10,12 +10,9 @@ import { PublishProgressModal } from './components/modals/PublishProgressModal';
 import { PublishSuccessModal } from './components/modals/PublishSuccessModal';
 import { GoogleSyncModal } from './components/modals/GoogleSyncModal';
 import { GuideModal } from './components/guide/GuideModal';
-import { MobileFab } from './components/common/MobileFab';
 import { LoginView } from './components/auth/LoginView';
 import { UnauthorizedView } from './components/auth/UnauthorizedView';
 import { QuickCaptureView } from './components/quickCapture/QuickCaptureView';
-import { BottomNavbar } from './components/layout/BottomNavbar';
-import { NoaChatBar } from './components/layout/NoaChatBar';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
 import { Toast } from './components/common/Toast';
 
@@ -60,7 +57,7 @@ export const MainApp: React.FC = () => {
         <Navbar />
         
         {/* 뷰 모드 분기: 홈 대시보드 vs 템플릿 빌더 vs 라이프 허브 vs 개발 랩 vs AI 미디어 랩 vs 내 보관함 vs 1초 퀵 캡처 */}
-        <main className={`flex-1 flex flex-col overflow-hidden ${currentView === 'home' ? 'pb-28 md:pb-16' : ''}`}>
+        <main className="flex-1 flex flex-col overflow-hidden">
           {currentView === 'home' ? (
             <HomePage />
           ) : currentView === 'builder' ? (
@@ -80,15 +77,6 @@ export const MainApp: React.FC = () => {
           )}
         </main>
         
-        {/* 메인 홈 대화창 (NoaChatBar) — 메인 홈(currentView === 'home')에서 플로팅 만능 멀티모달 바로 렌더링 */}
-        {currentView === 'home' && <NoaChatBar />}
-
-        {/* 모바일 하단 탭바 (빌더 / 보관함 / 퀵캡처) */}
-        {currentView === 'home' && <BottomNavbar />}
-
-        {/* Mobile Floating Action Button (모바일에서 언제든 새 템플릿 작성으로 복귀) */}
-        {currentView === 'home' && <MobileFab />}
-
         {/* Global Floating Toast Alerts */}
         <Toast toast={toast} onClose={hideToast} />
 
