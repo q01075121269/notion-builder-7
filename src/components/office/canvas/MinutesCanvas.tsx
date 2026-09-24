@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import type { OfficeDocument } from '../../../types/office';
-import { Mic, CheckSquare, Plus, Trash2, Calendar, Users, Zap, CheckCircle2 } from 'lucide-react';
+import { Mic, CheckSquare, Plus, Trash2, Calendar, Users, CheckCircle2 } from 'lucide-react';
 
 interface MinutesCanvasProps {
   document: OfficeDocument;
@@ -145,10 +145,9 @@ export const MinutesCanvas: React.FC<MinutesCanvasProps> = ({
               {onSyncToLifeHub && (
                 <button
                   onClick={onSyncToLifeHub}
-                  className="flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition shadow-xs cursor-pointer"
+                  className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 dark:bg-zinc-100 dark:hover:bg-zinc-200 text-white dark:text-zinc-900 text-xs font-semibold transition shadow-2xs cursor-pointer"
                 >
-                  <Zap className="w-3.5 h-3.5 text-amber-300" />
-                  <span>할 일 ➔ 라이프 Hub 연동</span>
+                  <span>라이프 Hub 연동</span>
                 </button>
               )}
               <button

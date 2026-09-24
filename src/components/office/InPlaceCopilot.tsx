@@ -4,7 +4,7 @@ import {
   Sparkles, 
   Send, 
   Mic, 
-  RotateCcw, 
+  Undo2, 
   ChevronDown, 
   Bot, 
   CheckCircle2,
@@ -130,7 +130,7 @@ export const InPlaceCopilot: React.FC<InPlaceCopilotProps> = ({
       const aiMsg: CopilotMessage = {
         id: `msg-${Date.now()}`,
         sender: 'ai',
-        text: `상단 전자 결재선 박스에 '${formattedRole}' 컬럼을 동적으로 삽입했습니다. [⏪ 되돌리기]로 언제든 직전 상태로 복원할 수 있습니다.`,
+        text: `상단 전자 결재선 박스에 '${formattedRole}' 컬럼을 동적으로 삽입했습니다. [되돌리기]로 언제든 직전 상태로 복원할 수 있습니다.`,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         appliedAction: `결재란 [${formattedRole}] 추가 완료`
       };
@@ -319,7 +319,7 @@ export const InPlaceCopilot: React.FC<InPlaceCopilotProps> = ({
                 className="flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-black/25 hover:bg-black/40 disabled:opacity-30 text-[11px] font-bold text-white transition cursor-pointer"
                 title={canUndo ? `되돌리기: ${lastActionName}` : '되돌릴 작업 없음'}
               >
-                <RotateCcw className="w-3.5 h-3.5" />
+                <Undo2 className="w-3.5 h-3.5 mr-1" />
                 <span>되돌리기</span>
               </button>
 

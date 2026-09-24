@@ -41,7 +41,7 @@ export const SmartSlidesRenderer: React.FC<SmartSlidesRendererProps> = ({
       id: 1,
       title: '01. AI 오피스 스튜디오 혁신 비전',
       subtitle: 'Gamma 벤치마크 기반의 16:9 감성 카드 프레젠테이션 피치덱',
-      keyMessage: '💡 Docs · Sheets · Slides가 원스톱으로 연결되는 차세대 멀티 캔버스 생태계 구축',
+      keyMessage: 'Docs · Sheets · Slides가 원스톱으로 연결되는 차세대 멀티 캔버스 생태계 구축',
       threeBlocks: [
         { num: '01', head: 'Docs 냅킨 AI', desc: '개조식 보고서 & 팩트 인용 마크업 지원' },
         { num: '02', head: 'Sheets 로우즈', desc: '=SUM() 및 =AVERAGE() 실시간 수식 연산' },
@@ -55,7 +55,7 @@ export const SmartSlidesRenderer: React.FC<SmartSlidesRendererProps> = ({
       id: 2,
       title: '02. 표준 결재 양식 자동화 파이프라인',
       subtitle: '지출결의서 및 품의서 원클릭 생성 프로세스',
-      keyMessage: '⚡ 기안자·부서·합계 금액 수식이 사전 매핑된 결재용 공문서 규격 지원',
+      keyMessage: '기안자·부서·합계 금액 수식이 사전 매핑된 결재용 공문서 규격 지원',
       threeBlocks: [
         { num: '01', head: '자유 기획 모드', desc: 'AI 아이디어 브레인스토밍 및 자유 서식 작성' },
         { num: '02', head: '표준 회사 양식', desc: '결재란 및 총 금액 자동 수식 탑재 서식' },
@@ -69,7 +69,7 @@ export const SmartSlidesRenderer: React.FC<SmartSlidesRendererProps> = ({
       id: 3,
       title: '03. NotebookLM RAG 팩트 인용 기반 구축',
       subtitle: '환각(Hallucination) 없는 100% 검증 근거 제시',
-      keyMessage: '📚 참고 PDF 및 웹 링크 문맥을 실시간 추출하여 본문 인용 뱃지로 렌더링',
+      keyMessage: '참고 PDF 및 웹 링크 문맥을 실시간 추출하여 본문 인용 뱃지로 렌더링',
       threeBlocks: [
         { num: '01', head: 'PDF 소스 업로드', desc: '사내 사업계획서 및 규정 집합 벡터화' },
         { num: '02', head: '인용 뱃지 [1], [2]', desc: '문장 단위 원문 출처 자동 툴팁 매핑' },
@@ -86,7 +86,7 @@ export const SmartSlidesRenderer: React.FC<SmartSlidesRendererProps> = ({
       id: 1,
       title: '01. 2026년 4분기 지출결의서 및 프로젝트 기안',
       subtitle: '표준 부서 결재 안건 최종 의결 장표',
-      keyMessage: '📋 총 집행 예정 금액 ₩865,000 사전 수식 검증 완료 건',
+      keyMessage: '총 집행 예정 금액 ₩865,000 사전 수식 검증 완료 건',
       threeBlocks: [
         { num: '01', head: '기안 부서', desc: 'AI 전략기획팀 (팀장 김노션)' },
         { num: '02', head: '결재 상태', desc: '최종 승인 완료 (DOC-2026-Q4)' },
@@ -108,7 +108,7 @@ export const SmartSlidesRenderer: React.FC<SmartSlidesRendererProps> = ({
       <div className="flex flex-wrap items-center justify-between gap-3 bg-white dark:bg-neutral-900 p-4 border border-slate-200 dark:border-neutral-800 rounded-2xl shadow-xs">
         <div className="flex items-center space-x-2">
           <span className="px-3 py-1 rounded-full text-xs font-extrabold bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
-            📑 AI 스마트 슬라이드 (Gamma Style Deck)
+            AI 스마트 슬라이드 (Gamma Style Deck)
           </span>
           <span className="text-xs text-slate-400 font-medium">
             {formMode === 'template' ? '표준 결재 장표 덱' : '핵심 피치덱'}
@@ -237,7 +237,7 @@ export const SmartSlidesRenderer: React.FC<SmartSlidesRendererProps> = ({
             >
               <div className="flex items-center space-x-2">
                 <Mic className="w-4 h-4 text-amber-400" />
-                <span className="text-xs font-extrabold text-amber-400">🎙️ 발표자 노트 (Speaker Notes)</span>
+                <span className="text-xs font-extrabold text-amber-400">발표자 노트 (Speaker Notes)</span>
               </div>
               <div className="flex items-center space-x-2 text-slate-400">
                 <span className="text-[10px] font-mono">Slide {currentSlide.id} 전용 스크립트</span>

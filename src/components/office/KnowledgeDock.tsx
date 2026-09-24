@@ -268,7 +268,7 @@ export const KnowledgeDock: React.FC<KnowledgeDockProps> = ({
               onKeyDown={(e) => {
                 if (e.key === 'Enter') handleRunDeepResearch();
               }}
-              placeholder="🔍 젠스파크형 자율 심층 리서치..."
+              placeholder="젠스파크형 자율 심층 리서치..."
               className="w-full py-2 px-2 text-xs bg-transparent outline-none text-slate-800 dark:text-zinc-100 placeholder-slate-400 dark:placeholder-zinc-500 font-medium"
             />
             <button
@@ -317,7 +317,7 @@ export const KnowledgeDock: React.FC<KnowledgeDockProps> = ({
           <div className="p-3 rounded-xl bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 space-y-2 animate-fadeIn">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-slate-700 dark:text-zinc-200">
-                {isRecording ? '🔴 실시간 음성 수신 중...' : '마이크를 켜고 아이디어를 말하세요'}
+                {isRecording ? '실시간 음성 수신 중...' : '마이크를 켜고 아이디어를 말하세요'}
               </span>
               <button
                 onClick={handleVoiceToggle}

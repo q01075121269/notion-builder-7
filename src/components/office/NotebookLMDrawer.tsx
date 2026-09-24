@@ -35,7 +35,7 @@ export const NotebookLMDrawer: React.FC<NotebookLMDrawerProps> = ({
 }) => {
   const { showToast } = useApp();
 
-  // 소스 문서 데이터 상태 ([📄 PDF], [🌐 웹 크롤링 URL], [📝 마크다운], [💬 회의록/음성])
+  // 소스 문서 데이터 상태 ([PDF], [웹 크롤링 URL], [마크다운], [회의록/음성])
   const [sources, setSources] = useState<GroundingSource[]>([
     {
       id: 1,
@@ -110,7 +110,7 @@ export const NotebookLMDrawer: React.FC<NotebookLMDrawerProps> = ({
     setSources((prev) => [...prev, newSource]);
     setInputLink('');
     setIsModalOpen(false);
-    showToast('🌐 [Source Vault] 웹 크롤링 소스가 성공적으로 추가되었습니다!', 'success');
+    showToast('[Source Vault] 웹 크롤링 소스가 성공적으로 추가되었습니다.', 'success');
   };
 
   // 모의 PDF / 마크다운 파일 업로드
@@ -129,7 +129,7 @@ export const NotebookLMDrawer: React.FC<NotebookLMDrawerProps> = ({
     };
     setSources((prev) => [...prev, newSource]);
     setIsModalOpen(false);
-    showToast(`📄 [Source Vault] ${file.name} 문서가 등록되었습니다!`, 'success');
+    showToast(`[Source Vault] ${file.name} 문서가 등록되었습니다.`, 'success');
   };
 
   // 2인 대화형 오디오 브리핑
@@ -140,7 +140,7 @@ export const NotebookLMDrawer: React.FC<NotebookLMDrawerProps> = ({
       }
       setIsAudioPlaying(false);
       setSpeakerTurn(null);
-      showToast('⏹️ 2인 오디오 브리핑을 중지했습니다.', 'info');
+      showToast('2인 오디오 브리핑을 중지했습니다.', 'info');
       return;
     }
 
@@ -162,7 +162,7 @@ export const NotebookLMDrawer: React.FC<NotebookLMDrawerProps> = ({
       if (turnIdx >= scriptTurns.length) {
         setIsAudioPlaying(false);
         setSpeakerTurn(null);
-        showToast('🎉 2인 대화형 브리핑이 완료되었습니다.', 'success');
+        showToast('2인 대화형 브리핑이 완료되었습니다.', 'success');
         return;
       }
 
@@ -192,7 +192,7 @@ export const NotebookLMDrawer: React.FC<NotebookLMDrawerProps> = ({
 
     window.speechSynthesis.cancel();
     playNextTurn();
-    showToast('🎙️ 2인 대화형 브리핑 팟캐스트를 재생합니다.', 'success');
+    showToast('2인 대화형 브리핑 팟캐스트를 재생합니다.', 'success');
   };
 
   return (
@@ -239,7 +239,7 @@ export const NotebookLMDrawer: React.FC<NotebookLMDrawerProps> = ({
             className="w-full py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold flex items-center justify-center space-x-1.5 transition cursor-pointer shadow-xs active:scale-95"
           >
             <Plus className="w-4 h-4" />
-            <span>➕ 신규 소스 추가 (PDF / URL / 마크다운)</span>
+            <span>신규 소스 추가 (PDF / URL / 마크다운)</span>
           </button>
 
           {/* 소스 타입 아이콘 패스트태그 설명 */}
@@ -328,7 +328,7 @@ export const NotebookLMDrawer: React.FC<NotebookLMDrawerProps> = ({
                 <Volume2 className="w-4 h-4 text-white" />
               </div>
               <div>
-                <h4 className="text-xs font-black text-white">🎙️ 2분 오디오 브리핑</h4>
+                <h4 className="text-xs font-black text-white">2분 오디오 브리핑</h4>
                 <p className="text-[10px] text-slate-400">2인 대화형 팟캐스트 AI 스피치</p>
               </div>
             </div>
@@ -346,7 +346,7 @@ export const NotebookLMDrawer: React.FC<NotebookLMDrawerProps> = ({
           {isAudioPlaying && (
             <div className="p-2 rounded-xl bg-slate-800 border border-purple-500/40 flex items-center justify-between text-[11px] animate-fadeIn">
               <span className="font-bold text-purple-300">
-                {speakerTurn === 'HostA' ? '🎙️ 진행자 A (알렉스)' : '🎙️ 전문가 B (엠마)'}
+                {speakerTurn === 'HostA' ? '진행자 A (알렉스)' : '전문가 B (엠마)'}
               </span>
               <span className="text-[10px] text-purple-400 font-mono animate-pulse">발화 중...</span>
             </div>
@@ -355,7 +355,7 @@ export const NotebookLMDrawer: React.FC<NotebookLMDrawerProps> = ({
 
       </div>
 
-      {/* 4. [➕ 신규 소스 추가] 모달 및 드래그앤드롭 영역 */}
+      {/* 4. 신규 소스 추가 모달 및 드래그앤드롭 영역 */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn">
           <div className="bg-white dark:bg-neutral-900 rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 dark:border-neutral-800 space-y-4">
@@ -393,7 +393,7 @@ export const NotebookLMDrawer: React.FC<NotebookLMDrawerProps> = ({
 
             {/* 웹 URL 입력 */}
             <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-700 dark:text-neutral-300">🌐 웹 크롤링 URL 입력</label>
+              <label className="text-xs font-bold text-slate-700 dark:text-neutral-300">웹 크롤링 URL 입력</label>
               <div className="flex items-center space-x-1.5">
                 <input
                   type="text"

@@ -11,7 +11,7 @@ import { GovDocsCanvas } from './canvas/GovDocsCanvas';
 import { SlidesCanvas } from './canvas/SlidesCanvas';
 import { SheetsCanvas } from './canvas/SheetsCanvas';
 import { MinutesCanvas } from './canvas/MinutesCanvas';
-import { Sparkles, FileText } from 'lucide-react';
+import { Sparkles, Edit3 } from 'lucide-react';
 
 interface UniversalSmartCanvasProps {
   document: OfficeDocument;
@@ -45,29 +45,29 @@ export const UniversalSmartCanvas: React.FC<UniversalSmartCanvasProps> = ({
           <button
             onClick={() => onChangeViewMode('triad')}
             className={`
-              flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-black transition cursor-pointer whitespace-nowrap
+              flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer whitespace-nowrap
               ${viewMode === 'triad'
-                ? 'bg-white dark:bg-zinc-900 text-indigo-600 dark:text-indigo-400 shadow-xs border border-indigo-200 dark:border-indigo-900'
+                ? 'bg-white dark:bg-zinc-900 text-indigo-600 dark:text-indigo-400 shadow-xs border border-indigo-200 dark:border-indigo-900 font-bold'
                 : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white'
               }
             `}
           >
-            <Sparkles className="w-3.5 h-3.5 text-indigo-500" />
-            <span>💡 3-Way 기획 인큐베이터</span>
+            <Sparkles className="w-4 h-4 mr-1.5 text-indigo-500 shrink-0" />
+            <span>3-Way 기획 인큐베이터</span>
           </button>
 
           <button
             onClick={() => onChangeViewMode('canvas')}
             className={`
-              flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-black transition cursor-pointer whitespace-nowrap
+              flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer whitespace-nowrap
               ${viewMode === 'canvas'
-                ? 'bg-white dark:bg-zinc-900 text-indigo-600 dark:text-indigo-400 shadow-xs border border-indigo-200 dark:border-indigo-900'
+                ? 'bg-white dark:bg-zinc-900 text-slate-900 dark:text-white shadow-xs border border-slate-300 dark:border-zinc-700 font-bold'
                 : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white'
               }
             `}
           >
-            <FileText className="w-3.5 h-3.5 text-indigo-500" />
-            <span>📄 실시간 인플레이스 캔버스</span>
+            <Edit3 className="w-4 h-4 mr-1.5 text-slate-500 shrink-0" />
+            <span>실시간 인플레이스 캔버스</span>
           </button>
         </div>
 

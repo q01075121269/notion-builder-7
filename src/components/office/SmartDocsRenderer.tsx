@@ -103,7 +103,7 @@ export const SmartDocsRenderer: React.FC<SmartDocsRendererProps> = ({
         <div className="border-b border-slate-200 dark:border-neutral-800 pb-6 space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <span className="px-3 py-1 rounded-full text-xs font-extrabold bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
-              📄 스마트 독스 (A4 Business Report)
+              스마트 독스 (A4 Business Report)
             </span>
             <span className="text-xs text-slate-400 font-medium">작성일: 2026. 09. 20 | 문서번호: DOC-2026-Q4</span>
           </div>

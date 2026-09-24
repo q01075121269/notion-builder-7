@@ -310,7 +310,7 @@ export const PlanTriadIncubator: React.FC<PlanTriadIncubatorProps> = ({
                 onClick={handleConfirmAndDocument}
                 className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white text-xs font-extrabold flex items-center space-x-2 transition cursor-pointer shadow-md active:scale-95"
               >
-                <span>최종 문서화 직결 ➔ 캔버스로 반영</span>
+                <span>최종 문서화 직결 (캔버스로 반영)</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
             </div>

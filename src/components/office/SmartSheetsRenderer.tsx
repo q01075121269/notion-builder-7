@@ -5,7 +5,8 @@ import {
   Search, 
   Columns,
   CheckSquare,
-  Globe
+  Globe,
+  Table
 } from 'lucide-react';
 
 export interface ColumnDef {
@@ -151,7 +152,7 @@ export const SmartSheetsRenderer: React.FC<SmartSheetsRendererProps> = ({
         <div>
           <div className="flex items-center space-x-2">
             <span className="px-3 py-1 rounded-full text-xs font-extrabold bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
-              📊 스마트 시트 (Rows Engine Grid)
+              스마트 시트 (Rows Engine Grid)
             </span>
             <span className="text-xs text-slate-400 font-medium">
               {formMode === 'template' ? '표준 지출결의서 서식' : '자유 기획 서식'}
@@ -167,7 +168,7 @@ export const SmartSheetsRenderer: React.FC<SmartSheetsRendererProps> = ({
             <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
             <input
               type="text"
-              placeholder="🔍 필터 검색..."
+              placeholder="필터 검색..."
               value={filterKeyword}
               onChange={(e) => setFilterKeyword(e.target.value)}
               className="pl-8 pr-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-neutral-700 bg-slate-50 dark:bg-neutral-800 text-xs text-slate-700 dark:text-neutral-200 focus:outline-none focus:border-emerald-500 w-32 sm:w-40"
@@ -176,12 +177,12 @@ export const SmartSheetsRenderer: React.FC<SmartSheetsRendererProps> = ({
 
           <button onClick={handleAddRow} className="flex items-center space-x-1 px-3 py-1.5 rounded-xl bg-emerald-600 text-white text-xs font-bold transition">
             <Plus className="w-3.5 h-3.5" />
-            <span>➕ 행 추가</span>
+            <span>행 추가</span>
           </button>
 
           <button onClick={handleAddColumn} className="flex items-center space-x-1 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-neutral-800 text-slate-700 dark:text-neutral-200 text-xs font-bold transition">
             <Columns className="w-3.5 h-3.5 text-blue-500" />
-            <span>➕ 열 추가</span>
+            <span>열 추가</span>
           </button>
 
           <div className="flex items-center bg-slate-100 dark:bg-neutral-800 p-1 rounded-xl border border-slate-200 dark:border-neutral-700">
@@ -227,14 +228,14 @@ export const SmartSheetsRenderer: React.FC<SmartSheetsRendererProps> = ({
             {filteredRows.length === 0 ? (
               <tr>
                 <td colSpan={columns.length + 1} className="p-8 text-center space-y-2">
-                  <div className="w-10 h-10 rounded-2xl bg-slate-100 dark:bg-neutral-800 text-slate-400 flex items-center justify-center mx-auto text-lg font-black">
-                    📊
+                  <div className="w-10 h-10 rounded-2xl bg-slate-100 dark:bg-neutral-800 text-slate-400 flex items-center justify-center mx-auto">
+                    <Table className="w-5 h-5 text-slate-400" />
                   </div>
                   <p className="text-xs font-bold text-slate-700 dark:text-neutral-300">
                     표시할 수집 시트 데이터가 없습니다.
                   </p>
                   <p className="text-[11px] text-slate-400">
-                    상단 '➕ 행 추가' 버튼을 누르시거나 노아(NOA) 챗으로 크롤링 요청을 입력해주세요.
+                    상단 '행 추가' 버튼을 누르시거나 노아(NOA) 챗으로 크롤링 요청을 입력해주세요.
                   </p>
                 </td>
               </tr>

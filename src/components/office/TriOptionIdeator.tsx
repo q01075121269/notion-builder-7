@@ -223,7 +223,7 @@ export const TriOptionIdeator: React.FC<TriOptionIdeatorProps> = ({
             ${theme.buttonBg}
           `}
         >
-          <span>🚀 이 안으로 기획 확정</span>
+          <span>이 안으로 기획 확정</span>
           <ArrowRight className="w-4 h-4" />
         </button>
       </div>
@@ -273,7 +273,7 @@ export const TriOptionIdeator: React.FC<TriOptionIdeatorProps> = ({
               ) : (
                 <>
                   <Zap className="w-4 h-4 text-amber-300" />
-                  <span>⚡ 3-Way 기획 발산</span>
+                  <span>3-Way 기획 발산</span>
                 </>
               )}
             </button>
@@ -284,27 +284,27 @@ export const TriOptionIdeator: React.FC<TriOptionIdeatorProps> = ({
       {/* 3대 기획 카드 동시 비교 그리드 */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {renderCard('A', planTriad.optionA, {
-          tag: '🛡️ A안 [정석·안정형]',
+          tag: 'A안 [정석·안정형]',
           tagClass: 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300 border border-blue-200 dark:border-blue-800',
-          icon: <ShieldCheck className="w-4 h-4 text-blue-600 dark:text-blue-400" />,
+          icon: <ShieldCheck className="w-3.5 h-3.5 mr-1 text-blue-600 shrink-0" />,
           borderClass: 'border-blue-500 dark:border-blue-500',
           hoverClass: 'hover:border-blue-300 dark:hover:border-blue-800',
           buttonBg: 'bg-blue-600 hover:bg-blue-500 text-white'
         })}
 
         {renderCard('B', planTriad.optionB, {
-          tag: '🔥 B안 [파격·혁신형]',
+          tag: 'B안 [파격·혁신형]',
           tagClass: 'bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300 border border-purple-200 dark:border-purple-800',
-          icon: <Flame className="w-4 h-4 text-purple-600 dark:text-purple-400" />,
+          icon: <Flame className="w-3.5 h-3.5 mr-1 text-purple-600 shrink-0" />,
           borderClass: 'border-purple-500 dark:border-purple-500',
           hoverClass: 'hover:border-purple-300 dark:hover:border-purple-800',
           buttonBg: 'bg-purple-600 hover:bg-purple-500 text-white'
         })}
 
         {renderCard('C', planTriad.optionC, {
-          tag: '⚡ C안 [실속·초고속 MVP]',
+          tag: 'C안 [실속·초고속 MVP]',
           tagClass: 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 border border-amber-200 dark:border-amber-800',
-          icon: <Zap className="w-4 h-4 text-amber-600 dark:text-amber-400" />,
+          icon: <Zap className="w-3.5 h-3.5 mr-1 text-amber-600 shrink-0" />,
           borderClass: 'border-amber-500 dark:border-amber-500',
           hoverClass: 'hover:border-amber-300 dark:hover:border-amber-800',
           buttonBg: 'bg-amber-600 hover:bg-amber-500 text-white'
@@ -374,7 +374,7 @@ export const TriOptionIdeator: React.FC<TriOptionIdeatorProps> = ({
                 onClick={handleFinalConfirm}
                 className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white text-xs font-extrabold flex items-center space-x-2 transition cursor-pointer shadow-md active:scale-95"
               >
-                <span>확인 ➔ 실시간 캔버스에 주입</span>
+                <span>확인 및 캔버스에 주입</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
             </div>

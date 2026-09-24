@@ -20,10 +20,10 @@ import {
   Presentation, 
   Table, 
   Mic, 
-  Zap,
   ChevronLeft,
   ChevronRight,
-  RotateCcw
+  Undo2,
+  CheckCircle2
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
@@ -102,7 +102,7 @@ export const OfficeStudioContainer: React.FC = () => {
   const handleDividerDoubleClick = () => {
     setSidebarWidth(DEFAULT_SIDEBAR_WIDTH);
     setIsCollapsed(false);
-    showToast('📐 사이드바 너비를 기본(380px)으로 리셋했습니다.', 'info');
+    showToast('사이드바 너비를 기본(380px)으로 리셋했습니다.', 'info');
   };
 
   // 상태 업데이트 헬퍼 (Undo 스냅샷 보존)
@@ -120,7 +120,7 @@ export const OfficeStudioContainer: React.FC = () => {
       return p;
     }));
 
-    showToast(`✨ ${actionName} 완료`, 'info');
+    showToast(`${actionName} 완료`, 'info');
   };
 
   // Undo (되돌리기)
@@ -140,7 +140,7 @@ export const OfficeStudioContainer: React.FC = () => {
     }));
 
     setHistoryStack(newStack);
-    showToast(`⏪ '${lastEntry.action}' 작업을 롤백했습니다.`, 'info');
+    showToast(`'${lastEntry.action}' 작업을 되돌렸습니다.`, 'info');
   };
 
   // 문서 포맷 변경 ('docs' | 'slides' | 'sheets' | 'minutes')
@@ -174,7 +174,7 @@ export const OfficeStudioContainer: React.FC = () => {
 
     setProjects(prev => [...prev, newProj]);
     setActiveProjectId(newProjId);
-    showToast('📂 신규 프로젝트 워크스페이스가 생성되었습니다.', 'success');
+    showToast('신규 프로젝트 워크스페이스가 생성되었습니다.', 'success');
   };
 
   // 소스 조작 헬퍼들
@@ -195,7 +195,7 @@ export const OfficeStudioContainer: React.FC = () => {
       }
       return p;
     }));
-    showToast(`📚 '${source.title}' 지식 창고에 적재 완료!`, 'success');
+    showToast(`'${source.title}' 지식 창고에 적재 완료`, 'success');
   };
 
   const handleDeleteSource = (srcId: string) => {
@@ -216,7 +216,7 @@ export const OfficeStudioContainer: React.FC = () => {
       }
       return p;
     }));
-    showToast('⚡ 3-Way 기획안 발산이 완료되었습니다!', 'success');
+    showToast('3-Way 기획안 발산이 완료되었습니다.', 'success');
   };
 
   // 3-Way 질문 답변 완료 후 문서에 뼈대 즉시 주입
@@ -287,16 +287,16 @@ export const OfficeStudioContainer: React.FC = () => {
 
     updateDocument(updatedDoc, `[${selectedKey}안] 기획 뼈대 문서 주입 완료`);
     setViewMode('canvas');
-    showToast(`🎉 [${selectedKey}안] 기획이 공문서와 슬라이드에 즉시 주입되었습니다!`, 'success');
+    showToast(`[${selectedKey}안] 기획이 공문서와 슬라이드에 주입되었습니다.`, 'success');
   };
 
-  // 옴니 출하 액션들
+  // 옴니 출하 액션들 (미니멀 텍스트 칩)
   const handleExportHwpx = () => {
-    showToast('💾 [.hwpx] 한글 표준 공문서 파일 변환 및 다운로드를 시작합니다.', 'success');
+    showToast('[.hwpx] 한글 표준 공문서 파일 변환 및 다운로드를 시작합니다.', 'info');
   };
 
   const handleExportPptx = () => {
-    showToast('📊 [.pptx] 16:9 와이드 프레젠테이션 덱 다운로드가 완료되었습니다.', 'success');
+    showToast('[.pptx] 16:9 와이드 프레젠테이션 덱 다운로드가 완료되었습니다.', 'success');
   };
 
   const handleExportXlsx = () => {
@@ -310,7 +310,7 @@ export const OfficeStudioContainer: React.FC = () => {
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, '예산산출내역');
       XLSX.writeFile(wb, `${activeProject.title}_예산내역.xlsx`);
-      showToast('📈 [.xlsx] 스프레드시트 엑셀 파일 다운로드가 완료되었습니다!', 'success');
+      showToast('[.xlsx] 스프레드시트 엑셀 파일 다운로드가 완료되었습니다.', 'success');
     } catch {
       showToast('엑셀 생성 중 오류가 발생했습니다.', 'error');
     }
@@ -318,16 +318,16 @@ export const OfficeStudioContainer: React.FC = () => {
 
   const handleExportPdf = () => {
     window.print();
-    showToast('📄 PDF 인쇄 대화상자를 호출했습니다.', 'info');
+    showToast('PDF 인쇄 대화상자를 호출했습니다.', 'info');
   };
 
   const handleSendToNotion = () => {
-    showToast('☁️ 노션 Wiki 마스터 DB로 실시간 문서 적재가 완료되었습니다!', 'success');
+    showToast('노션 Wiki 마스터 DB로 실시간 문서 적재가 완료되었습니다.', 'success');
   };
 
   const handleSyncToLifeHub = () => {
     setCurrentView('life');
-    showToast('⚡ 회의록 액션 아이템이 [🌱 라이프 Hub] 투두 데이터베이스와 연동되었습니다!', 'success');
+    showToast('회의록 액션 아이템이 라이프 Hub 투두 데이터베이스와 연동되었습니다.', 'success');
   };
 
   return (
@@ -337,164 +337,181 @@ export const OfficeStudioContainer: React.FC = () => {
     >
       
       {/* ========================================================================= */}
-      {/* 1. 상단 글로벌 서브 헤더 (조종석 콘솔 바) */}
+      {/* 상단 1단: 프로젝트 워크스페이스 바 (h-11 border-b bg-slate-50/60) */}
       {/* ========================================================================= */}
-      <header className="px-3 sm:px-6 py-2.5 bg-white dark:bg-zinc-900 border-b border-slate-200 dark:border-zinc-800 flex flex-wrap items-center justify-between gap-3 shrink-0 shadow-2xs z-20">
+      <div className="h-11 border-b border-slate-200 dark:border-zinc-800 bg-slate-50/80 dark:bg-zinc-900/80 px-3 sm:px-4 flex items-center justify-between shrink-0 z-20 gap-3">
         
-        {/* (1) 프로젝트 탭 스위처 & 사이드바 접기/펼치기 토글 */}
-        <div className="flex items-center space-x-1.5 overflow-x-auto max-w-[460px] scrollbar-none py-0.5">
-          {/* 사이드바 접기/펼치기 빠른 토글 */}
+        {/* 좌측: 사이드바 접기/펼치기 화살표 + 프로젝트 탭 목록 + 새 프로젝트 버튼 */}
+        <div className="flex items-center space-x-1.5 overflow-x-auto whitespace-nowrap scrollbar-none flex-1 min-w-0 py-0.5">
+          {/* 사이드바 접기/펼치기 화살표 버튼 */}
           <button
             onClick={() => setIsCollapsed(!isCollapsed)}
-            className="p-1.5 rounded-xl border border-slate-200 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-800 hover:bg-slate-100 dark:hover:bg-zinc-700 text-slate-700 dark:text-zinc-300 transition cursor-pointer shrink-0"
-            title={isCollapsed ? '사이드바 펼치기 (Knowledge Dock)' : '사이드바 접기 (Full Canvas)'}
+            className="p-1.5 rounded-lg border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-slate-100 dark:hover:bg-zinc-700 text-slate-600 dark:text-zinc-300 transition cursor-pointer shrink-0 shadow-2xs"
+            title={isCollapsed ? '지식 창고 펼치기' : '지식 창고 접기 (전폭 캔버스)'}
           >
-            {isCollapsed ? <ChevronRight className="w-4 h-4 text-indigo-500" /> : <ChevronLeft className="w-4 h-4 text-indigo-500" />}
+            {isCollapsed ? <ChevronRight className="w-3.5 h-3.5 text-slate-600 dark:text-zinc-300" /> : <ChevronLeft className="w-3.5 h-3.5 text-slate-600 dark:text-zinc-300" />}
           </button>
 
+          {/* 프로젝트 탭 목록 */}
           {projects.map(proj => (
             <button
               key={proj.id}
               onClick={() => setActiveProjectId(proj.id)}
               className={`
-                flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer shrink-0 border
+                flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition whitespace-nowrap cursor-pointer shrink-0 border
                 ${activeProjectId === proj.id
-                  ? 'bg-indigo-50 dark:bg-indigo-950/80 text-indigo-700 dark:text-indigo-300 border-indigo-300 dark:border-indigo-800 shadow-2xs'
-                  : 'bg-slate-50 dark:bg-zinc-800/80 text-slate-600 dark:text-zinc-400 border-slate-200 dark:border-zinc-700 hover:text-slate-900 dark:hover:text-zinc-200'
+                  ? 'bg-white dark:bg-zinc-800 text-slate-900 dark:text-white border-slate-300 dark:border-zinc-600 shadow-2xs font-bold'
+                  : 'bg-transparent text-slate-500 hover:text-slate-800 dark:text-zinc-400 dark:hover:text-zinc-200 border-transparent hover:bg-white/60 dark:hover:bg-zinc-800/60'
                 }
               `}
               title={proj.title}
             >
-              <Folder className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
-              <span className="truncate max-w-[120px] sm:max-w-[160px]">{proj.title}</span>
+              <Folder className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+              <span className="truncate max-w-[200px] sm:max-w-[280px]">{proj.title}</span>
             </button>
           ))}
 
+          {/* 새 프로젝트 생성 버튼 */}
           <button
             onClick={handleCreateNewProject}
-            className="flex items-center space-x-1 px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-slate-700 dark:text-zinc-300 text-xs font-bold transition cursor-pointer shrink-0 border border-dashed border-slate-300 dark:border-zinc-600"
+            className="flex items-center space-x-1 px-2.5 py-1.5 rounded-lg bg-transparent hover:bg-white dark:hover:bg-zinc-800 text-slate-600 dark:text-zinc-400 text-xs font-medium transition cursor-pointer shrink-0 border border-dashed border-slate-300 dark:border-zinc-700"
             title="새 프로젝트 생성"
           >
-            <Plus className="w-3.5 h-3.5" />
+            <Plus className="w-3.5 h-3.5 text-slate-400" />
             <span className="hidden sm:inline">새 프로젝트</span>
           </button>
         </div>
 
-        {/* (2) 문서 포맷 선택기 (4대 포맷) */}
-        <div className="flex items-center bg-slate-100 dark:bg-zinc-800 p-1 rounded-2xl border border-slate-200 dark:border-zinc-750 shrink-0">
+        {/* 우측: 저장 상태 뱃지 & 되돌리기 버튼 */}
+        <div className="flex items-center space-x-2 shrink-0">
+          <div className="hidden md:flex items-center space-x-1 text-[11px] text-slate-400 dark:text-zinc-500">
+            <CheckCircle2 className="w-3 h-3 text-slate-400" />
+            <span>자동 저장됨</span>
+          </div>
+
+          <button
+            onClick={handleUndo}
+            disabled={historyStack.length === 0}
+            className="flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-white dark:bg-zinc-800 hover:bg-slate-100 dark:hover:bg-zinc-700 disabled:opacity-30 border border-slate-200 dark:border-zinc-700 text-xs font-semibold text-slate-700 dark:text-zinc-300 transition cursor-pointer shadow-2xs"
+            title={historyStack.length > 0 ? `되돌리기: ${historyStack[historyStack.length - 1].action}` : '되돌릴 작업 없음'}
+          >
+            <Undo2 className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+            <span>되돌리기</span>
+          </button>
+        </div>
+
+      </div>
+
+      {/* ========================================================================= */}
+      {/* 하단 2단: 캔버스 포맷 & 옴니 출하 툴바 (h-11 border-b bg-white) */}
+      {/* ========================================================================= */}
+      <div className="h-11 border-b border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-3 sm:px-4 flex items-center justify-between shrink-0 z-10 shadow-2xs gap-3">
+        
+        {/* 좌측: 4대 문서 포맷 스위처 버튼 그룹 (단일 Lucide SVG 아이콘 규격화) */}
+        <div className="flex items-center bg-slate-100 dark:bg-zinc-800 p-0.5 rounded-lg border border-slate-200 dark:border-zinc-700 shrink-0">
           <button
             onClick={() => handleFormatChange('docs')}
-            className={`flex items-center space-x-1 px-2.5 py-1 rounded-xl text-xs font-bold transition cursor-pointer whitespace-nowrap ${
+            className={`flex items-center space-x-1.5 px-2.5 py-1 rounded-md text-xs font-semibold transition cursor-pointer whitespace-nowrap ${
               currentDoc.format === 'docs'
-                ? 'bg-white dark:bg-zinc-900 text-indigo-600 dark:text-indigo-400 shadow-xs'
-                : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900'
+                ? 'bg-white dark:bg-zinc-900 text-slate-900 dark:text-white shadow-2xs font-bold'
+                : 'text-slate-500 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-zinc-200'
             }`}
           >
-            <FileText className="w-3.5 h-3.5 text-indigo-500" />
-            <span>🏢 공문서/기안서</span>
+            <FileText className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+            <span>공문서/기안서</span>
           </button>
 
           <button
             onClick={() => handleFormatChange('slides')}
-            className={`flex items-center space-x-1 px-2.5 py-1 rounded-xl text-xs font-bold transition cursor-pointer whitespace-nowrap ${
+            className={`flex items-center space-x-1.5 px-2.5 py-1 rounded-md text-xs font-semibold transition cursor-pointer whitespace-nowrap ${
               currentDoc.format === 'slides'
-                ? 'bg-white dark:bg-zinc-900 text-amber-600 dark:text-amber-400 shadow-xs'
-                : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900'
+                ? 'bg-white dark:bg-zinc-900 text-slate-900 dark:text-white shadow-2xs font-bold'
+                : 'text-slate-500 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-zinc-200'
             }`}
           >
-            <Presentation className="w-3.5 h-3.5 text-amber-500" />
-            <span>📊 발표 슬라이드</span>
+            <Presentation className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+            <span>발표 슬라이드</span>
           </button>
 
           <button
             onClick={() => handleFormatChange('sheets')}
-            className={`flex items-center space-x-1 px-2.5 py-1 rounded-xl text-xs font-bold transition cursor-pointer whitespace-nowrap ${
+            className={`flex items-center space-x-1.5 px-2.5 py-1 rounded-md text-xs font-semibold transition cursor-pointer whitespace-nowrap ${
               currentDoc.format === 'sheets'
-                ? 'bg-white dark:bg-zinc-900 text-emerald-600 dark:text-emerald-400 shadow-xs'
-                : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900'
+                ? 'bg-white dark:bg-zinc-900 text-slate-900 dark:text-white shadow-2xs font-bold'
+                : 'text-slate-500 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-zinc-200'
             }`}
           >
-            <Table className="w-3.5 h-3.5 text-emerald-500" />
-            <span>📈 스프레드시트</span>
+            <Table className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+            <span>스프레드시트</span>
           </button>
 
           <button
             onClick={() => handleFormatChange('minutes')}
-            className={`flex items-center space-x-1 px-2.5 py-1 rounded-xl text-xs font-bold transition cursor-pointer whitespace-nowrap ${
+            className={`flex items-center space-x-1.5 px-2.5 py-1 rounded-md text-xs font-semibold transition cursor-pointer whitespace-nowrap ${
               currentDoc.format === 'minutes'
-                ? 'bg-white dark:bg-zinc-900 text-purple-600 dark:text-purple-400 shadow-xs'
-                : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900'
+                ? 'bg-white dark:bg-zinc-900 text-slate-900 dark:text-white shadow-2xs font-bold'
+                : 'text-slate-500 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-zinc-200'
             }`}
           >
-            <Mic className="w-3.5 h-3.5 text-purple-500" />
-            <span>🎙️ 회의록·할일</span>
+            <Mic className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+            <span>회의록·할일</span>
           </button>
         </div>
 
-        {/* (3) 옴니 출하 액션 바 & 상단 Undo 버튼 */}
+        {/* 우측: 옴니 출하 액션 바 (단정한 텍스트 칩 스타일) */}
         <div className="flex items-center space-x-1 shrink-0 overflow-x-auto">
-          {/* 상단 1클릭 롤백 Undo 버튼 */}
-          <button
-            onClick={handleUndo}
-            disabled={historyStack.length === 0}
-            className="flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-white dark:bg-zinc-800 hover:bg-slate-100 dark:hover:bg-zinc-700 disabled:opacity-30 border border-slate-200 dark:border-zinc-750 text-[11px] font-bold text-slate-700 dark:text-zinc-300 transition cursor-pointer whitespace-nowrap mr-1"
-            title={historyStack.length > 0 ? `되돌리기: ${historyStack[historyStack.length - 1].action}` : '되돌릴 작업 없음'}
-          >
-            <RotateCcw className="w-3 h-3 text-indigo-500" />
-            <span>되돌리기</span>
-          </button>
-
           <button
             onClick={handleExportHwpx}
-            className="px-2 py-1 rounded-lg bg-white dark:bg-zinc-800 hover:bg-slate-50 dark:hover:bg-zinc-750 border border-slate-200 dark:border-zinc-700 text-[11px] font-bold text-slate-700 dark:text-zinc-300 transition cursor-pointer whitespace-nowrap"
+            className="px-2.5 py-1 rounded-md bg-slate-50 dark:bg-zinc-800 hover:bg-slate-100 dark:hover:bg-zinc-700 border border-slate-200 dark:border-zinc-700 text-xs font-medium text-slate-700 dark:text-zinc-300 transition cursor-pointer whitespace-nowrap"
             title="한글 HWPX 다운로드"
           >
-            💾 .hwpx
+            .hwpx
           </button>
 
           <button
             onClick={handleExportPptx}
-            className="px-2 py-1 rounded-lg bg-white dark:bg-zinc-800 hover:bg-slate-50 dark:hover:bg-zinc-750 border border-slate-200 dark:border-zinc-700 text-[11px] font-bold text-slate-700 dark:text-zinc-300 transition cursor-pointer whitespace-nowrap"
+            className="px-2.5 py-1 rounded-md bg-slate-50 dark:bg-zinc-800 hover:bg-slate-100 dark:hover:bg-zinc-700 border border-slate-200 dark:border-zinc-700 text-xs font-medium text-slate-700 dark:text-zinc-300 transition cursor-pointer whitespace-nowrap"
             title="파워포인트 PPTX 다운로드"
           >
-            📊 .pptx
+            .pptx
           </button>
 
           <button
             onClick={handleExportXlsx}
-            className="px-2 py-1 rounded-lg bg-white dark:bg-zinc-800 hover:bg-slate-50 dark:hover:bg-zinc-750 border border-slate-200 dark:border-zinc-700 text-[11px] font-bold text-slate-700 dark:text-zinc-300 transition cursor-pointer whitespace-nowrap"
+            className="px-2.5 py-1 rounded-md bg-slate-50 dark:bg-zinc-800 hover:bg-slate-100 dark:hover:bg-zinc-700 border border-slate-200 dark:border-zinc-700 text-xs font-medium text-slate-700 dark:text-zinc-300 transition cursor-pointer whitespace-nowrap"
             title="엑셀 XLSX 다운로드"
           >
-            📈 .xlsx
+            .xlsx
           </button>
 
           <button
             onClick={handleExportPdf}
-            className="px-2 py-1 rounded-lg bg-white dark:bg-zinc-800 hover:bg-slate-50 dark:hover:bg-zinc-750 border border-slate-200 dark:border-zinc-700 text-[11px] font-bold text-slate-700 dark:text-zinc-300 transition cursor-pointer whitespace-nowrap"
-            title="A4 PDF 인쇄 / 저장"
+            className="px-2.5 py-1 rounded-md bg-slate-50 dark:bg-zinc-800 hover:bg-slate-100 dark:hover:bg-zinc-700 border border-slate-200 dark:border-zinc-700 text-xs font-medium text-slate-700 dark:text-zinc-300 transition cursor-pointer whitespace-nowrap"
+            title="PDF 인쇄 및 저장"
           >
-            🖨️ PDF 인쇄
+            PDF 인쇄
           </button>
+
+          <div className="h-4 w-px bg-slate-200 dark:border-zinc-700 mx-0.5" />
 
           <button
             onClick={handleSendToNotion}
-            className="px-2.5 py-1 rounded-lg bg-slate-900 text-white dark:bg-zinc-100 dark:text-zinc-900 text-[11px] font-extrabold hover:opacity-90 transition cursor-pointer whitespace-nowrap shadow-xs"
+            className="px-2.5 py-1 rounded-md bg-slate-900 text-white dark:bg-zinc-100 dark:text-zinc-900 text-xs font-semibold hover:opacity-90 transition cursor-pointer whitespace-nowrap shadow-2xs"
             title="노션 Wiki 마스터 DB로 전송"
           >
-            ☁️ 노션 Wiki
+            노션 Wiki
           </button>
 
           <button
             onClick={handleSyncToLifeHub}
-            className="flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-[11px] font-extrabold hover:opacity-90 transition cursor-pointer whitespace-nowrap shadow-xs"
+            className="px-2.5 py-1 rounded-md bg-slate-800 text-white dark:bg-zinc-200 dark:text-zinc-900 text-xs font-semibold hover:opacity-90 transition cursor-pointer whitespace-nowrap shadow-2xs"
             title="할 일 목록을 라이프 Hub로 연동"
           >
-            <Zap className="w-3 h-3 text-amber-300" />
-            <span>할일 ➔ 라이프 Hub</span>
+            라이프 Hub
           </button>
         </div>
 
-      </header>
+      </div>
 
       {/* ========================================================================= */}
       {/* 2. 본문 리사이저블 레이아웃 (Knowledge Dock vs Universal Smart Canvas) */}
@@ -522,9 +539,9 @@ export const OfficeStudioContainer: React.FC = () => {
             onMouseDown={handleMouseDown}
             onDoubleClick={handleDividerDoubleClick}
             className={`
-              w-1.5 hover:w-2 bg-slate-200 dark:bg-zinc-800 hover:bg-indigo-500 dark:hover:bg-indigo-500
+              w-1.5 hover:w-2 bg-slate-200 dark:bg-zinc-800 hover:bg-slate-400 dark:hover:bg-zinc-600
               transition-all cursor-col-resize shrink-0 z-30 relative group flex items-center justify-center
-              ${isResizing ? 'bg-indigo-600 dark:bg-indigo-600 w-2' : ''}
+              ${isResizing ? 'bg-slate-400 dark:bg-zinc-600 w-2' : ''}
             `}
             title="드래그하여 너비 조절 (더블클릭 시 기본값 380px 리셋)"
           >
