@@ -1,18 +1,20 @@
 // src/app/life/page.tsx
-// 라이프 Hub 4대 마스터 DB(Projects, Tasks & Habits, Resources & Inbox, Life Log)
-// 양방향 관계형(Mutual Relation) 및 Formulas 2.0 엔진 실시간 통합 화면
+// 라이프 Hub(Life Hub) 2열 벤토 그리드 조종석 캔버스 렌더러 (모닝 커맨드 센터, PARA 매트릭스, 해빗 트래커, 인텔리전스 독)
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
 import { 
-  Rocket, 
-  CheckSquare, 
-  Inbox, 
+  Sun, 
+  Brain, 
+  Coins, 
   Activity, 
   ArrowLeft, 
-  RefreshCw, 
-  Layers, 
-  LayoutGrid
+  Zap, 
+  Save, 
+  Send, 
+  ChevronDown, 
+  Download,
+  RotateCcw
 } from 'lucide-react';
 
 
@@ -31,6 +33,7 @@ import type {
   ResourceStatus,
   LifeLogCategory
 } from '../../types/lifeHub';
+
 import {
   loadLifeHubMasterState,
   saveLifeHubMasterState,
@@ -42,13 +45,14 @@ import {
   INITIAL_LIFE_HUB_LOGS
 } from '../../services/lifeHubMasterEngine';
 
+import { CockpitMorningCommandCenter } from '../../components/life/CockpitMorningCommandCenter';
 import { ProjectsMasterView } from '../../components/life/ProjectsMasterView';
 import { TasksHabitsMasterView } from '../../components/life/TasksHabitsMasterView';
 import { ResourcesInboxMasterView } from '../../components/life/ResourcesInboxMasterView';
 import { LifeLogMasterView } from '../../components/life/LifeLogMasterView';
+import { IntelligenceDock } from '../../components/life/IntelligenceDock';
 
-type LifeMasterTab = 'projects' | 'tasks' | 'resources' | 'lifelog';
-type ViewMode = 'tabs' | 'grid';
+type ViewModeTab = 'morning_command' | 'para_second_brain' | 'smart_finance' | 'health_routine';
 
 export const LifePage: React.FC = () => {
   const { 
@@ -60,19 +64,16 @@ export const LifePage: React.FC = () => {
     setIsNotionSettingsModalOpen
   } = useApp();
 
-  const [viewMode, setViewMode] = useState<ViewMode>('tabs');
-  const [activeTab, setActiveTab] = useState<LifeMasterTab>('projects');
+  // 상단 서브 뷰 모드 탭 (기본 활성: ☀️ 모닝 커맨드 센터)
+  const [activeTab, setActiveTab] = useState<ViewModeTab>('morning_command');
   const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [lastSyncTime, setLastSyncTime] = useState<string>('');
+  const [isSaveMenuOpen, setIsSaveMenuOpen] = useState<boolean>(false);
 
   // 4대 마스터 DB 상태 (Fallback 빈 배열 안전 보장)
   const [projects, setProjects] = useState<ProjectItem[]>(() => INITIAL_LIFE_HUB_PROJECTS);
   const [tasks, setTasks] = useState<TaskHabitItem[]>(() => INITIAL_LIFE_HUB_TASKS);
   const [resources, setResources] = useState<ResourceInboxItem[]>(() => INITIAL_LIFE_HUB_RESOURCES);
   const [lifeLogs, setLifeLogs] = useState<LifeLogItem[]>(() => INITIAL_LIFE_HUB_LOGS);
-
-  // 선택된 특정 프로젝트 ID (양방향 하이라이트용)
-  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
 
   // 초기 로컬 스토리지 로드
   useEffect(() => {
@@ -83,9 +84,8 @@ export const LifePage: React.FC = () => {
       setTasks(loaded.tasks || INITIAL_LIFE_HUB_TASKS);
       setResources(loaded.resources || INITIAL_LIFE_HUB_RESOURCES);
       setLifeLogs(loaded.lifeLogs || INITIAL_LIFE_HUB_LOGS);
-      setLastSyncTime(new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
     } catch (e) {
-      console.error('[LifePage] Failed to load initial state:', e);
+      console.error('[LifePage] Failed to load state:', e);
     } finally {
       setIsLoading(false);
     }
@@ -109,10 +109,10 @@ export const LifePage: React.FC = () => {
   }, []);
 
   // ─────────────────────────────────────────────────────────────────────────────
-  // 양방향 관계형(Mutual Relation) 및 Formulas 2.0 실시간 계산 파이프라인
+  // 양방향 관계형(Mutual Relation) 및 Formulas 2.0 실시간 계산
   // ─────────────────────────────────────────────────────────────────────────────
 
-  // 1. Task에 Formulas 2.0 스트릭/D-Day 결과 주입
+  // 1. Task에 스트릭/D-Day 수식 주입
   const resolvedTasks = useMemo(() => {
     return enrichTasksWithFormulas(tasks);
   }, [tasks]);
@@ -123,10 +123,10 @@ export const LifePage: React.FC = () => {
   }, [projects, resolvedTasks, resources]);
 
   // ─────────────────────────────────────────────────────────────────────────────
-  // 액션 핸들러 (양방향 연동 완벽 동기화)
+  // 액션 핸들러
   // ─────────────────────────────────────────────────────────────────────────────
 
-  // 과제 / 루틴 완료 토글 (체크박스 클릭 시 프로젝트 게이지 자동 연동 갱신)
+  // 1. 과제 / 루틴 완료 토글 (체크박스 클릭 시 프로젝트 게이지 자동 연동 갱신)
   const handleToggleTask = useCallback((taskId: string) => {
     setTasks(prevTasks => {
       const nextTasks = prevTasks.map(t => {
@@ -145,15 +145,40 @@ export const LifePage: React.FC = () => {
         return t;
       });
 
-      // 영속화
       persistState(projects, nextTasks, resources, lifeLogs);
       return nextTasks;
     });
 
-    showToast('과제 상태가 변경되었으며, Projects 진척률 게이지가 실시간 갱신되었습니다.', 'success');
+    showToast('과제 상태가 변경되었으며, Projects 진척률 게이지가 실시간 연동되었습니다.', 'success');
   }, [projects, resources, lifeLogs, persistState, showToast]);
 
-  // 프로젝트 추가
+  // 2. 1초 퀵 캡처 인박스 등록
+  const handleQuickCapture = useCallback((item: {
+    title: string;
+    type: ResourceType;
+    summary: string;
+    sourceUrl?: string;
+  }) => {
+    const newRes: ResourceInboxItem = {
+      id: `res-${Date.now()}`,
+      title: item.title,
+      type: item.type,
+      sourceUrl: item.sourceUrl,
+      summary: item.summary,
+      status: '인박스',
+      createdAt: new Date().toISOString()
+    };
+
+    setResources(prev => {
+      const next = [newRes, ...prev];
+      persistState(projects, tasks, next, lifeLogs);
+      return next;
+    });
+
+    showToast(`'${item.title}' 항목이 1초 퀵 인박스에 저장되었습니다.`, 'success');
+  }, [projects, tasks, lifeLogs, persistState, showToast]);
+
+  // 3. 프로젝트 추가
   const handleAddProject = useCallback((newProjData: {
     title: string;
     area: ProjectArea;
@@ -178,25 +203,20 @@ export const LifePage: React.FC = () => {
       persistState(next, tasks, resources, lifeLogs);
       return next;
     });
-    showToast(`'${newProjData.title}' 프로젝트가 신규 생성되었습니다.`, 'success');
+    showToast(`'${newProjData.title}' 프로젝트가 생성되었습니다.`, 'success');
   }, [tasks, resources, lifeLogs, persistState, showToast]);
 
   // 프로젝트 삭제
   const handleDeleteProject = useCallback((projectId: string) => {
     setProjects(prev => {
       const next = prev.filter(p => p.id !== projectId);
-      // 소속 태스크의 projectId 연결 해제
-      setTasks(prevTasks => {
-        const nextTasks = prevTasks.map(t => t.projectId === projectId ? { ...t, projectId: undefined } : t);
-        persistState(next, nextTasks, resources, lifeLogs);
-        return nextTasks;
-      });
+      persistState(next, tasks, resources, lifeLogs);
       return next;
     });
     showToast('프로젝트가 삭제되었습니다.', 'info');
-  }, [resources, lifeLogs, persistState, showToast]);
+  }, [tasks, resources, lifeLogs, persistState, showToast]);
 
-  // 과제 추가
+  // 태스크 추가
   const handleAddTask = useCallback((newTaskData: {
     title: string;
     type: TaskType;
@@ -223,7 +243,6 @@ export const LifePage: React.FC = () => {
 
     setTasks(prevTasks => {
       const nextTasks = [newTask, ...prevTasks];
-      // 연결된 프로젝트가 있다면 해당 프로젝트의 taskIds에도 추가
       if (newTask.projectId) {
         setProjects(prevProj => {
           const nextProj = prevProj.map(p => {
@@ -240,28 +259,20 @@ export const LifePage: React.FC = () => {
       }
       return nextTasks;
     });
-    showToast(`'${newTaskData.title}' 과제가 등록되었습니다.`, 'success');
+    showToast(`'${newTaskData.title}' 과제가 추가되었습니다.`, 'success');
   }, [projects, resources, lifeLogs, persistState, showToast]);
 
-  // 과제 삭제
+  // 태스크 삭제
   const handleDeleteTask = useCallback((taskId: string) => {
     setTasks(prev => {
       const next = prev.filter(t => t.id !== taskId);
-      // 프로젝트 taskIds에서도 정리
-      setProjects(prevProj => {
-        const nextProj = prevProj.map(p => ({
-          ...p,
-          taskIds: p.taskIds.filter(id => id !== taskId)
-        }));
-        persistState(nextProj, next, resources, lifeLogs);
-        return nextProj;
-      });
+      persistState(projects, next, resources, lifeLogs);
       return next;
     });
     showToast('과제가 삭제되었습니다.', 'info');
-  }, [resources, lifeLogs, persistState, showToast]);
+  }, [projects, resources, lifeLogs, persistState, showToast]);
 
-  // 리소스 상태 토글 (인박스 ↔ 처리완료)
+  // 리소스 상태 토글
   const handleToggleResourceStatus = useCallback((resourceId: string) => {
     setResources(prev => {
       const next = prev.map(r => {
@@ -339,7 +350,7 @@ export const LifePage: React.FC = () => {
       persistState(projects, tasks, resources, next);
       return next;
     });
-    showToast(`'${newLogData.title}' 라이프 로그가 기록되었습니다.`, 'success');
+    showToast(`'${newLogData.title}' 로그가 기록되었습니다.`, 'success');
   }, [projects, tasks, resources, persistState, showToast]);
 
   // 라이프 로그 삭제
@@ -349,314 +360,245 @@ export const LifePage: React.FC = () => {
       persistState(projects, tasks, resources, next);
       return next;
     });
-    showToast('라이프 로그가 삭제되었습니다.', 'info');
+    showToast('로그가 삭제되었습니다.', 'info');
   }, [projects, tasks, resources, persistState, showToast]);
 
-  // 동기화 새로고침
-  const handleRefresh = useCallback(() => {
-    setIsLoading(true);
+  // 1초 퀵 캡처 포커스
+  const focusQuickInbox = () => {
+    setActiveTab('morning_command');
     setTimeout(() => {
-      const loaded = loadLifeHubMasterState();
-      setProjects(loaded.projects);
-      setTasks(loaded.tasks);
-      setResources(loaded.resources);
-      setLifeLogs(loaded.lifeLogs);
-      setLastSyncTime(new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
-      setIsLoading(false);
-      showToast('라이프 Hub 4대 마스터 DB 최신 상태를 동기화했습니다.', 'success');
-    }, 300);
-  }, [showToast]);
+      const inputEl = document.getElementById('quick-inbox-input') as HTMLTextAreaElement | null;
+      if (inputEl) {
+        inputEl.focus();
+        inputEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }, 100);
+  };
+
+  // JSON 백업 다운로드
+  const handleExportJson = () => {
+    const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(
+      JSON.stringify({ projects, tasks, resources, lifeLogs }, null, 2)
+    );
+    const downloadAnchor = document.createElement('a');
+    downloadAnchor.setAttribute('href', dataStr);
+    downloadAnchor.setAttribute('download', `life_hub_backup_${new Date().toISOString().split('T')[0]}.json`);
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
+    setIsSaveMenuOpen(false);
+    showToast('라이프 Hub 데이터가 JSON 백업 파일로 내보내졌습니다.', 'success');
+  };
+
+  // 시드 데이터 초기화
+  const handleResetSeedData = () => {
+    if (window.confirm('기본 시드 데이터로 전체 초기화하시겠습니까?')) {
+      setProjects(INITIAL_LIFE_HUB_PROJECTS);
+      setTasks(INITIAL_LIFE_HUB_TASKS);
+      setResources(INITIAL_LIFE_HUB_RESOURCES);
+      setLifeLogs(INITIAL_LIFE_HUB_LOGS);
+      persistState(INITIAL_LIFE_HUB_PROJECTS, INITIAL_LIFE_HUB_TASKS, INITIAL_LIFE_HUB_RESOURCES, INITIAL_LIFE_HUB_LOGS);
+      setIsSaveMenuOpen(false);
+      showToast('라이프 Hub 데이터가 초기 시드로 복원되었습니다.', 'info');
+    }
+  };
 
   const isNotionConnected = Boolean(notionApiKey && (createdNotionResource || selectedNotionDbId));
 
-  // 4대 마스터 DB 탭 정의
-  const TABS: { 
-    id: LifeMasterTab; 
-    label: string; 
-    icon: React.FC<{ className?: string }>; 
-    countText: string;
-    badgeColor: string;
-  }[] = [
-    {
-      id: 'projects',
-      label: '1. 🚀 Projects DB',
-      icon: Rocket,
-      countText: `${resolvedProjects.length}개`,
-      badgeColor: 'bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300'
-    },
-    {
-      id: 'tasks',
-      label: '2. 🎯 Tasks & Habits DB',
-      icon: CheckSquare,
-      countText: `${resolvedTasks.filter(t => t.completed).length}/${resolvedTasks.length} 완료`,
-      badgeColor: 'bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300'
-    },
-    {
-      id: 'resources',
-      label: '3. 📚 Resources & Inbox DB',
-      icon: Inbox,
-      countText: `${resources.length}건`,
-      badgeColor: 'bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300'
-    },
-    {
-      id: 'lifelog',
-      label: '4. 📊 Life Log DB',
-      icon: Activity,
-      countText: `${lifeLogs.length}건`,
-      badgeColor: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300'
-    }
+  // 4대 뷰 모드 탭 목록
+  const VIEW_TABS = [
+    { id: 'morning_command' as ViewModeTab, label: '☀️ 모닝 커맨드 센터', icon: Sun },
+    { id: 'para_second_brain' as ViewModeTab, label: '🧠 PARA 세컨드 브레인', icon: Brain },
+    { id: 'smart_finance' as ViewModeTab, label: '💰 스마트 재정', icon: Coins },
+    { id: 'health_routine' as ViewModeTab, label: '🏃 건강 & 루틴', icon: Activity }
   ];
 
   return (
-    <div className="flex-1 flex flex-col h-full w-full overflow-y-auto bg-slate-50 dark:bg-notion-dark-bg text-slate-900 dark:text-slate-100 selection:bg-slate-200 dark:selection:bg-neutral-700 font-sans">
-      {/* 상단 서브 헤더 네비게이션 */}
-      <div className="sticky top-0 z-20 px-4 sm:px-8 py-3.5 border-b border-slate-200/90 dark:border-neutral-800 bg-white/95 dark:bg-notion-dark-bg/95 backdrop-blur-md flex flex-wrap items-center justify-between gap-3 shadow-xs">
-        <div className="flex items-center space-x-3">
+    <div className="flex-1 flex flex-col h-full w-full overflow-y-auto bg-[#fafafa] dark:bg-[#09090b] text-zinc-900 dark:text-zinc-100 font-sans selection:bg-blue-100 dark:selection:bg-blue-950">
+      {/* ─────────────────────────────────────────────────────────────────────────────
+          1. [상단 서브 컨트롤 바] - Google AI Studio & Linear 모노톤 스타일
+         ───────────────────────────────────────────────────────────────────────────── */}
+      <div className="sticky top-0 z-20 px-4 sm:px-8 py-3 border-b border-zinc-200/80 dark:border-white/10 bg-white/95 dark:bg-[#09090b]/95 backdrop-blur-md flex flex-wrap items-center justify-between gap-3 shadow-2xs">
+        {/* 좌측 뷰 모드 탭들 */}
+        <div className="flex items-center space-x-2 sm:space-x-3 overflow-x-auto scrollbar-none">
           <button
             onClick={() => setCurrentView('home')}
-            className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-neutral-800 hover:bg-slate-200 dark:hover:bg-neutral-700 text-slate-700 dark:text-neutral-300 text-xs font-semibold transition cursor-pointer whitespace-nowrap shadow-xs"
+            className="flex items-center space-x-1.5 px-2.5 py-1.5 rounded-xl bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 text-xs font-semibold transition cursor-pointer shrink-0"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
-            <span className="whitespace-nowrap">홈으로</span>
-          </button>
-          <div className="flex items-center space-x-2">
-            <span className="text-xl">🌿</span>
-            <div>
-              <div className="flex items-center space-x-2">
-                <h1 className="text-base sm:text-lg font-bold tracking-tight text-slate-900 dark:text-white whitespace-nowrap">
-                  라이프 Hub (Life Hub)
-                </h1>
-                <span className="px-2 py-0.5 text-[10px] font-bold rounded-md bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-200 dark:border-blue-800/40">
-                  PARA & GTD 4대 마스터 DB
-                </span>
-              </div>
-              <p className="text-[11px] text-slate-500 dark:text-neutral-400 whitespace-nowrap hidden sm:block">
-                Projects ↔ Tasks & Habits ↔ Resources & Inbox ↔ Life Log 유기적 양방향 관계형 및 Formulas 2.0 엔진
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* 컨트롤: 뷰 모드 토글 & 동기화 & 노션 연동 */}
-        <div className="flex items-center space-x-2">
-          {/* 탭 보기 vs 4분할 한눈에 보기 */}
-          <div className="flex items-center p-0.5 rounded-xl bg-slate-100 dark:bg-neutral-800 border border-slate-200 dark:border-neutral-700/60 shadow-xs">
-            <button
-              onClick={() => setViewMode('tabs')}
-              title="상단 탭 스위칭 보기"
-              className={`flex items-center space-x-1 px-2.5 py-1 rounded-lg text-xs font-semibold transition cursor-pointer whitespace-nowrap ${
-                viewMode === 'tabs'
-                  ? 'bg-white dark:bg-neutral-900 text-slate-900 dark:text-white shadow-xs'
-                  : 'text-slate-500 dark:text-neutral-400 hover:text-slate-900 dark:hover:text-white'
-              }`}
-            >
-              <Layers className="w-3.5 h-3.5" />
-              <span className="whitespace-nowrap">탭 보기</span>
-            </button>
-            <button
-              onClick={() => setViewMode('grid')}
-              title="4분할 그리드로 한눈에 보기"
-              className={`flex items-center space-x-1 px-2.5 py-1 rounded-lg text-xs font-semibold transition cursor-pointer whitespace-nowrap ${
-                viewMode === 'grid'
-                  ? 'bg-white dark:bg-neutral-900 text-slate-900 dark:text-white shadow-xs'
-                  : 'text-slate-500 dark:text-neutral-400 hover:text-slate-900 dark:hover:text-white'
-              }`}
-            >
-              <LayoutGrid className="w-3.5 h-3.5" />
-              <span className="whitespace-nowrap">4분할 한눈에</span>
-            </button>
-          </div>
-
-          <button
-            onClick={handleRefresh}
-            disabled={isLoading}
-            title="4대 마스터 DB 실시간 동기화"
-            className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-white dark:bg-neutral-800 hover:bg-slate-100 dark:hover:bg-neutral-700 text-slate-700 dark:text-neutral-300 border border-slate-200 dark:border-neutral-700 transition cursor-pointer disabled:opacity-50 whitespace-nowrap shadow-xs"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin text-blue-500' : ''}`} />
-            <span className="whitespace-nowrap">{isLoading ? '동기화 중...' : '실시간 동기화'}</span>
-            {lastSyncTime && <span className="text-[10px] text-slate-400 hidden sm:inline whitespace-nowrap">({lastSyncTime})</span>}
+            <span className="hidden sm:inline">홈으로</span>
           </button>
 
-          <button
-            onClick={() => setIsNotionSettingsModalOpen(true)}
-            title={isNotionConnected ? '노션 워크스페이스 연결됨' : '노션 연결 설정'}
-            className={`inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border cursor-pointer transition whitespace-nowrap shadow-xs ${
-              isNotionConnected
-                ? 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800/40'
-                : 'bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800/40'
-            }`}
-          >
-            <span className={`w-2 h-2 rounded-full ${isNotionConnected ? 'bg-emerald-500' : 'bg-amber-500'}`} />
-            <span className="whitespace-nowrap">{isNotionConnected ? '노션 연결됨' : '노션 연결 대기'}</span>
-          </button>
-        </div>
-      </div>
+          <div className="h-4 w-[1px] bg-zinc-200 dark:bg-zinc-800 hidden sm:block" />
 
-      {/* 메인 컨텐츠 컨테이너 */}
-      <div className="max-w-7xl mx-auto w-full p-4 sm:p-7 space-y-6">
-        {/* 상단 4대 마스터 DB 탭 네비게이션 */}
-        <div className="bg-slate-100/90 dark:bg-neutral-800/70 p-1.5 rounded-2xl border border-slate-200 dark:border-neutral-700/60 shadow-xs overflow-x-auto scrollbar-none">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 min-w-[560px] sm:min-w-0">
-            {TABS.map((tab) => {
+          {/* 4대 뷰 모드 토글 탭 */}
+          <div className="flex items-center space-x-1 p-0.5 rounded-xl bg-zinc-100 dark:bg-zinc-900 border border-zinc-200/80 dark:border-white/10">
+            {VIEW_TABS.map(tab => {
               const Icon = tab.icon;
-              const isActive = activeTab === tab.id && viewMode === 'tabs';
-
+              const isActive = activeTab === tab.id;
               return (
                 <button
                   key={tab.id}
-                  onClick={() => {
-                    setActiveTab(tab.id);
-                    setViewMode('tabs');
-                  }}
-                  className={`flex items-center justify-center space-x-2 py-2.5 px-3 min-h-[44px] rounded-xl text-xs sm:text-sm font-bold transition cursor-pointer whitespace-nowrap shrink-0 ${
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer whitespace-nowrap ${
                     isActive
-                      ? 'bg-white dark:bg-neutral-900 text-slate-900 dark:text-white shadow-sm border border-slate-200/80 dark:border-neutral-700'
-                      : 'text-slate-600 dark:text-neutral-400 hover:text-slate-900 dark:hover:text-white hover:bg-white/60 dark:hover:bg-neutral-800/60'
+                      ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-2xs'
+                      : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'
                   }`}
                 >
-                  <Icon className="w-4 h-4 shrink-0" />
-                  <span className="whitespace-nowrap">{tab.label}</span>
-                  <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-semibold border border-slate-200/60 dark:border-neutral-700/60 whitespace-nowrap ${tab.badgeColor}`}>
-                    {tab.countText}
-                  </span>
+                  <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-amber-500' : ''}`} />
+                  <span>{tab.label}</span>
                 </button>
               );
             })}
           </div>
         </div>
 
-        {/* 로딩 스켈레톤 (Fail-Fast 및 런타임 방어) */}
-        {isLoading ? (
-          <div className="p-8 space-y-4 rounded-2xl bg-white dark:bg-notion-dark-card border border-slate-200 dark:border-neutral-800 animate-pulse">
-            <div className="h-6 w-1/4 bg-slate-200 dark:bg-neutral-700 rounded-lg"></div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="h-36 bg-slate-100 dark:bg-neutral-800 rounded-xl"></div>
-              <div className="h-36 bg-slate-100 dark:bg-neutral-800 rounded-xl"></div>
-            </div>
-          </div>
-        ) : viewMode === 'tabs' ? (
-          /* [탭 보기] 모드 */
-          <div className="bg-white dark:bg-notion-dark-card rounded-2xl border border-slate-200 dark:border-neutral-800 p-5 sm:p-7 shadow-sm">
-            {activeTab === 'projects' && (
-              <ErrorBoundary fallbackTitle="Projects DB 모듈 로드 중 오류가 발생했습니다.">
-                <ProjectsMasterView
-                  projects={resolvedProjects}
-                  onToggleTask={handleToggleTask}
-                  onAddProject={handleAddProject}
-                  onDeleteProject={handleDeleteProject}
-                  onSelectProject={(id) => setSelectedProjectId(id)}
-                  selectedProjectId={selectedProjectId}
-                  isCompact={false}
-                />
-              </ErrorBoundary>
-            )}
+        {/* 우측 액션 툴바 */}
+        <div className="flex items-center space-x-2 shrink-0">
+          {/* [ ⚡ 1초 퀵 캡처 ] */}
+          <button
+            onClick={focusQuickInbox}
+            className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-blue-50 dark:bg-blue-950/60 hover:bg-blue-100 text-blue-700 dark:text-blue-300 border border-blue-200/80 dark:border-blue-800/60 transition cursor-pointer shadow-2xs"
+          >
+            <Zap className="w-3.5 h-3.5 fill-blue-500" />
+            <span>1초 퀵 캡처</span>
+          </button>
 
-            {activeTab === 'tasks' && (
-              <ErrorBoundary fallbackTitle="Tasks & Habits DB 모듈 로드 중 오류가 발생했습니다.">
-                <TasksHabitsMasterView
-                  tasks={resolvedTasks}
-                  projects={projects}
-                  onToggleTask={handleToggleTask}
-                  onAddTask={handleAddTask}
-                  onDeleteTask={handleDeleteTask}
-                  isCompact={false}
-                />
-              </ErrorBoundary>
-            )}
+          {/* [ 💾 저장 및 관리 ▼ (통합 드롭다운)] */}
+          <div className="relative">
+            <button
+              onClick={() => setIsSaveMenuOpen(!isSaveMenuOpen)}
+              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-200 border border-zinc-200/80 dark:border-zinc-700/60 transition cursor-pointer shadow-2xs"
+            >
+              <Save className="w-3.5 h-3.5" />
+              <span>저장 및 관리</span>
+              <ChevronDown className="w-3 h-3 text-zinc-400" />
+            </button>
 
-            {activeTab === 'resources' && (
-              <ErrorBoundary fallbackTitle="Resources & Inbox DB 모듈 로드 중 오류가 발생했습니다.">
-                <ResourcesInboxMasterView
-                  resources={resources}
-                  projects={projects}
-                  onToggleStatus={handleToggleResourceStatus}
-                  onAddResource={handleAddResource}
-                  onDeleteResource={handleDeleteResource}
-                  isCompact={false}
-                />
-              </ErrorBoundary>
-            )}
-
-            {activeTab === 'lifelog' && (
-              <ErrorBoundary fallbackTitle="Life Log DB 모듈 로드 중 오류가 발생했습니다.">
-                <LifeLogMasterView
-                  logs={lifeLogs}
-                  onAddLog={handleAddLifeLog}
-                  onDeleteLog={handleDeleteLifeLog}
-                  isCompact={false}
-                />
-              </ErrorBoundary>
+            {isSaveMenuOpen && (
+              <div className="absolute right-0 mt-1.5 w-48 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xl p-1.5 z-40 space-y-1">
+                <button
+                  onClick={handleExportJson}
+                  className="w-full flex items-center space-x-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition text-left cursor-pointer"
+                >
+                  <Download className="w-3.5 h-3.5 text-blue-500" />
+                  <span>JSON 데이터 백업</span>
+                </button>
+                <button
+                  onClick={handleResetSeedData}
+                  className="w-full flex items-center space-x-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition text-left cursor-pointer"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span>초기 시드 데이터 복원</span>
+                </button>
+              </div>
             )}
           </div>
-        ) : (
-          /* [4분할 한눈에 보기 (2x2 그리드)] 모드 */
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-            {/* 1. Projects DB */}
-            <div className="bg-white dark:bg-notion-dark-card rounded-2xl border border-slate-200 dark:border-neutral-800 p-4 sm:p-5 shadow-sm flex flex-col h-[650px] max-h-[650px] overflow-hidden">
-              <div className="flex-1 overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-neutral-700">
-                <ErrorBoundary fallbackTitle="Projects DB 로드 중 오류">
-                  <ProjectsMasterView
-                    projects={resolvedProjects}
-                    onToggleTask={handleToggleTask}
-                    onAddProject={handleAddProject}
-                    onDeleteProject={handleDeleteProject}
-                    onSelectProject={(id) => setSelectedProjectId(id)}
-                    selectedProjectId={selectedProjectId}
-                    isCompact={true}
-                  />
-                </ErrorBoundary>
-              </div>
-            </div>
 
-            {/* 2. Tasks & Habits DB */}
-            <div className="bg-white dark:bg-notion-dark-card rounded-2xl border border-slate-200 dark:border-neutral-800 p-4 sm:p-5 shadow-sm flex flex-col h-[650px] max-h-[650px] overflow-hidden">
-              <div className="flex-1 overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-neutral-700">
-                <ErrorBoundary fallbackTitle="Tasks & Habits DB 로드 중 오류">
-                  <TasksHabitsMasterView
-                    tasks={resolvedTasks}
-                    projects={projects}
-                    onToggleTask={handleToggleTask}
-                    onAddTask={handleAddTask}
-                    onDeleteTask={handleDeleteTask}
-                    isCompact={true}
-                  />
-                </ErrorBoundary>
-              </div>
-            </div>
+          {/* [ ⚡ 노션에 바로 배포 ] */}
+          <button
+            onClick={() => setIsNotionSettingsModalOpen(true)}
+            className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 hover:opacity-90 transition cursor-pointer shadow-xs"
+          >
+            <Send className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">노션에 바로 배포</span>
+            <span className="sm:hidden">배포</span>
+          </button>
 
-            {/* 3. Resources & Inbox DB */}
-            <div className="bg-white dark:bg-notion-dark-card rounded-2xl border border-slate-200 dark:border-neutral-800 p-4 sm:p-5 shadow-sm flex flex-col h-[650px] max-h-[650px] overflow-hidden">
-              <div className="flex-1 overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-neutral-700">
-                <ErrorBoundary fallbackTitle="Resources & Inbox DB 로드 중 오류">
-                  <ResourcesInboxMasterView
-                    resources={resources}
-                    projects={projects}
-                    onToggleStatus={handleToggleResourceStatus}
-                    onAddResource={handleAddResource}
-                    onDeleteResource={handleDeleteResource}
-                    isCompact={true}
-                  />
-                </ErrorBoundary>
-              </div>
-            </div>
-
-            {/* 4. Life Log DB */}
-            <div className="bg-white dark:bg-notion-dark-card rounded-2xl border border-slate-200 dark:border-neutral-800 p-4 sm:p-5 shadow-sm flex flex-col h-[650px] max-h-[650px] overflow-hidden">
-              <div className="flex-1 overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-neutral-700">
-                <ErrorBoundary fallbackTitle="Life Log DB 로드 중 오류">
-                  <LifeLogMasterView
-                    logs={lifeLogs}
-                    onAddLog={handleAddLifeLog}
-                    onDeleteLog={handleDeleteLifeLog}
-                    isCompact={true}
-                  />
-                </ErrorBoundary>
-              </div>
-            </div>
-          </div>
-        )}
+          {/* 노션 연결 상태 뱃지 */}
+          <button
+            onClick={() => setIsNotionSettingsModalOpen(true)}
+            title={isNotionConnected ? '노션 연결됨' : '노션 연결 설정'}
+            className={`hidden sm:inline-flex items-center space-x-1 px-2.5 py-1.5 rounded-xl text-[11px] font-semibold border cursor-pointer transition shadow-2xs ${
+              isNotionConnected
+                ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800/40'
+                : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 border-zinc-200 dark:border-zinc-700'
+            }`}
+          >
+            <span className={`w-1.5 h-1.5 rounded-full ${isNotionConnected ? 'bg-emerald-500' : 'bg-zinc-400'}`} />
+            <span>{isNotionConnected ? '연결됨' : '미연결'}</span>
+          </button>
+        </div>
       </div>
+
+      {/* ─────────────────────────────────────────────────────────────────────────────
+          메인 바디 캔버스
+         ───────────────────────────────────────────────────────────────────────────── */}
+      <div className="flex-1 max-w-7xl mx-auto w-full p-4 sm:p-7 space-y-6 pb-20">
+        <ErrorBoundary fallbackTitle="라이프 Hub 화면 로드 중 오류가 발생했습니다.">
+          {isLoading ? (
+            /* 스켈레톤 로더 */
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 animate-pulse">
+              <div className="lg:col-span-4 space-y-4">
+                <div className="h-44 rounded-2xl bg-zinc-200/70 dark:bg-zinc-800" />
+                <div className="h-52 rounded-2xl bg-zinc-200/70 dark:bg-zinc-800" />
+              </div>
+              <div className="lg:col-span-8 space-y-4">
+                <div className="h-96 rounded-2xl bg-zinc-200/70 dark:bg-zinc-800" />
+              </div>
+            </div>
+          ) : activeTab === 'morning_command' ? (
+            /* ☀️ [1. 모닝 커맨드 센터] - 2열 벤토 그리드 조종석 캔버스 (좌측 35% / 우측 65%) */
+            <CockpitMorningCommandCenter
+              projects={resolvedProjects}
+              tasks={resolvedTasks}
+              resources={resources}
+              onToggleTask={handleToggleTask}
+              onAddResource={handleQuickCapture}
+              onAddProject={() => setActiveTab('para_second_brain')}
+            />
+          ) : activeTab === 'para_second_brain' ? (
+            /* 🧠 [2. PARA 세컨드 브레인] - Projects & Resources 매트릭스 뷰 */
+            <div className="space-y-5">
+              <ProjectsMasterView
+                projects={resolvedProjects}
+                onToggleTask={handleToggleTask}
+                onAddProject={handleAddProject}
+                onDeleteProject={handleDeleteProject}
+              />
+              <ResourcesInboxMasterView
+                resources={resources}
+                projects={projects}
+                onToggleStatus={handleToggleResourceStatus}
+                onAddResource={handleAddResource}
+                onDeleteResource={handleDeleteResource}
+              />
+            </div>
+          ) : activeTab === 'smart_finance' ? (
+            /* 💰 [3. 스마트 재정] - Life Log 가계부 & 소비 지출 분석 */
+            <div className="space-y-5">
+              <LifeLogMasterView
+                logs={lifeLogs}
+                onAddLog={handleAddLifeLog}
+                onDeleteLog={handleDeleteLifeLog}
+              />
+            </div>
+          ) : (
+            /* 🏃 [4. 건강 & 루틴] - 모닝 루틴 & 해빗 & 운동/수면 로깅 */
+            <div className="space-y-5">
+              <TasksHabitsMasterView
+                tasks={resolvedTasks}
+                projects={projects}
+                onToggleTask={handleToggleTask}
+                onAddTask={handleAddTask}
+                onDeleteTask={handleDeleteTask}
+              />
+              <LifeLogMasterView
+                logs={lifeLogs.filter(l => l.category === '운동' || l.category === '수면')}
+                onAddLog={handleAddLifeLog}
+                onDeleteLog={handleDeleteLifeLog}
+              />
+            </div>
+          )}
+        </ErrorBoundary>
+      </div>
+
+
+      {/* ─────────────────────────────────────────────────────────────────────────────
+          4. [하단 인텔리전스 독] - 2026 자율 AI 에이전트 브리핑 바
+         ───────────────────────────────────────────────────────────────────────────── */}
+      <IntelligenceDock inboxCount={resources.filter(r => r.status === '인박스').length} />
     </div>
   );
 };
