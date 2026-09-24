@@ -178,8 +178,12 @@ async function callDirectGeminiVisionOrchestrator(
    - 절대로 기존 DB 이름이나 기존 이모지 앞에 새 이모지를 중복해서 덧붙이지 마십시오!
    - 기존 DB 이름의 선행 이모지나 특수기호를 완전히 제거하고 순수 텍스트 제목만 유지하십시오. (예: "📋 프로젝트 관리" -> "프로젝트 관리")
    - DB 객체의 "icon" 필드에 요청된 새 이모지(예: "⭐")를 단독 설정하여 깨끗하게 대체(Replace)하십시오.
-4. 일반 대화인 경우:
+4. 라이프 허브(LIFE) 관련 지시인 경우:
+   - 사용자가 일정/할일/습관/지출/메모/프로젝트 등 라이프 허브 관련 질의나 등록을 요청한 경우:
+   - "intent": "LIFE", "redirect_url": "/life-hub"로 설정하고, 4대 마스터 DB(Projects, Tasks & Habits, Resources & Inbox, Life Log) 간 상호 양방향 관계형 및 Formulas 2.0(진척률 게이지 바 ■■■■■■■■□□, D-Day 태그, 루틴 스트릭)을 연계하여 응답하십시오.
+5. 일반 대화인 경우:
    - "intent": "CHAT", "reply_message": "답변", "payload": null 로 응답하십시오.`;
+
 
   // 멀티모달 parts 조립
   const userParts: any[] = [];

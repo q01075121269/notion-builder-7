@@ -316,3 +316,13 @@ export const ALL_MASTER_SCHEMAS: MasterDbSchema[] = [
   MEDIA_SCRAP_DB_SCHEMA,
   AGENT_HEARTBEAT_LOG_DB_SCHEMA
 ];
+
+// 4대 마스터 DB 스키마 (Projects, Tasks & Habits, Resources & Inbox, Life Log)
+export {
+  NOTION_PROJECTS_DB_SCHEMA,
+  NOTION_TASKS_HABITS_DB_SCHEMA,
+  NOTION_RESOURCES_INBOX_DB_SCHEMA,
+  NOTION_LIFE_LOG_DB_SCHEMA,
+  LIFE_HUB_4_MASTER_SCHEMAS
+} from './lifeHubMasterEngine';
+
