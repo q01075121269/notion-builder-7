@@ -1720,12 +1720,6 @@ export const OmniChatBar: React.FC = () => {
             </button>
           )}
         </div>
-
-        {/* 안내 텍스트 */}
-        <p className="mt-1.5 px-1 text-[10px] text-neutral-400 dark:text-neutral-500 flex items-center space-x-1">
-          <Sparkles className="w-2.5 h-2.5 text-amber-400 shrink-0" />
-          <span>옴니 챗 — 템플릿 빌더 · 라이프 허브 · 오피스 스튜디오를 말 한마디로 통합 제어</span>
-        </p>
       </div>
     </div>
   );
