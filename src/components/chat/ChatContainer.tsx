@@ -141,7 +141,7 @@ export const ChatContainer: React.FC = () => {
                   선택된 템플릿 스키마가 없습니다.
                 </p>
                 <p className="text-[10px] text-neutral-400">
-                  상단 TOP 10 큐레이션을 클릭하거나 하단 옴니 챗에 템플릿 작성을 명령해 보세요!
+                  상단 TOP 10 큐레이션을 클릭하거나 하단 노아(NOA) 챗에 템플릿 작성을 명령해 보세요!
                 </p>
               </div>
             )}
@@ -150,10 +150,10 @@ export const ChatContainer: React.FC = () => {
 
       </div>
 
-      {/* 하단 안내 패널 (OmniChat 안내) */}
+      {/* 하단 안내 패널 (노아(NOA) 챗 안내) */}
       <div className="p-3 bg-white dark:bg-notion-dark-bg border-t border-neutral-200/80 dark:border-notion-dark-border shrink-0">
         <p className="text-[11px] text-neutral-500 dark:text-neutral-400 text-center leading-normal">
-          💡 커스텀 템플릿 설계는 하단 <span className="font-bold text-amber-500">옴니 챗</span>에 <b>"~템플릿 만들어줘"</b>를 요청하세요.
+          💡 커스텀 템플릿 설계는 하단 <span className="font-bold text-amber-500">노아(NOA) 챗</span>에 <b>"~템플릿 만들어줘"</b>를 요청하세요.
         </p>
       </div>
 

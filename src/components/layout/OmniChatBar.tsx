@@ -122,28 +122,28 @@ const CHAT_MODES: ChatModeConfig[] = [
     key: 'builder',
     label: '템플릿 마스터',
     emoji: '🏗️',
-    placeholder: '어떤 업무를 위한 노션 템플릿을 만들어 드릴까요? (예: 아덴힐 시설관리, 분기 OKR 기획)',
+    placeholder: '노아(NOA)에게 어떤 업무를 도와드릴지 편하게 말씀해 주세요...',
     activeClass: 'bg-amber-500/20 border-amber-500/50 text-amber-800 dark:text-amber-200 font-bold shadow-xs',
   },
   {
     key: 'life',
     label: '라이프 비서',
     emoji: '👔',
-    placeholder: '일정이나 할 일을 말씀해 주세요. (예: 내일 오후 3시 디자인 미팅 등록해 줘, 오늘 점심 15,000원)',
+    placeholder: '노아(NOA)에게 어떤 업무를 도와드릴지 편하게 말씀해 주세요...',
     activeClass: 'bg-emerald-500/20 border-emerald-500/50 text-emerald-800 dark:text-emerald-200 font-bold shadow-xs',
   },
   {
     key: 'devlab',
     label: '오피스 스튜디오',
     emoji: '📄',
-    placeholder: '작성할 문서나 기획서 주제를 입력하세요. (예: 신규 사업 제안서 개요 작성, 주간 회고록)',
+    placeholder: '노아(NOA)에게 어떤 업무를 도와드릴지 편하게 말씀해 주세요...',
     activeClass: 'bg-blue-500/20 border-blue-500/50 text-blue-800 dark:text-blue-200 font-bold shadow-xs',
   },
   {
     key: 'media_lab',
     label: 'AI 미디어 랩',
     emoji: '🎨',
-    placeholder: '생성할 이미지나 사운드 프롬프트를 입력하세요. (예: 미니멀 테크 데스크 커버, 팟캐스트 인트로 BGM)',
+    placeholder: '노아(NOA)에게 어떤 업무를 도와드릴지 편하게 말씀해 주세요...',
     activeClass: 'bg-purple-500/20 border-purple-500/50 text-purple-800 dark:text-purple-200 font-bold shadow-xs',
   },
 ];
@@ -1141,7 +1141,7 @@ export const OmniChatBar: React.FC = () => {
               <div className="w-5 h-5 rounded-lg bg-gradient-to-tr from-amber-500 via-emerald-500 to-indigo-600 flex items-center justify-center">
                 <Bot className="w-3 h-3 text-white" />
               </div>
-              <span className="text-xs font-bold text-neutral-800 dark:text-neutral-200">옴니 챗 기록</span>
+              <span className="text-xs font-bold text-neutral-800 dark:text-neutral-200">노아(NOA) 챗 기록</span>
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
             </div>
             <div className="flex items-center space-x-1">

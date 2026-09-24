@@ -299,15 +299,16 @@ export async function POST(req: Request): Promise<Response> {
     const apiKey = 
       req.headers.get('x-gemini-api-key') || 
       process.env.GEMINI_API_KEY || 
-      process.env.VITE_GEMINI_API_KEY || 
       '';
 
-    let result: OrchestratorResponse;
-    if (apiKey) {
-      result = await callGeminiForOrchestrator(userText, history, apiKey);
-    } else {
-      result = fallbackRuleBasedOrchestrator(userText, 'API_KEY_MISSING');
+    if (!apiKey) {
+      return new Response(
+        JSON.stringify({ error: '노아(NOA)를 구동하기 위한 Gemini API 키가 없습니다. 우측 상단 [설정]에서 API 키를 먼저 등록해 주세요.' }),
+        { status: 401, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } }
+      );
     }
+
+    const result = await callGeminiForOrchestrator(userText, history, apiKey);
 
     return new Response(JSON.stringify(result), {
       status: 200,
@@ -376,15 +377,13 @@ export default async function handler(req: any, res: any) {
     const apiKey = 
       req.headers['x-gemini-api-key'] || 
       process.env.GEMINI_API_KEY || 
-      process.env.VITE_GEMINI_API_KEY || 
       '';
 
-    let result: OrchestratorResponse;
-    if (apiKey) {
-      result = await callGeminiForOrchestrator(userText, history, apiKey);
-    } else {
-      result = fallbackRuleBasedOrchestrator(userText, 'API_KEY_MISSING');
+    if (!apiKey) {
+      return res.status(401).json({ error: '노아(NOA)를 구동하기 위한 Gemini API 키가 없습니다. 우측 상단 [설정]에서 API 키를 먼저 등록해 주세요.' });
     }
+
+    const result = await callGeminiForOrchestrator(userText, history, apiKey);
 
     return res.status(200).json(result);
   } catch (err: any) {

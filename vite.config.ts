@@ -14,6 +14,79 @@ function geminiApiProxyPlugin(): Plugin {
     },
     configureServer(server) {
       server.middlewares.use(async (req, res, next) => {
+        if (req.url && req.url.startsWith('/api/auth/health')) {
+          let bodyBuffer = ''
+          req.on('data', (chunk) => {
+            bodyBuffer += chunk
+          })
+          req.on('end', async () => {
+            let bodyObj: any = {}
+            try {
+              if (bodyBuffer) bodyObj = JSON.parse(bodyBuffer)
+            } catch (e) {}
+
+            const geminiApiKey =
+              (req.headers['x-gemini-api-key'] as string) ||
+              bodyObj.geminiApiKey ||
+              env.GEMINI_API_KEY ||
+              process.env.GEMINI_API_KEY ||
+              ''
+            const notionApiKey =
+              (req.headers['x-notion-api-key'] as string) ||
+              bodyObj.notionApiKey ||
+              env.NOTION_API_KEY ||
+              process.env.NOTION_API_KEY ||
+              ''
+
+            let geminiResult = { ok: false, message: '🔴 인증 실패 (키를 다시 확인해 주세요)' }
+            let notionResult = { ok: false, message: '🔴 인증 실패 (키를 다시 확인해 주세요)' }
+
+            // 1. Gemini Check
+            if (geminiApiKey) {
+              try {
+                const gRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${geminiApiKey}`)
+                if (gRes.ok) {
+                  geminiResult = { ok: true, message: '🟢 노아 AI 연동 완료' }
+                } else {
+                  const errData: any = await gRes.json().catch(() => ({}))
+                  geminiResult = { ok: false, message: `🔴 인증 실패: ${errData.error?.message || gRes.statusText}` }
+                }
+              } catch (err: any) {
+                geminiResult = { ok: false, message: `🔴 인증 실패 (네트워크 오류: ${err.message})` }
+              }
+            } else {
+              geminiResult = { ok: false, message: '🔴 인증 실패 (Gemini API 키가 설정되지 않음)' }
+            }
+
+            // 2. Notion Check
+            if (notionApiKey) {
+              try {
+                const nRes = await fetch('https://api.notion.com/v1/users/me', {
+                  headers: {
+                    'Authorization': `Bearer ${notionApiKey}`,
+                    'Notion-Version': '2022-06-28',
+                  },
+                })
+                if (nRes.ok) {
+                  notionResult = { ok: true, message: '🟢 Notion API 연동 완료' }
+                } else {
+                  const errData: any = await nRes.json().catch(() => ({}))
+                  notionResult = { ok: false, message: `🔴 인증 실패: ${errData.message || nRes.statusText}` }
+                }
+              } catch (err: any) {
+                notionResult = { ok: false, message: `🔴 인증 실패 (네트워크 오류: ${err.message})` }
+              }
+            } else {
+              notionResult = { ok: false, message: '🔴 인증 실패 (Notion API 키가 설정되지 않음)' }
+            }
+
+            res.statusCode = 200
+            res.setHeader('Content-Type', 'application/json')
+            res.end(JSON.stringify({ gemini: geminiResult, notion: notionResult }))
+          })
+          return
+        }
+
         if (req.url && req.url.startsWith('/api/gemini')) {
           const urlObj = new URL(req.url, 'http://localhost:5173')
           const rawModel = urlObj.searchParams.get('model') || 'gemini-1.5-flash'

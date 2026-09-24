@@ -130,14 +130,14 @@ export const HomePage: React.FC = () => {
               Notion AI Master Workspace <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-500 via-emerald-500 to-blue-600">v2.0</span>
             </h1>
             <p className="text-xs sm:text-sm text-neutral-600 dark:text-neutral-400 max-w-3xl leading-relaxed">
-              최하단 중앙 옴니바(Omni-Chat)를 통해 어떤 지시든 음성/텍스트로 입력하면 4대 전문 챕터 작업실로 자동 분류 처리됩니다.
+              최하단 중앙 노아(NOA) 챗을 통해 어떤 지시든 음성/텍스트로 입력하면 4대 전문 챕터 작업실로 자동 분류 처리됩니다.
             </p>
           </div>
 
           <div className="shrink-0 flex items-center space-x-2">
             <span className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-neutral-800 text-slate-700 dark:text-slate-300 text-xs font-medium border border-slate-200 dark:border-neutral-700">
               <Zap className="w-4 h-4 text-amber-500" />
-              <span>하단 옴니바 활성화됨</span>
+              <span>하단 노아(NOA) 챗 활성화됨</span>
             </span>
           </div>
         </div>
@@ -219,10 +219,10 @@ export const HomePage: React.FC = () => {
             </div>
             <div>
               <h4 className="text-sm font-bold text-neutral-900 dark:text-white">
-                💡 언제든 최하단 옴니바(Omni-Chat)로 통합 지시 가능
+                💡 언제든 최하단 노아(NOA) 챗으로 통합 지시 가능
               </h4>
               <p className="text-xs text-neutral-500 dark:text-neutral-400">
-                어느 페이지에서나 화면 최하단 옴니바에 음성이나 텍스트를 입력하면 AI 오케스트레이터가 자동으로 알맞은 챕터 작업실을 업데이트합니다.
+                어느 페이지에서나 화면 최하단 노아(NOA) 챗에 음성이나 텍스트를 입력하면 AI 오케스트레이터가 자동으로 알맞은 챕터 작업실을 업데이트합니다.
               </p>
             </div>
           </div>

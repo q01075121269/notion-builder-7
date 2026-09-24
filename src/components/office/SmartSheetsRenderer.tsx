@@ -234,7 +234,7 @@ export const SmartSheetsRenderer: React.FC<SmartSheetsRendererProps> = ({
                     표시할 수집 시트 데이터가 없습니다.
                   </p>
                   <p className="text-[11px] text-slate-400">
-                    상단 '➕ 행 추가' 버튼을 누르시거나 옴니챗으로 크롤링 요청을 입력해주세요.
+                    상단 '➕ 행 추가' 버튼을 누르시거나 노아(NOA) 챗으로 크롤링 요청을 입력해주세요.
                   </p>
                 </td>
               </tr>

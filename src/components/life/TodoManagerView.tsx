@@ -672,11 +672,11 @@ export const TodoManagerView: React.FC<TodoManagerViewProps> = ({
             </button>
             <button
               onClick={handleGuideOmniChat}
-              title="하단 옴니 챗에 말 한마디로 할 일 등록"
+              title="하단 노아(NOA) 챗에 말 한마디로 할 일 등록"
               className="inline-flex items-center space-x-1.5 px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold transition shadow-xs whitespace-nowrap cursor-pointer"
             >
               <Plus className="w-3.5 h-3.5" />
-              <span>옴니 챗으로 등록</span>
+              <span>노아 챗으로 등록</span>
             </button>
           </div>
         </div>

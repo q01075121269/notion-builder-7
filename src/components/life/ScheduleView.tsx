@@ -497,7 +497,7 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
 
           <button
             onClick={() => handleGuideOmniChat(selectedYMD)}
-            title="하단 옴니 챗에 날짜 템플릿과 함께 즉시 타이핑하여 일정 등록"
+            title="하단 노아(NOA) 챗에 날짜 템플릿과 함께 즉시 타이핑하여 일정 등록"
             className={`flex items-center space-x-1.5 ${isCompact ? 'px-2 py-1 text-[11px]' : 'px-3 py-1.5 text-xs'} rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold transition shadow-xs whitespace-nowrap cursor-pointer`}
           >
             <span className="text-xs">💬</span>
@@ -513,7 +513,7 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
               이 날짜에 예정된 일정이 없습니다.
             </h4>
             <p className="text-xs text-slate-500 dark:text-neutral-400 mt-1">
-              하단 옴니 챗에 "9월 20일 15시 팀 회의 일정 등록해 줘"라고 편하게 말해보세요!
+              하단 노아(NOA) 챗에 "9월 20일 15시 팀 회의 일정 등록해 줘"라고 편하게 말해보세요!
             </p>
           </div>
         ) : (
@@ -679,10 +679,10 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
           </button>
         </div>
 
-        {/* 우측 액션: 하단 옴니 챗으로 자연어 일정 등록 */}
+        {/* 우측 액션: 하단 노아(NOA) 챗으로 자연어 일정 등록 */}
         <button
           onClick={() => handleGuideOmniChat()}
-          title="하단 옴니 챗에 텍스트를 바로 입력하여 일정 등록"
+          title="하단 노아(NOA) 챗에 텍스트를 바로 입력하여 일정 등록"
           className={`flex items-center space-x-1.5 ${isCompact ? 'px-2.5 py-1' : 'px-3.5 py-1.5'} rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs transition cursor-pointer whitespace-nowrap`}
         >
           <span className="text-xs">💬</span>

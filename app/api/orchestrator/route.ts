@@ -925,12 +925,16 @@ export async function POST(req: Request): Promise<Response> {
     const apiKey =
       req.headers.get('x-gemini-api-key') ||
       process.env.GEMINI_API_KEY ||
-      process.env.VITE_GEMINI_API_KEY ||
       '';
 
-    const result = apiKey
-      ? await callGeminiWithFunctions(userText, history, apiKey)
-      : localHeuristicFallback(userText);
+    if (!apiKey) {
+      return new Response(
+        JSON.stringify({ error: '노아(NOA)를 구동하기 위한 Gemini API 키가 없습니다. 우측 상단 [설정]에서 API 키를 먼저 등록해 주세요.' }),
+        { status: 401, headers: CORS_HEADERS }
+      );
+    }
+
+    const result = await callGeminiWithFunctions(userText, history, apiKey);
 
     return new Response(JSON.stringify(result), { status: 200, headers: CORS_HEADERS });
   } catch (err: unknown) {
@@ -938,8 +942,7 @@ export async function POST(req: Request): Promise<Response> {
     console.error('[Orchestrator POST] Unexpected error:', msg);
     return new Response(
       JSON.stringify({
-        error: '오케스트레이터 처리 중 오류가 발생했습니다: ' + msg,
-        fallback: buildErrorFallback('일시적 오류가 발생했습니다. 잠시 후 다시 시도해주세요.'),
+        error: '오케스트레이터 처리 중 오류가 발생했습니다: ' + msg
       }),
       { status: 500, headers: CORS_HEADERS }
     );
@@ -977,12 +980,13 @@ export default async function handler(req: {
     const apiKey =
       req.headers['x-gemini-api-key'] ||
       process.env.GEMINI_API_KEY ||
-      process.env.VITE_GEMINI_API_KEY ||
       '';
 
-    const result = apiKey
-      ? await callGeminiWithFunctions(userText, history, apiKey)
-      : localHeuristicFallback(userText);
+    if (!apiKey) {
+      return res.status(401).json({ error: '노아(NOA)를 구동하기 위한 Gemini API 키가 없습니다. 우측 상단 [설정]에서 API 키를 먼저 등록해 주세요.' });
+    }
+
+    const result = await callGeminiWithFunctions(userText, history, apiKey);
 
     return res.status(200).json(result);
   } catch (err: unknown) {

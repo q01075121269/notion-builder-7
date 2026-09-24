@@ -4,10 +4,13 @@
 import type { AIPluginRequest } from '../types';
 import type { GeminiConversationResponse } from '../../types/notion';
 import { MASTER_SYSTEM_PROMPT } from './geminiPrompts';
-import { generateLocalFallbackResponse } from '../../services/localTemplateFallback';
 
 export async function executeGeminiCall(req: AIPluginRequest): Promise<GeminiConversationResponse> {
-  const apiKey = (req.apiKey || '').trim();
+  const apiKey = (req.apiKey || (typeof window !== 'undefined' ? localStorage.getItem('gemini_api_key') || '' : '')).trim();
+  if (!apiKey) {
+    throw new Error("노아(NOA)를 구동하기 위한 Gemini API 키가 없습니다. 우측 상단 [설정]에서 API 키를 먼저 등록해 주세요.");
+  }
+
   const model = req.options?.model || 'gemini-2.5-flash';
   const targetModel = model.replace(/^models\//, '').trim();
 
@@ -46,6 +49,8 @@ export async function executeGeminiCall(req: AIPluginRequest): Promise<GeminiCon
     new Set([targetModel, 'gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'])
   );
 
+  let lastErrMessage = '';
+
   for (const m of candidateModels) {
     try {
       // 1. 프록시 호출 (/api/gemini)
@@ -72,14 +77,19 @@ export async function executeGeminiCall(req: AIPluginRequest): Promise<GeminiCon
           const parsed = parseGeminiOutput(rawText);
           return parsed;
         }
+      } else if (res) {
+        const errJson: any = await res.json().catch(() => ({}));
+        if (errJson?.error) {
+          lastErrMessage = typeof errJson.error === 'string' ? errJson.error : errJson.error.message;
+        }
       }
-    } catch (e) {
+    } catch (e: any) {
       console.warn(`[GeminiExecutor] 모델 '${m}' 시도 실패:`, e);
+      lastErrMessage = e.message;
     }
   }
 
-  console.warn('[GeminiExecutor] 모든 Gemini 모델 통신 실패 -> Fail-Fast & Honest 정책에 따라 정직한 안내 메시지 반환');
-  return generateLocalFallbackResponse(req.prompt, req.currentTemplate || null);
+  throw new Error(lastErrMessage || 'Gemini API 호출에 실패했습니다. 키 유효성 및 네트워크 상태를 확인해 주세요.');
 }
 
 function parseGeminiOutput(rawText: string): GeminiConversationResponse {

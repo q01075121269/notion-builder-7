@@ -263,8 +263,8 @@ export function buildDynamicDatabases(title: string, description?: string): Noti
         { name: 'Verified', type: 'checkbox' }
       ],
       sample_rows: [
-        { '항목명': `${cleanTitle} 1단계 실행 계획 수립`, '진행상태': '완료', '우선순위': '높음 (P1)', 'Quality_Status': '승인', 'Verified': true },
-        { '항목명': `${cleanTitle} 2단계 모니터링 및 모듈 적용`, '진행상태': '진행중', '우선순위': '보통 (P2)', 'Quality_Status': '검수중', 'Verified': false }
+        { '항목명': `${cleanTitle} 기획 수립`, '진행상태': '완료', '우선순위': '높음 (P1)', 'Quality_Status': '승인', 'Verified': true },
+        { '항목명': `${cleanTitle} 모니터링 적용`, '진행상태': '진행중', '우선순위': '보통 (P2)', 'Quality_Status': '검수중', 'Verified': false }
       ]
     },
     {
@@ -286,8 +286,8 @@ export function buildDynamicDatabases(title: string, description?: string): Noti
         { name: 'Verified', type: 'checkbox' }
       ],
       sample_rows: [
-        { '작업명': `${cleanTitle} 초기 환경 설정 및 데이터 세팅`, '우선순위': '긴급 (P1)', '상태': '진행중', 'Quality_Status': '검수중', 'Verified': false },
-        { '작업명': `${cleanTitle} 데이터 검수 기준표 문서화`, '우선순위': '중요 (P2)', '상태': '완료', 'Quality_Status': '승인', 'Verified': true }
+        { '작업명': `${cleanTitle} 환경 설정`, '우선순위': '긴급 (P1)', '상태': '진행중', 'Quality_Status': '검수중', 'Verified': false },
+        { '작업명': `${cleanTitle} 데이터 검수`, '우선순위': '중요 (P2)', '상태': '완료', 'Quality_Status': '승인', 'Verified': true }
       ]
     },
     {

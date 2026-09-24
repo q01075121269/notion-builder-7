@@ -370,11 +370,11 @@ export const ExpenseAnalyticsView: React.FC<ExpenseAnalyticsViewProps> = ({
           {!isCompact && (
             <button
               onClick={handleGuideOmniChat}
-              title="하단 옴니 챗에 말 한마디로 지출 기록"
+              title="하단 노아(NOA) 챗에 말 한마디로 지출 기록"
               className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-white dark:bg-neutral-800 hover:bg-slate-50 dark:hover:bg-neutral-700 text-slate-700 dark:text-neutral-200 border border-slate-200 dark:border-neutral-700 text-xs font-semibold shadow-xs transition cursor-pointer active:scale-95 whitespace-nowrap"
             >
               <Zap className="w-3.5 h-3.5 text-emerald-500" />
-              <span className="whitespace-nowrap hidden sm:inline">옴니 챗 지출 기록</span>
+              <span className="whitespace-nowrap hidden sm:inline">노아 챗 지출 기록</span>
             </button>
           )}
 
