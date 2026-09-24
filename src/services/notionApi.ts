@@ -594,7 +594,7 @@ async function insertSampleRows(
         // 2차 Fallback: Status 옵션 오류 가능성 방어 (Status 제외하고 Title + Date + Number + RichText 조합)
         const safeProps = { ...rowProperties };
         // Status 속성 제거 후 시도
-        db.properties.filter(p => p.type === 'status').forEach(p => {
+        (Array.isArray(db.properties) ? db.properties : []).filter(p => p.type === 'status').forEach(p => {
           delete safeProps[p.name];
         });
 

@@ -1,6 +1,7 @@
 import React from 'react';
 import type { NotionTemplate } from '../../types/notion';
 import { Database, Layers, FunctionSquare, Calendar, ArrowUpRight, Tag, Type } from 'lucide-react';
+import { getSafeProperties } from './NotionDatabaseView';
 
 export const StructureTreeView: React.FC<{ template: NotionTemplate }> = ({ template }) => {
   return (
@@ -31,13 +32,13 @@ export const StructureTreeView: React.FC<{ template: NotionTemplate }> = ({ temp
           <div className="p-3 bg-white dark:bg-notion-dark-card rounded-xl border border-neutral-200/60 dark:border-neutral-700/60 text-center">
             <span className="text-xs text-neutral-400 block">캘린더 연동</span>
             <span className="text-lg font-bold text-amber-600 dark:text-amber-400">
-              {template.databases.some(d => d.properties.some(p => p.type === 'date')) ? '지원 됨' : '미지원'}
+              {template.databases.some(d => getSafeProperties(d.properties).some(p => p.type === 'date')) ? '지원 됨' : '미지원'}
             </span>
           </div>
           <div className="p-3 bg-white dark:bg-notion-dark-card rounded-xl border border-neutral-200/60 dark:border-neutral-700/60 text-center">
             <span className="text-xs text-neutral-400 block">수식(Formula)</span>
             <span className="text-lg font-bold text-purple-600 dark:text-purple-400">
-              {template.databases.reduce((acc, d) => acc + d.properties.filter(p => p.type === 'formula').length, 0)}개
+              {template.databases.reduce((acc, d) => acc + getSafeProperties(d.properties).filter(p => p.type === 'formula').length, 0)}개
             </span>
           </div>
         </div>
@@ -51,34 +52,36 @@ export const StructureTreeView: React.FC<{ template: NotionTemplate }> = ({ temp
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {template.databases.map((db, idx) => (
-            <div
-              key={idx}
-              className="p-5 rounded-xl bg-white dark:bg-notion-dark-card border border-neutral-200 dark:border-neutral-700/80 shadow-xs space-y-3"
-            >
-              <div className="flex items-start justify-between border-b border-neutral-100 dark:border-neutral-800 pb-2.5">
-                <div>
-                  <h3 className="font-bold text-sm text-neutral-900 dark:text-white flex items-center space-x-1.5">
-                    <span>🗂️</span>
-                    <span>{db.name}</span>
-                  </h3>
-                  <span className="text-[11px] text-neutral-400 block mt-0.5">
-                    기본 뷰: {db.view_type || 'table'}
+          {template.databases.map((db, idx) => {
+            const safeProps = getSafeProperties(db.properties);
+            return (
+              <div
+                key={idx}
+                className="p-5 rounded-xl bg-white dark:bg-notion-dark-card border border-neutral-200 dark:border-neutral-700/80 shadow-xs space-y-3"
+              >
+                <div className="flex items-start justify-between border-b border-neutral-100 dark:border-neutral-800 pb-2.5">
+                  <div>
+                    <h3 className="font-bold text-sm text-neutral-900 dark:text-white flex items-center space-x-1.5">
+                      <span>🗂️</span>
+                      <span>{db.name}</span>
+                    </h3>
+                    <span className="text-[11px] text-neutral-400 block mt-0.5">
+                      기본 뷰: {db.view_type || 'table'}
+                    </span>
+                  </div>
+                  <span className="text-[11px] px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 font-medium">
+                    속성 {safeProps.length}개
                   </span>
                 </div>
-                <span className="text-[11px] px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 font-medium">
-                  속성 {db.properties.length}개
-                </span>
-              </div>
 
-              {db.description && (
-                <p className="text-xs text-neutral-500 dark:text-neutral-400">
-                  {db.description}
-                </p>
-              )}
+                {db.description && (
+                  <p className="text-xs text-neutral-500 dark:text-neutral-400">
+                    {db.description}
+                  </p>
+                )}
 
-              <div className="space-y-1.5 pt-1">
-                {db.properties.map((prop, pIdx) => (
+                <div className="space-y-1.5 pt-1">
+                  {safeProps.map((prop, pIdx) => (
                   <div
                     key={pIdx}
                     className="flex items-center justify-between p-2 rounded-lg bg-neutral-50 dark:bg-neutral-850/60 text-xs border border-neutral-100 dark:border-neutral-800"
@@ -106,9 +109,10 @@ export const StructureTreeView: React.FC<{ template: NotionTemplate }> = ({ temp
                     </div>
                   </div>
                 ))}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 

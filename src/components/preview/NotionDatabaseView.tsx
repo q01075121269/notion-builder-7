@@ -32,6 +32,18 @@ import {
   X
 } from 'lucide-react';
 
+export const getSafeProperties = (props: any): NotionProperty[] => {
+  if (Array.isArray(props)) return props;
+  if (props && typeof props === 'object') {
+    return Object.entries(props).map(([name, val]: [string, any]) => ({
+      name,
+      type: typeof val === 'string' ? val : val?.type || 'rich_text',
+      ...(typeof val === 'object' ? val : {})
+    }));
+  }
+  return [];
+};
+
 export interface NotionDatabaseViewProps {
   database: NotionDatabase;
   dbIndex?: number;
@@ -42,7 +54,7 @@ export interface NotionDatabaseViewProps {
   onAddProperty?: (dbIndex: number) => void;
 }
 
-export const NotionDatabaseView: React.FC<NotionDatabaseViewProps> = ({ 
+export const NotionDatabaseView: React.FC<NotionDatabaseViewProps> = ({
   database,
   dbIndex,
   onUpdateDatabaseName,
@@ -69,7 +81,8 @@ export const NotionDatabaseView: React.FC<NotionDatabaseViewProps> = ({
     setEditingDbName(database.name);
   }, [database]);
 
-  const titleProp = database.properties.find(p => p.type === 'title') || database.properties[0];
+  const safeProperties = getSafeProperties(database?.properties);
+  const titleProp = safeProperties.find(p => p.type === 'title') || safeProperties[0] || { name: '이름', type: 'title' };
 
   const handleSaveDbName = () => {
     if (editingDbName.trim() && onUpdateDatabaseName && dbIndex !== undefined) {
@@ -84,7 +97,7 @@ export const NotionDatabaseView: React.FC<NotionDatabaseViewProps> = ({
       [titleProp.name]: newTitle.trim()
     };
 
-    database.properties.forEach(p => {
+    safeProperties.forEach(p => {
       if (p.type === 'date') newRow[p.name] = new Date().toISOString().split('T')[0];
       if (p.type === 'status') newRow[p.name] = p.options?.[0] || '시작 전';
       if (p.type === 'formula') newRow[p.name] = '진행중 🟡';
@@ -331,11 +344,13 @@ const TableView: React.FC<{
     setEditingPropIdx(null);
   };
 
+  const safeProperties = getSafeProperties(database?.properties);
+
   return (
     <table className="w-full text-left text-xs border-collapse">
       <thead>
         <tr className="border-b border-neutral-200 dark:border-neutral-800 bg-neutral-50/70 dark:bg-neutral-900/40 text-neutral-500 dark:text-neutral-400">
-          {database.properties.map((prop, idx) => {
+          {safeProperties.map((prop, idx) => {
             const isModified = recentProps.includes(prop.name);
             const isEditing = editingPropIdx === idx;
 
@@ -431,7 +446,7 @@ const TableView: React.FC<{
       <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800/80">
         {rows.map((row, rIdx) => (
           <tr key={rIdx} className="hover:bg-neutral-50/70 dark:hover:bg-neutral-800/40 transition">
-            {database.properties.map((prop, pIdx) => {
+            {safeProperties.map((prop, pIdx) => {
               const isModified = recentProps.includes(prop.name);
               return (
                 <td 
@@ -467,7 +482,7 @@ const TableView: React.FC<{
                 className="w-full bg-transparent text-xs font-semibold focus:outline-none"
               />
             </td>
-            {database.properties.slice(1).map((_, idx) => (
+            {safeProperties.slice(1).map((_, idx) => (
               <td key={idx} className="py-2 px-3 text-neutral-400 border-r border-neutral-100 dark:border-neutral-800">
                 -
               </td>
@@ -490,7 +505,8 @@ const BoardView: React.FC<{
   rows: Array<Record<string, any>>;
   titleProp: NotionProperty;
 }> = ({ database, rows, titleProp }) => {
-  const statusProp = database.properties.find(p => p.type === 'status' || p.type === 'select') || {
+  const safeProperties = getSafeProperties(database?.properties);
+  const statusProp = safeProperties.find(p => p.type === 'status' || p.type === 'select') || {
     name: '상태',
     type: 'status',
     options: ['시작 전', '진행 중', '완료']
@@ -520,7 +536,7 @@ const BoardView: React.FC<{
                     {row[titleProp.name] || '제목 없음'}
                   </div>
                   <div className="space-y-1">
-                    {database.properties.filter(p => p.name !== titleProp.name && p.name !== statusProp.name).slice(0, 3).map((p, pIdx) => (
+                    {safeProperties.filter(p => p.name !== titleProp.name && p.name !== statusProp.name).slice(0, 3).map((p, pIdx) => (
                       <div key={pIdx} className="flex items-center justify-between text-[11px] text-neutral-500 dark:text-neutral-400">
                         <span className="truncate">{p.name}</span>
                         <PropertyValueCell property={p} value={row[p.name]} row={row} />

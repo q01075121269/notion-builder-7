@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import type { NotionDatabase, NotionProperty, NotionPropertyType } from '../../types/notion';
+import { getSafeProperties } from './NotionDatabaseView';
 import { 
   Database, 
   Table, 
@@ -250,10 +251,11 @@ export const TemplateSchemaTable: React.FC<TemplateSchemaTableProps> = ({
       {/* 데이터베이스 목록별 스키마 테이블 */}
       <div className="space-y-6">
         {databases.map((db, dbIdx) => {
+          const safeProps = getSafeProperties(db.properties);
           const key = db.name || `db-${dbIdx}`;
           const isExpanded = expandedDbs[key] !== false;
-          const formulaCount = db.properties.filter(p => p.type === 'formula').length;
-          const relationCount = db.properties.filter(p => p.type === 'relation').length;
+          const formulaCount = safeProps.filter(p => p.type === 'formula').length;
+          const relationCount = safeProps.filter(p => p.type === 'relation').length;
           const isEditingThisDb = editingDbIdx === dbIdx;
 
           return (
@@ -325,7 +327,7 @@ export const TemplateSchemaTable: React.FC<TemplateSchemaTableProps> = ({
 
                 <div className="flex items-center space-x-3 shrink-0">
                   <span className="text-xs text-neutral-400 hidden sm:inline">
-                    총 {db.properties.length}개 속성
+                    총 {safeProps.length}개 속성
                   </span>
                   <button 
                     type="button"
@@ -350,7 +352,7 @@ export const TemplateSchemaTable: React.FC<TemplateSchemaTableProps> = ({
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800">
-                      {db.properties.map((prop, propIdx) => {
+                      {safeProps.map((prop, propIdx) => {
                         const isEditingThisProp = editingPropKey === `${dbIdx}-${propIdx}`;
 
                         return (

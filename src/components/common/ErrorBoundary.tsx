@@ -28,9 +28,18 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   private handleReset = () => {
+    try {
+      localStorage.removeItem('notion_template_cache');
+      localStorage.removeItem('notion_template_vault_draft');
+    } catch (err) {
+      console.warn('[ErrorBoundary] Cache reset error:', err);
+    }
     this.setState({ hasError: false, error: null });
     if (this.props.onReset) {
       this.props.onReset();
+    }
+    if (typeof window !== 'undefined') {
+      window.location.reload();
     }
   };
 

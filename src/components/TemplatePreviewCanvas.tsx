@@ -11,6 +11,7 @@ import { StructureTreeView } from './preview/StructureTreeView';
 import { AgentBlueprintCallout } from './preview/AgentBlueprintCallout';
 import { ensureTemplateAgentBlueprint } from '../services/notionDynamicBuilder';
 import { saveArchivedTemplate } from '../services/archiveStorage';
+import { getSafeProperties } from './preview/NotionDatabaseView';
 import { useApp } from '../context/AppContext';
 import {
   Layers,
@@ -170,7 +171,7 @@ export const TemplatePreviewCanvas: React.FC<TemplatePreviewCanvasProps> = ({ te
           return { ...db, name: newName };
         }
         if (oldName) {
-          const updatedProps = db.properties.map(p => {
+          const updatedProps = getSafeProperties(db.properties).map(p => {
             if (p.type === 'relation' && p.target === oldName) {
               return { ...p, target: newName };
             }
@@ -298,9 +299,9 @@ export const TemplatePreviewCanvas: React.FC<TemplatePreviewCanvasProps> = ({ te
 
   // 통계 계산: DB 수, 총 속성 수, Formulas 2.0 수식 수
   const totalDatabases = editableTemplate ? editableTemplate.databases.length : 0;
-  const totalProperties = editableTemplate ? editableTemplate.databases.reduce((sum, db) => sum + db.properties.length, 0) : 0;
+  const totalProperties = editableTemplate ? editableTemplate.databases.reduce((sum, db) => sum + getSafeProperties(db.properties).length, 0) : 0;
   const totalFormulas = editableTemplate ? editableTemplate.databases.reduce(
-    (sum, db) => sum + db.properties.filter((p) => p.type === 'formula').length,
+    (sum, db) => sum + getSafeProperties(db.properties).filter((p) => p.type === 'formula').length,
     0
   ) : 0;
 

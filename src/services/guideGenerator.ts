@@ -197,7 +197,7 @@ export const generateGuideWithGemini = async (
   const prompt = `[템플릿 정보]
 - 제목: ${template.title}
 - 설명: ${template.description || '노션 아키텍트가 생성한 맞춤형 템플릿'}
-- 데이터베이스: ${template.databases.map(db => `${db.name} (속성: ${db.properties.map(p => p.name).join(', ')})`).join(' | ')}
+- 데이터베이스: ${template.databases.map(db => `${db.name} (속성: ${(Array.isArray(db.properties) ? db.properties : Object.values(db.properties || {})).map((p: any) => p.name || p).join(', ')})`).join(' | ')}
 - 레이아웃 구성: ${template.page_layout.map(b => b.type).join(', ')}
 
 위 템플릿을 처음 쓰는 사람을 위한 쉬운 비주얼 가이드를 지침에 따라 JSON으로 만들어줘.`;
