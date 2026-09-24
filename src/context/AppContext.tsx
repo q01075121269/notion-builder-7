@@ -66,6 +66,7 @@ interface AppContextType {
   publishProgress: { step: string; percent: number };
   publishError: string | null;
   createdNotionResource: CreatedNotionResource | null;
+  setCreatedNotionResource: (res: CreatedNotionResource | null) => void;
   isNotionSettingsModalOpen: boolean;
   setIsNotionSettingsModalOpen: (open: boolean) => void;
   isPublishSuccessModalOpen: boolean;
@@ -926,6 +927,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         publishProgress,
         publishError,
         createdNotionResource,
+        setCreatedNotionResource,
         isNotionSettingsModalOpen,
         setIsNotionSettingsModalOpen,
         isPublishSuccessModalOpen,

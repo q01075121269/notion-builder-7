@@ -13,7 +13,8 @@ import {
   Send, 
   ChevronDown, 
   Download,
-  RotateCcw
+  RotateCcw,
+  Loader2
 } from 'lucide-react';
 
 
@@ -52,6 +53,7 @@ import { LifeLogMasterView } from '../../components/life/LifeLogMasterView';
 import { IntelligenceDock } from '../../components/life/IntelligenceDock';
 import { MorningBriefingModal } from '../../components/life/MorningBriefingModal';
 import type { TriageResult } from '../../services/lifeHubAutoTriageRouter';
+import { deployLifeHubToNotion } from '../../services/lifeHubNotionPublisher';
 
 type ViewModeTab = 'morning_command' | 'para_second_brain' | 'smart_finance' | 'health_routine';
 
@@ -59,10 +61,13 @@ export const LifePage: React.FC = () => {
   const { 
     setCurrentView, 
     notionApiKey, 
+    notionParentPageId,
     showToast,
     createdNotionResource,
+    setCreatedNotionResource,
     selectedNotionDbId,
     setIsNotionSettingsModalOpen,
+    setIsPublishSuccessModalOpen,
     apiKey
   } = useApp();
 
@@ -72,6 +77,10 @@ export const LifePage: React.FC = () => {
   const [isSaveMenuOpen, setIsSaveMenuOpen] = useState<boolean>(false);
   const [isBriefingOpen, setIsBriefingOpen] = useState<boolean>(false);
   const [dockStatusMessage, setDockStatusMessage] = useState<string | null>(null);
+
+  // 노션 배포(Export) 인터랙션 및 진행률 상태
+  const [isExporting, setIsExporting] = useState<boolean>(false);
+  const [exportStepText, setExportStepText] = useState<string>('');
 
   // 글로벌 루틴 브리핑 오픈 이벤트 리스너
   useEffect(() => {
@@ -269,6 +278,68 @@ export const LifePage: React.FC = () => {
       }
     }, 150);
   }, []);
+
+  // 2-3. [노션 무손실 배포 엔진] 4대 마스터 DB 및 접이식 토글 에이전트 지침서 일괄 배포
+  const handleExportToNotion = useCallback(async () => {
+    if (!notionApiKey?.trim() || !notionParentPageId?.trim()) {
+      setIsNotionSettingsModalOpen(true);
+      showToast('노션 API 연동 키와 부모 페이지 ID를 먼저 설정해 주세요.', 'warning');
+      return;
+    }
+
+    setIsExporting(true);
+    setExportStepText('배포 준비 중... (1/5)');
+
+    try {
+      const currentState: LifeHubMasterState = {
+        projects,
+        tasks,
+        resources,
+        lifeLogs
+      };
+
+      const result = await deployLifeHubToNotion(
+        notionApiKey,
+        notionParentPageId,
+        currentState,
+        (step) => {
+          setExportStepText(step);
+        }
+      );
+
+      // 전역 생성 리소스 등록
+      setCreatedNotionResource({
+        pageId: result.pageId,
+        pageUrl: result.pageUrl,
+        pageTitle: result.pageTitle,
+        pageIcon: '🌱',
+        databases: result.databases,
+        createdAt: new Date().toISOString()
+      });
+
+      showToast('🎉 라이프 Hub가 노션에 완벽하게 생성되었습니다!', 'success');
+      
+      // 노션 배포 완료 모달 팝업
+      setIsPublishSuccessModalOpen(true);
+    } catch (err: any) {
+      console.error('[LifePage] Notion export failed:', err);
+      showToast(err.message || '노션 배포 중 오류가 발생했습니다. 다시 시도해 주세요.', 'error');
+    } finally {
+      setIsExporting(false);
+      setExportStepText('');
+    }
+  }, [
+    notionApiKey,
+    notionParentPageId,
+    projects,
+    tasks,
+    resources,
+    lifeLogs,
+    setIsNotionSettingsModalOpen,
+    setIsPublishSuccessModalOpen,
+    setCreatedNotionResource,
+    showToast
+  ]);
 
   // 3. 프로젝트 추가
   const handleAddProject = useCallback((newProjData: {
@@ -568,14 +639,29 @@ export const LifePage: React.FC = () => {
             )}
           </div>
 
-          {/* [ ⚡ 노션에 바로 배포 ] - 모노톤 1px 보더 스타일 */}
+          {/* [ ⚡ 노션 내보내기 ] - 실제 노션 API 무손실 배포 엔진 연동 */}
           <button
-            onClick={() => setIsNotionSettingsModalOpen(true)}
-            className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs sm:text-sm font-medium bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 border border-zinc-300 dark:border-zinc-700 transition cursor-pointer shadow-2xs"
+            onClick={handleExportToNotion}
+            disabled={isExporting}
+            className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs sm:text-sm font-medium transition cursor-pointer shadow-2xs ${
+              isExporting
+                ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700 cursor-wait'
+                : 'bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 border border-zinc-300 dark:border-zinc-700'
+            }`}
+            title="현재 라이프 Hub 4대 DB를 내 노션 워크스페이스에 일괄 배포"
           >
-            <Send className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">노션에 바로 배포</span>
-            <span className="sm:hidden">배포</span>
+            {isExporting ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-500" />
+                <span>{exportStepText || '배포 중...'}</span>
+              </>
+            ) : (
+              <>
+                <Send className="w-3.5 h-3.5 text-zinc-600 dark:text-zinc-300" />
+                <span className="hidden sm:inline">노션 내보내기</span>
+                <span className="sm:hidden">내보내기</span>
+              </>
+            )}
           </button>
 
           {/* 노션 연결 상태 슬림 도트 뱃지 */}
