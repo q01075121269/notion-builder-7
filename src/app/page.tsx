@@ -100,7 +100,6 @@ export const HomePage: React.FC = () => {
       localStorage.removeItem('notion_template_vault_draft');
     } catch {}
     showToast('✨ 새 Co-Thinking 대화 세션이 시작되었습니다.', 'info');
-    window.location.reload();
   };
 
   // 특정 세션 선택

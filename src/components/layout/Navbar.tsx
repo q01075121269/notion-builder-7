@@ -148,15 +148,15 @@ export const Navbar: React.FC = () => {
 
           {/* [우측]: [👑 통합 허브] + [⏰ 루틴 브리핑], Gemini 모델 셀렉터, [⚙️ 설정] 버튼, 프로필 아바타 */}
           <div className="flex items-center space-x-1 sm:space-x-1.5 shrink-0 whitespace-nowrap pr-1 relative z-50 overflow-visible">
-            {/* 👑 통합 허브 (사용자 요청: 루틴 브리핑 옆으로 이동) */}
+            {/* 👑 통합 허브 */}
             <button
               onClick={handleOpenMasterHub}
-              className="flex items-center space-x-1 px-2 sm:px-2.5 py-1.5 text-xs font-bold rounded-xl transition whitespace-nowrap cursor-pointer bg-gradient-to-r from-amber-500 via-indigo-600 to-purple-600 text-white hover:opacity-90 shadow-xs active:scale-95 shrink-0"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-900 text-white hover:bg-slate-800 transition-colors shadow-sm cursor-pointer border border-slate-800 shrink-0 tracking-tight"
               title="내 노션 통합 허브 워크스페이스 새 탭 열기"
             >
-              <Crown className="w-3.5 h-3.5 text-amber-300 shrink-0" />
+              <Crown className="w-3.5 h-3.5 text-slate-200 shrink-0" />
               <span className="whitespace-nowrap">👑 통합 허브</span>
-              <ExternalLink className="w-3 h-3 opacity-80 shrink-0" />
+              <ExternalLink className="w-3 h-3 opacity-70 shrink-0 text-slate-300" />
             </button>
 
             {/* 데일리 루틴 퀵 버튼 */}

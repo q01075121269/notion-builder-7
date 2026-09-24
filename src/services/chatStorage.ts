@@ -118,7 +118,7 @@ export function createNewSession(title?: string): ChatSession {
     title: title || '새 대화 기획',
     createdAt: Date.now(),
     updatedAt: Date.now(),
-    messages: INITIAL_CHAT_MESSAGES
+    messages: []
   };
 
   const sessions = getSavedSessions();
@@ -222,7 +222,7 @@ export function getSavedChatMessages(): ChatMessage[] {
   const sessions = getSavedSessions();
   const activeId = getActiveSessionId();
   const activeSession = sessions.find(s => s.id === activeId) || sessions[0];
-  return activeSession ? activeSession.messages : INITIAL_CHAT_MESSAGES;
+  return activeSession ? activeSession.messages : [];
 }
 
 /**

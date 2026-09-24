@@ -440,8 +440,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const clearChatHistory = () => {
-    const newSession = createNewSession();
-    setMessages(newSession.messages);
+    createNewSession();
+    setMessages([]);
     setCurrentTemplate(null);
     clearRecentModifications();
     try {
