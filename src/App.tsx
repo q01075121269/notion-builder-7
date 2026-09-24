@@ -64,7 +64,7 @@ export const MainApp: React.FC = () => {
             <BuilderPage />
           ) : currentView === 'life' ? (
             <LifePage />
-          ) : currentView === 'devlab' ? (
+          ) : (currentView === 'devlab' || currentView === 'office') ? (
             <DevLabPage />
           ) : currentView === 'media_lab' ? (
             <MediaLabPage />

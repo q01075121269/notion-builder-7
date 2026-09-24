@@ -119,7 +119,7 @@ export const Navbar: React.FC = () => {
             <button
               onClick={() => setCurrentView('devlab')}
               className={`flex items-center space-x-1 px-2 sm:px-2.5 py-1.5 text-xs font-semibold rounded-lg transition whitespace-nowrap cursor-pointer ${
-                currentView === 'devlab'
+                currentView === 'devlab' || currentView === 'office'
                   ? 'bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 font-bold shadow-xs border border-zinc-300 dark:border-zinc-700'
                   : 'text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100'
               }`}

@@ -1,8 +1,8 @@
 import React from 'react';
 import { OfficeStudioContainer } from '../../components/office/OfficeStudioContainer';
 
-export const DevLabPage: React.FC = () => {
+export const OfficePage: React.FC = () => {
   return <OfficeStudioContainer />;
 };
 
-export default DevLabPage;
+export default OfficePage;
