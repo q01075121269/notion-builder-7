@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import type { 
   OfficeProject, 
   OfficeDocument, 
   OfficeDocumentFormat, 
   CanvasViewMode, 
   OfficeSource,
-  PlanTriad
+  PlanTriad,
+  PlanOption
 } from '../../types/office';
 import { SEED_PROJECTS } from '../../services/officeSeedData';
 import { KnowledgeDock } from './KnowledgeDock';
@@ -19,7 +20,10 @@ import {
   Presentation, 
   Table, 
   Mic, 
-  Zap
+  Zap,
+  ChevronLeft,
+  ChevronRight,
+  RotateCcw
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
@@ -30,7 +34,6 @@ export const OfficeStudioContainer: React.FC = () => {
   const [projects, setProjects] = useState<OfficeProject[]>(SEED_PROJECTS);
   const [activeProjectId, setActiveProjectId] = useState<string>(SEED_PROJECTS[0].id);
 
-  // 현재 활성 프로젝트 및 문서 참조
   const activeProject = projects.find(p => p.id === activeProjectId) || projects[0];
   const currentDoc = activeProject.currentDoc;
 
@@ -39,6 +42,68 @@ export const OfficeStudioContainer: React.FC = () => {
 
   // 3. Undo 히스토리 스택
   const [historyStack, setHistoryStack] = useState<Array<{ action: string; docSnapshot: OfficeDocument }>>([]);
+
+  // =========================================================================
+  // 4. 반응형 사이드바 리사이저 & 접기/펼치기 상태
+  // =========================================================================
+  const DEFAULT_SIDEBAR_WIDTH = 380;
+  const MIN_SIDEBAR_WIDTH = 260;
+  const MAX_SIDEBAR_WIDTH = 600;
+
+  const [sidebarWidth, setSidebarWidth] = useState<number>(DEFAULT_SIDEBAR_WIDTH);
+  const [isCollapsed, setIsCollapsed] = useState<boolean>(false);
+  const [isResizing, setIsResizing] = useState<boolean>(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // 마우스 드래그 리사이저 핸들러
+  const handleMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsResizing(true);
+  };
+
+  const handleMouseMove = useCallback((e: MouseEvent) => {
+    if (!isResizing || !containerRef.current) return;
+    const containerRect = containerRef.current.getBoundingClientRect();
+    const newWidth = e.clientX - containerRect.left;
+
+    if (newWidth >= MIN_SIDEBAR_WIDTH && newWidth <= MAX_SIDEBAR_WIDTH) {
+      setSidebarWidth(newWidth);
+      if (isCollapsed) setIsCollapsed(false);
+    }
+  }, [isResizing, isCollapsed]);
+
+  const handleMouseUp = useCallback(() => {
+    if (isResizing) {
+      setIsResizing(false);
+    }
+  }, [isResizing]);
+
+  useEffect(() => {
+    if (isResizing) {
+      window.addEventListener('mousemove', handleMouseMove);
+      window.addEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+    } else {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    }
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+  }, [isResizing, handleMouseMove, handleMouseUp]);
+
+  // 더블클릭 시 기본 너비(380px)로 리셋
+  const handleDividerDoubleClick = () => {
+    setSidebarWidth(DEFAULT_SIDEBAR_WIDTH);
+    setIsCollapsed(false);
+    showToast('📐 사이드바 너비를 기본(380px)으로 리셋했습니다.', 'info');
+  };
 
   // 상태 업데이트 헬퍼 (Undo 스냅샷 보존)
   const updateDocument = (updatedDoc: OfficeDocument, actionName: string) => {
@@ -143,53 +208,86 @@ export const OfficeStudioContainer: React.FC = () => {
     showToast('소스를 지식 창고에서 삭제했습니다.', 'info');
   };
 
-  // 3-Way 옵션 선택
-  const handleSelectOption = (optKey: 'A' | 'B' | 'C') => {
-    if (!activeProject.planTriad) return;
-    const updatedTriad: PlanTriad = {
-      ...activeProject.planTriad,
-      selectedOption: optKey
-    };
+  // 3-Way Triad 전체 업데이트
+  const handleUpdatePlanTriad = (newTriad: PlanTriad) => {
     setProjects(prev => prev.map(p => {
       if (p.id === activeProjectId) {
-        return { ...p, planTriad: updatedTriad };
+        return { ...p, planTriad: newTriad };
       }
       return p;
     }));
+    showToast('⚡ 3-Way 기획안 발산이 완료되었습니다!', 'success');
   };
 
-  // 3-Way 질문 답변 완료 후 문서에 반영 직결
-  const handleApplyPlanToDoc = (selectedKey: 'A' | 'B' | 'C', qaAnswers: { targetDetail: string; channelDetail: string }) => {
-    if (!activeProject.planTriad) return;
-    const chosen = selectedKey === 'A' 
-      ? activeProject.planTriad.optionA 
-      : selectedKey === 'B' 
-        ? activeProject.planTriad.optionB 
-        : activeProject.planTriad.optionC;
+  // 3-Way 질문 답변 완료 후 문서에 뼈대 즉시 주입
+  const handleApplyPlanToDoc = (
+    selectedKey: 'A' | 'B' | 'C', 
+    qaAnswers: { targetDetail: string; channelDetail: string },
+    chosenOption?: PlanOption
+  ) => {
+    const chosen = chosenOption || (
+      selectedKey === 'A' 
+        ? activeProject.planTriad?.optionA 
+        : selectedKey === 'B' 
+          ? activeProject.planTriad?.optionB 
+          : activeProject.planTriad?.optionC
+    );
 
-    // 공문서 내용에 선택한 안을 반영
-    const updatedSections = currentDoc.content.docsContent.sections.map(sec => {
-      if (sec.id === 'sec-6') {
-        return { ...sec, text: `선정 전략: [${selectedKey}안] ${chosen.title} 기반 확정` };
+    if (!chosen) return;
+
+    // 1. 공문서 섹션에 뼈대 주입
+    const updatedSections = [
+      { id: 'sec-1', level: 1 as const, marker: '1.', text: '추진 배경 및 목적' },
+      { id: 'sec-2', level: 2 as const, marker: '□', text: `${chosen.title} 추진 배경 및 전사적 기대 효과` },
+      { id: 'sec-3', level: 3 as const, marker: '○', text: `핵심 컨셉: ${chosen.concept}` },
+      { id: 'sec-4', level: 1 as const, marker: '2.', text: '세부 실행 방안 및 타깃 채널' },
+      { id: 'sec-5', level: 2 as const, marker: '□', text: `목표 타깃 & 과금: ${qaAnswers.targetDetail} (${chosen.pricing})` },
+      { id: 'sec-6', level: 3 as const, marker: '○', text: `최우선 도입 채널: ${qaAnswers.channelDetail}` },
+      { id: 'sec-7', level: 4 as const, marker: '―', text: `주요 장점 및 고려 사항: ${chosen.pros} (주의: ${chosen.cons})` },
+      { id: 'sec-8', level: 1 as const, marker: '3.', text: '단계별 실행 로드맵' },
+      ...chosen.roadmap.map((step, idx) => ({
+        id: `sec-road-${idx}`,
+        level: 3 as const,
+        marker: '○',
+        text: step
+      }))
+    ];
+
+    // 2. 슬라이드 덱에 뼈대 주입
+    const updatedSlides = [
+      {
+        id: `slide-1`,
+        title: chosen.title,
+        subtitle: chosen.concept,
+        bullets: [
+          `핵심 타깃: ${qaAnswers.targetDetail}`,
+          `실행 채널: ${qaAnswers.channelDetail}`,
+          `예산 및 모델: ${chosen.pricing}`
+        ],
+        badge: `${selectedKey}안 KEYNOTE`
+      },
+      {
+        id: `slide-2`,
+        title: '핵심 실행 로드맵',
+        subtitle: '단계별 액션 플랜',
+        bullets: chosen.roadmap,
+        badge: 'ROADMAP'
       }
-      if (sec.id === 'sec-7') {
-        return { ...sec, text: `핵심 타깃 및 도입 채널: ${qaAnswers.targetDetail} 대상, ${qaAnswers.channelDetail} 연계 추진` };
-      }
-      return sec;
-    });
+    ];
 
     const updatedDoc: OfficeDocument = {
       ...currentDoc,
-      title: `${chosen.title} 공식 추진 기안서`,
+      title: `${chosen.title} 추진 기안서`,
       content: {
         ...currentDoc.content,
-        docsContent: { sections: updatedSections }
+        docsContent: { sections: updatedSections },
+        slidesContent: { slides: updatedSlides }
       }
     };
 
-    updateDocument(updatedDoc, `[${selectedKey}안] 전략 및 소크라테스 답변 문서 반영`);
+    updateDocument(updatedDoc, `[${selectedKey}안] 기획 뼈대 문서 주입 완료`);
     setViewMode('canvas');
-    showToast(`🎉 [${selectedKey}안] 전략이 정식 기안서에 연동되었습니다!`, 'success');
+    showToast(`🎉 [${selectedKey}안] 기획이 공문서와 슬라이드에 즉시 주입되었습니다!`, 'success');
   };
 
   // 옴니 출하 액션들
@@ -224,7 +322,7 @@ export const OfficeStudioContainer: React.FC = () => {
   };
 
   const handleSendToNotion = () => {
-    showToast('☁️ 노션 마스터 Wiki 데이터베이스로 실시간 문서 적재가 완료되었습니다!', 'success');
+    showToast('☁️ 노션 Wiki 마스터 DB로 실시간 문서 적재가 완료되었습니다!', 'success');
   };
 
   const handleSyncToLifeHub = () => {
@@ -233,15 +331,27 @@ export const OfficeStudioContainer: React.FC = () => {
   };
 
   return (
-    <div className="flex-1 flex flex-col h-full w-full overflow-hidden bg-slate-100 dark:bg-zinc-950 text-slate-900 dark:text-zinc-100 font-sans select-none relative">
+    <div 
+      ref={containerRef}
+      className="flex-1 flex flex-col h-full w-full overflow-hidden bg-slate-100 dark:bg-zinc-950 text-slate-900 dark:text-zinc-100 font-sans select-none relative"
+    >
       
       {/* ========================================================================= */}
       {/* 1. 상단 글로벌 서브 헤더 (조종석 콘솔 바) */}
       {/* ========================================================================= */}
       <header className="px-3 sm:px-6 py-2.5 bg-white dark:bg-zinc-900 border-b border-slate-200 dark:border-zinc-800 flex flex-wrap items-center justify-between gap-3 shrink-0 shadow-2xs z-20">
         
-        {/* (1) 프로젝트 탭 스위처 */}
-        <div className="flex items-center space-x-1 sm:space-x-1.5 overflow-x-auto max-w-[420px] scrollbar-none py-0.5">
+        {/* (1) 프로젝트 탭 스위처 & 사이드바 접기/펼치기 토글 */}
+        <div className="flex items-center space-x-1.5 overflow-x-auto max-w-[460px] scrollbar-none py-0.5">
+          {/* 사이드바 접기/펼치기 빠른 토글 */}
+          <button
+            onClick={() => setIsCollapsed(!isCollapsed)}
+            className="p-1.5 rounded-xl border border-slate-200 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-800 hover:bg-slate-100 dark:hover:bg-zinc-700 text-slate-700 dark:text-zinc-300 transition cursor-pointer shrink-0"
+            title={isCollapsed ? '사이드바 펼치기 (Knowledge Dock)' : '사이드바 접기 (Full Canvas)'}
+          >
+            {isCollapsed ? <ChevronRight className="w-4 h-4 text-indigo-500" /> : <ChevronLeft className="w-4 h-4 text-indigo-500" />}
+          </button>
+
           {projects.map(proj => (
             <button
               key={proj.id}
@@ -321,8 +431,19 @@ export const OfficeStudioContainer: React.FC = () => {
           </button>
         </div>
 
-        {/* (3) 옴니 출하 액션 바 */}
+        {/* (3) 옴니 출하 액션 바 & 상단 Undo 버튼 */}
         <div className="flex items-center space-x-1 shrink-0 overflow-x-auto">
+          {/* 상단 1클릭 롤백 Undo 버튼 */}
+          <button
+            onClick={handleUndo}
+            disabled={historyStack.length === 0}
+            className="flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-white dark:bg-zinc-800 hover:bg-slate-100 dark:hover:bg-zinc-700 disabled:opacity-30 border border-slate-200 dark:border-zinc-750 text-[11px] font-bold text-slate-700 dark:text-zinc-300 transition cursor-pointer whitespace-nowrap mr-1"
+            title={historyStack.length > 0 ? `되돌리기: ${historyStack[historyStack.length - 1].action}` : '되돌릴 작업 없음'}
+          >
+            <RotateCcw className="w-3 h-3 text-indigo-500" />
+            <span>되돌리기</span>
+          </button>
+
           <button
             onClick={handleExportHwpx}
             className="px-2 py-1 rounded-lg bg-white dark:bg-zinc-800 hover:bg-slate-50 dark:hover:bg-zinc-750 border border-slate-200 dark:border-zinc-700 text-[11px] font-bold text-slate-700 dark:text-zinc-300 transition cursor-pointer whitespace-nowrap"
@@ -376,21 +497,42 @@ export const OfficeStudioContainer: React.FC = () => {
       </header>
 
       {/* ========================================================================= */}
-      {/* 2. 본문 2열 벤토 분할 (좌측 35% Knowledge Dock vs 우측 65% Universal Smart Canvas) */}
+      {/* 2. 본문 리사이저블 레이아웃 (Knowledge Dock vs Universal Smart Canvas) */}
       {/* ========================================================================= */}
       <div className="flex-1 flex overflow-hidden w-full relative">
         
-        {/* 좌측 35%: Knowledge Dock */}
-        <div className="w-full lg:w-[35%] h-full shrink-0 flex flex-col">
-          <KnowledgeDock
-            sources={activeProject.sources}
-            onToggleSelectSource={handleToggleSelectSource}
-            onAddSource={handleAddSource}
-            onDeleteSource={handleDeleteSource}
-          />
-        </div>
+        {/* (1) 좌측 패널: Knowledge Dock (접힘 토글 및 너비 드래그 적용) */}
+        {!isCollapsed && (
+          <div 
+            style={{ width: `${sidebarWidth}px` }} 
+            className="h-full shrink-0 flex flex-col transition-[width] duration-75 relative"
+          >
+            <KnowledgeDock
+              sources={activeProject.sources}
+              onToggleSelectSource={handleToggleSelectSource}
+              onAddSource={handleAddSource}
+              onDeleteSource={handleDeleteSource}
+            />
+          </div>
+        )}
 
-        {/* 우측 65%: Universal Smart Canvas */}
+        {/* (2) 리사이저 경계선 (Divider) */}
+        {!isCollapsed && (
+          <div
+            onMouseDown={handleMouseDown}
+            onDoubleClick={handleDividerDoubleClick}
+            className={`
+              w-1.5 hover:w-2 bg-slate-200 dark:bg-zinc-800 hover:bg-indigo-500 dark:hover:bg-indigo-500
+              transition-all cursor-col-resize shrink-0 z-30 relative group flex items-center justify-center
+              ${isResizing ? 'bg-indigo-600 dark:bg-indigo-600 w-2' : ''}
+            `}
+            title="드래그하여 너비 조절 (더블클릭 시 기본값 380px 리셋)"
+          >
+            <div className="w-0.5 h-8 bg-slate-400 dark:bg-zinc-600 rounded-full group-hover:bg-white" />
+          </div>
+        )}
+
+        {/* (3) 우측 메인 영역: Universal Smart Canvas (사이드바 접힘 시 100% 전폭) */}
         <div className="flex-1 h-full flex flex-col min-w-0">
           <UniversalSmartCanvas
             document={currentDoc}
@@ -398,7 +540,7 @@ export const OfficeStudioContainer: React.FC = () => {
             viewMode={viewMode}
             onChangeViewMode={setViewMode}
             onChangeDocument={updateDocument}
-            onSelectOption={handleSelectOption}
+            onUpdatePlanTriad={handleUpdatePlanTriad}
             onApplyPlanToDoc={handleApplyPlanToDoc}
             onSyncToLifeHub={handleSyncToLifeHub}
           />
@@ -407,7 +549,7 @@ export const OfficeStudioContainer: React.FC = () => {
       </div>
 
       {/* ========================================================================= */}
-      {/* 3. 대화형 인플레이스 실시간 코파일럿 (우측 하단 플로팅) */}
+      {/* 3. 대화형 인플레이스 실시간 변이 코파일럿 (InPlaceCopilot 2.0) */}
       {/* ========================================================================= */}
       <InPlaceCopilot
         document={currentDoc}

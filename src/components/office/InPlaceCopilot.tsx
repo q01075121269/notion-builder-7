@@ -9,7 +9,8 @@ import {
   Bot, 
   CheckCircle2,
   Table,
-  FileText
+  FileText,
+  UserCheck
 } from 'lucide-react';
 
 interface CopilotMessage {
@@ -42,7 +43,7 @@ export const InPlaceCopilot: React.FC<InPlaceCopilotProps> = ({
     {
       id: 'msg-init',
       sender: 'ai',
-      text: '안녕하세요! 오피스 인플레이스 코파일럿입니다. 문서 요약, 시트 표 항목 추가, 공문서 개조식 어조 변환 등을 실시간으로 처리해 드릴 수 있습니다.',
+      text: '오피스 인플레이스 코파일럿 2.0 가동되었습니다. "표에 [항목명] [금액] 추가해줘", "공문서체로 바꿔줘", "정중체로 바꿔줘", "결재란에 [직책] 추가해줘" 등의 자연어 명령을 실시간으로 실행합니다.',
       timestamp: '방금 전'
     }
   ]);
@@ -55,7 +56,7 @@ export const InPlaceCopilot: React.FC<InPlaceCopilotProps> = ({
     }
   }, [messages, isOpen]);
 
-  // 음성 STT 핸들러
+  // Web Speech API
   const handleToggleVoice = () => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SpeechRecognition) {
@@ -85,7 +86,177 @@ export const InPlaceCopilot: React.FC<InPlaceCopilotProps> = ({
     }
   };
 
-  // 명령어 및 프롬프트 처리
+  // 금액 파서 헬퍼: "120만 원", "50만원", "1500000원", "150만" 등 숫자로 변환
+  const parseKoreanCurrency = (text: string): { amount: number; matchedStr: string } => {
+    // 1) "120만 원" 또는 "120만원"
+    const manMatch = text.match(/(\d+[\d,]*)\s*만\s*원?/);
+    if (manMatch) {
+      const val = parseInt(manMatch[1].replace(/,/g, ''), 10);
+      return { amount: val * 10000, matchedStr: manMatch[0] };
+    }
+
+    // 2) "1500000원"
+    const wonMatch = text.match(/(\d+[\d,]*)\s*원/);
+    if (wonMatch) {
+      const val = parseInt(wonMatch[1].replace(/,/g, ''), 10);
+      return { amount: val, matchedStr: wonMatch[0] };
+    }
+
+    // 3) 기본 100만 원
+    return { amount: 1000000, matchedStr: '100만 원' };
+  };
+
+  // 자연어 명령어 디스패처 (Command Dispatcher)
+  const processCommand = (query: string) => {
+    const lower = query.toLowerCase();
+
+    // 1. 결재선 조작 명령: "결재란에 부서장 추가해줘", "결재선에 이사 추가해줘"
+    if (lower.includes('결재란') || lower.includes('결재선') || (lower.includes('결재') && lower.includes('추가'))) {
+      const roleMatch = query.match(/결재(?:란|선)?에\s*([^\s]+)\s*추가/);
+      const roleName = roleMatch ? roleMatch[1] : '부서장';
+      const formattedRole = `${roleName}(결재대기)`;
+
+      const updatedApprovers = [...document.metadata.approvers, formattedRole];
+      const updatedDoc: OfficeDocument = {
+        ...document,
+        metadata: {
+          ...document.metadata,
+          approvers: updatedApprovers
+        }
+      };
+
+      onChangeDocument(updatedDoc, `결재선에 [${formattedRole}] 컬럼 동적 추가`);
+
+      const aiMsg: CopilotMessage = {
+        id: `msg-${Date.now()}`,
+        sender: 'ai',
+        text: `상단 전자 결재선 박스에 '${formattedRole}' 컬럼을 동적으로 삽입했습니다. [⏪ 되돌리기]로 언제든 직전 상태로 복원할 수 있습니다.`,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        appliedAction: `결재란 [${formattedRole}] 추가 완료`
+      };
+      setMessages(prev => [...prev, aiMsg]);
+      return;
+    }
+
+    // 2. 표 데이터 조작 명령: "표에 [항목명] [금액] 추가해줘"
+    if (lower.includes('표') || lower.includes('시트') || lower.includes('행') || lower.includes('외주비') || lower.includes('호스팅비') || lower.includes('예산')) {
+      const { amount, matchedStr } = parseKoreanCurrency(query);
+
+      // 항목명 추출
+      let itemName = '신규 집행 항목';
+      if (query.includes('디자인')) itemName = '디자인 외주비';
+      else if (query.includes('서버') || query.includes('호스팅')) itemName = '서버 호스팅비';
+      else if (query.includes('외주')) itemName = '전문 외주용역비';
+      else if (query.includes('마케팅')) itemName = '마케팅 집행비';
+      else {
+        // "표에 XXX 120만원 추가해줘"에서 XXX 추출 시도
+        const cleanMatch = query.replace(/표에|시트에|추가해줘|넣어줘|추가|등록/g, '').replace(matchedStr, '').trim();
+        if (cleanMatch) itemName = cleanMatch;
+      }
+
+      const newRow: SheetRow = {
+        id: `row-mut-${Date.now()}`,
+        cells: [itemName, `${itemName} 실시간 산출 근거`, '식', 1, amount, amount]
+      };
+
+      const updatedDoc: OfficeDocument = {
+        ...document,
+        content: {
+          ...document.content,
+          sheetsContent: {
+            ...document.content.sheetsContent,
+            rows: [...document.content.sheetsContent.rows, newRow]
+          }
+        }
+      };
+
+      onChangeDocument(updatedDoc, `스프레드시트에 [${itemName} - ${amount.toLocaleString()}원] 행 삽입`);
+
+      const aiMsg: CopilotMessage = {
+        id: `msg-${Date.now()}`,
+        sender: 'ai',
+        text: `스프레드시트 표에 '${itemName} (${amount.toLocaleString()}원)' 행을 즉시 삽입하고 =SUM() 총합계를 자동 재연산했습니다.`,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        appliedAction: `${itemName} 행 삽입 및 합계 재연산 완료`
+      };
+      setMessages(prev => [...prev, aiMsg]);
+      return;
+    }
+
+    // 3. 어조 변환 명령 A: "공문서체로 바꿔줘" (행안부 표준 개조식 종결어미: ~추진함., ~보고함., ~검토함.)
+    if (lower.includes('공문서') || lower.includes('개조식') || lower.includes('사내규정체')) {
+      const endings = ['추진함.', '보고함.', '검토함.', '확정함.', '시행함.'];
+      const convertedSections: DocSection[] = document.content.docsContent.sections.map((sec, idx) => {
+        let txt = sec.text.replace(/합니다\.|합니다|이다\.|이다|바랍니다\.|드리겠습니다\./g, '').trim();
+        const pickEnding = endings[idx % endings.length];
+        if (!txt.endsWith('함.') && !txt.endsWith('임.') && !txt.endsWith('음.')) {
+          txt = `${txt} ${pickEnding}`;
+        }
+        return { ...sec, text: txt };
+      });
+
+      const updatedDoc: OfficeDocument = {
+        ...document,
+        content: {
+          ...document.content,
+          docsContent: { sections: convertedSections }
+        }
+      };
+
+      onChangeDocument(updatedDoc, '본문 어조를 행안부 표준 개조식(~추진함/보고함)으로 변환');
+
+      const aiMsg: CopilotMessage = {
+        id: `msg-${Date.now()}`,
+        sender: 'ai',
+        text: "공문서 본문의 모든 문장을 행정안전부 표준 개조식 어조('~추진함.', '~보고함.', '~검토함.')로 일괄 변환했습니다.",
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        appliedAction: '표준 공문서 개조식 변환 완료'
+      };
+      setMessages(prev => [...prev, aiMsg]);
+      return;
+    }
+
+    // 4. 어조 변환 명령 B: "정중체로 바꿔줘" (비즈니스 공손형: ~바랍니다., ~드리겠습니다.)
+    if (lower.includes('정중') || lower.includes('공손') || lower.includes('존댓말') || lower.includes('안내문')) {
+      const convertedSections: DocSection[] = document.content.docsContent.sections.map(sec => {
+        let txt = sec.text
+          .replace(/추진함\.|보고함\.|검토함\.|확정함\.|시행함\.|함\.|임\.|음\./g, '')
+          .trim();
+        txt = `${txt} 적극 검토하여 주시기 바랍니다.`;
+        return { ...sec, text: txt };
+      });
+
+      const updatedDoc: OfficeDocument = {
+        ...document,
+        content: {
+          ...document.content,
+          docsContent: { sections: convertedSections }
+        }
+      };
+
+      onChangeDocument(updatedDoc, '본문 어조를 비즈니스 정중체(~바랍니다)로 변환');
+
+      const aiMsg: CopilotMessage = {
+        id: `msg-${Date.now()}`,
+        sender: 'ai',
+        text: "본문 어조를 대외 협력 및 임원 보고용 비즈니스 공손 정중체('~바랍니다.', '~드리겠습니다.')로 품격 있게 변환했습니다.",
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        appliedAction: '비즈니스 정중체 변환 완료'
+      };
+      setMessages(prev => [...prev, aiMsg]);
+      return;
+    }
+
+    // 5. 일반 질의 및 분석
+    const aiMsg: CopilotMessage = {
+      id: `msg-${Date.now()}`,
+      sender: 'ai',
+      text: `질문하신 내용("${query}")을 바탕으로 현재 문서(${document.title}) 및 활성 지식 소스를 분석했습니다. 표 행 삽입, 결재선 추가, 공문서체 변환 등 원하시는 작업을 말씀해 주세요.`,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    };
+    setMessages(prev => [...prev, aiMsg]);
+  };
+
   const handleSendMessage = (textToSend?: string) => {
     const query = (textToSend || inputText).trim();
     if (!query) return;
@@ -100,89 +271,9 @@ export const InPlaceCopilot: React.FC<InPlaceCopilotProps> = ({
     setMessages(prev => [...prev, userMsg]);
     setInputText('');
 
-    // 시뮬레이션 명령어 라우팅
     setTimeout(() => {
       processCommand(query);
-    }, 400);
-  };
-
-  const processCommand = (query: string) => {
-    const lower = query.toLowerCase();
-
-    // 1. "표에 '외주비 150만 원' 추가해줘" 또는 시트 행 추가 명령어
-    if (lower.includes('외주비') || (lower.includes('표') && lower.includes('추가')) || lower.includes('시트')) {
-      const newRow: SheetRow = {
-        id: `row-copilot-${Date.now()}`,
-        cells: ['전문 외주용역비', 'AI 오피스 캔버스 커스텀 개발 외주비', '건', 1, 1500000, 1500000]
-      };
-
-      const updatedDoc: OfficeDocument = {
-        ...document,
-        content: {
-          ...document.content,
-          sheetsContent: {
-            ...document.content.sheetsContent,
-            rows: [...document.content.sheetsContent.rows, newRow]
-          }
-        }
-      };
-
-      onChangeDocument(updatedDoc, "스프레드시트에 '외주비 150만 원' 실시간 행 추가");
-
-      const aiMsg: CopilotMessage = {
-        id: `msg-${Date.now()}`,
-        sender: 'ai',
-        text: "스프레드시트에 '전문 외주용역비 (1,500,000원)' 행을 즉시 추가하고 =SUM() 총액을 자동 재연산했습니다. [⏪ 되돌리기] 버튼으로 언제든 롤백 가능합니다.",
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        appliedAction: '시트 행 추가 완료'
-      };
-      setMessages(prev => [...prev, aiMsg]);
-      return;
-    }
-
-    // 2. "공문서 말투로 바꿔줘" 또는 어조 변환 명령어
-    if (lower.includes('말투') || lower.includes('공문서') || lower.includes('어조') || lower.includes('개조식')) {
-      const convertedSections: DocSection[] = document.content.docsContent.sections.map(sec => {
-        let txt = sec.text;
-        // 문장 끝을 ~함., ~보고함., ~추진함. 으로 정형화
-        if (!txt.endsWith('함.') && !txt.endsWith('임.') && !txt.endsWith('음.')) {
-          txt = txt.replace(/합니다\.|합니다|이다\.|이다/g, '함.').trim();
-          if (!txt.endsWith('.') && !txt.endsWith(']')) txt += '함.';
-        }
-        return { ...sec, text: txt };
-      });
-
-      const updatedDoc: OfficeDocument = {
-        ...document,
-        content: {
-          ...document.content,
-          docsContent: {
-            sections: convertedSections
-          }
-        }
-      };
-
-      onChangeDocument(updatedDoc, '공문서 개조식 어조(~함) 일괄 변환');
-
-      const aiMsg: CopilotMessage = {
-        id: `msg-${Date.now()}`,
-        sender: 'ai',
-        text: "공문서 본문의 모든 문장을 공공 표준 개조식 종결어미('~함.', '~보고함.')로 정밀 변환 완료했습니다.",
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        appliedAction: '공문서 어조 변환 완료'
-      };
-      setMessages(prev => [...prev, aiMsg]);
-      return;
-    }
-
-    // 3. 일반 질의 및 분석
-    const aiMsg: CopilotMessage = {
-      id: `msg-${Date.now()}`,
-      sender: 'ai',
-      text: `질문하신 내용("${query}")을(를) 현재 활성 지식 창고 3건과 대조 분석했습니다. 필요 시 3-Way 기획안과 기안서 양식에 즉시 반영할 수 있습니다. 추가 작업을 지시해 주세요.`,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    };
-    setMessages(prev => [...prev, aiMsg]);
+    }, 300);
   };
 
   return (
@@ -203,7 +294,7 @@ export const InPlaceCopilot: React.FC<InPlaceCopilotProps> = ({
 
       {/* 2. 열려있을 때 구글 닥스/시트 Gemini 패널 스타일 대화창 */}
       {isOpen && (
-        <div className="w-[360px] sm:w-[400px] h-[520px] bg-white dark:bg-zinc-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-zinc-800 flex flex-col overflow-hidden animate-fadeIn">
+        <div className="w-[360px] sm:w-[410px] h-[540px] bg-white dark:bg-zinc-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-zinc-800 flex flex-col overflow-hidden animate-fadeIn">
           
           {/* 헤더 */}
           <div className="p-3.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white flex items-center justify-between shrink-0 shadow-md">
@@ -211,10 +302,10 @@ export const InPlaceCopilot: React.FC<InPlaceCopilotProps> = ({
               <Bot className="w-5 h-5 text-amber-300" />
               <div>
                 <h3 className="text-xs font-black tracking-tight flex items-center gap-1.5">
-                  <span>In-Place Copilot</span>
-                  <span className="text-[9px] bg-white/20 px-1.5 py-0.5 rounded-full font-mono">2026</span>
+                  <span>In-Place Copilot 2026</span>
+                  <span className="text-[9px] bg-white/20 px-1.5 py-0.5 rounded-full font-mono">v2</span>
                 </h3>
-                <p className="text-[10px] text-indigo-100 opacity-90 truncate">
+                <p className="text-[10px] text-indigo-100 opacity-90 truncate max-w-[180px]">
                   {document.title}
                 </p>
               </div>
@@ -225,7 +316,7 @@ export const InPlaceCopilot: React.FC<InPlaceCopilotProps> = ({
               <button
                 onClick={onUndo}
                 disabled={!canUndo}
-                className="flex items-center space-x-1 px-2 py-1 rounded-lg bg-black/20 hover:bg-black/30 disabled:opacity-30 text-[11px] font-bold text-white transition cursor-pointer"
+                className="flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-black/25 hover:bg-black/40 disabled:opacity-30 text-[11px] font-bold text-white transition cursor-pointer"
                 title={canUndo ? `되돌리기: ${lastActionName}` : '되돌릴 작업 없음'}
               >
                 <RotateCcw className="w-3.5 h-3.5" />
@@ -242,22 +333,46 @@ export const InPlaceCopilot: React.FC<InPlaceCopilotProps> = ({
             </div>
           </div>
 
-          {/* 추천 퀵 프롬프트 칩들 */}
-          <div className="p-2 bg-slate-50 dark:bg-zinc-850/70 border-b border-slate-200 dark:border-zinc-800 flex items-center gap-1.5 overflow-x-auto text-[11px] shrink-0">
+          {/* 퀵 프롬프트 칩들 (실무 자연어 명령 4종) */}
+          <div className="p-2 bg-slate-50 dark:bg-zinc-850/70 border-b border-slate-200 dark:border-zinc-800 flex items-center gap-1.5 overflow-x-auto text-[11px] shrink-0 scrollbar-none">
             <button
-              onClick={() => handleSendMessage("표에 '외주비 150만 원' 추가해줘")}
-              className="flex items-center space-x-1 px-2.5 py-1 rounded-full bg-white dark:bg-zinc-800 hover:bg-indigo-50 dark:hover:bg-zinc-700 border border-slate-200 dark:border-zinc-700 text-slate-700 dark:text-zinc-200 font-semibold whitespace-nowrap transition cursor-pointer"
+              onClick={() => handleSendMessage("표에 디자인 외주비 120만 원 추가해줘")}
+              className="flex items-center space-x-1 px-2.5 py-1 rounded-full bg-white dark:bg-zinc-800 hover:bg-indigo-50 dark:hover:bg-zinc-700 border border-slate-200 dark:border-zinc-700 text-slate-700 dark:text-zinc-200 font-semibold whitespace-nowrap transition cursor-pointer shrink-0"
             >
               <Table className="w-3 h-3 text-emerald-500" />
-              <span>외주비 150만원 추가</span>
+              <span>외주비 120만 원 추가</span>
             </button>
 
             <button
-              onClick={() => handleSendMessage("공문서 말투로 바꿔줘")}
-              className="flex items-center space-x-1 px-2.5 py-1 rounded-full bg-white dark:bg-zinc-800 hover:bg-indigo-50 dark:hover:bg-zinc-700 border border-slate-200 dark:border-zinc-700 text-slate-700 dark:text-zinc-200 font-semibold whitespace-nowrap transition cursor-pointer"
+              onClick={() => handleSendMessage("표에 서버 호스팅비 50만 원 추가해줘")}
+              className="flex items-center space-x-1 px-2.5 py-1 rounded-full bg-white dark:bg-zinc-800 hover:bg-indigo-50 dark:hover:bg-zinc-700 border border-slate-200 dark:border-zinc-700 text-slate-700 dark:text-zinc-200 font-semibold whitespace-nowrap transition cursor-pointer shrink-0"
+            >
+              <Table className="w-3 h-3 text-emerald-500" />
+              <span>호스팅비 50만 원 추가</span>
+            </button>
+
+            <button
+              onClick={() => handleSendMessage("공문서체로 바꿔줘")}
+              className="flex items-center space-x-1 px-2.5 py-1 rounded-full bg-white dark:bg-zinc-800 hover:bg-indigo-50 dark:hover:bg-zinc-700 border border-slate-200 dark:border-zinc-700 text-slate-700 dark:text-zinc-200 font-semibold whitespace-nowrap transition cursor-pointer shrink-0"
             >
               <FileText className="w-3 h-3 text-blue-500" />
-              <span>공문서 말투 변환</span>
+              <span>공문서체 변환</span>
+            </button>
+
+            <button
+              onClick={() => handleSendMessage("정중체로 바꿔줘")}
+              className="flex items-center space-x-1 px-2.5 py-1 rounded-full bg-white dark:bg-zinc-800 hover:bg-indigo-50 dark:hover:bg-zinc-700 border border-slate-200 dark:border-zinc-700 text-slate-700 dark:text-zinc-200 font-semibold whitespace-nowrap transition cursor-pointer shrink-0"
+            >
+              <FileText className="w-3 h-3 text-purple-500" />
+              <span>정중체 변환</span>
+            </button>
+
+            <button
+              onClick={() => handleSendMessage("결재란에 부서장 추가해줘")}
+              className="flex items-center space-x-1 px-2.5 py-1 rounded-full bg-white dark:bg-zinc-800 hover:bg-indigo-50 dark:hover:bg-zinc-700 border border-slate-200 dark:border-zinc-700 text-slate-700 dark:text-zinc-200 font-semibold whitespace-nowrap transition cursor-pointer shrink-0"
+            >
+              <UserCheck className="w-3 h-3 text-indigo-500" />
+              <span>결재란에 부서장 추가</span>
             </button>
           </div>
 
@@ -285,7 +400,7 @@ export const InPlaceCopilot: React.FC<InPlaceCopilotProps> = ({
                   
                   {msg.appliedAction && (
                     <div className="mt-2 pt-1.5 border-t border-slate-100 dark:border-zinc-700/80 flex items-center space-x-1 text-[10px] text-emerald-600 dark:text-emerald-400 font-bold">
-                      <CheckCircle2 className="w-3 h-3" />
+                      <CheckCircle2 className="w-3 h-3 shrink-0" />
                       <span>{msg.appliedAction}</span>
                     </div>
                   )}
@@ -325,7 +440,7 @@ export const InPlaceCopilot: React.FC<InPlaceCopilotProps> = ({
                 type="text"
                 value={inputText}
                 onChange={(e) => setInputText(e.target.value)}
-                placeholder="명령어 또는 AI 수정 요청 입력..."
+                placeholder="자연어 명령 입력 (예: 표에 서버비 50만 원 추가)..."
                 className="flex-1 py-2 px-3 text-xs bg-slate-100 dark:bg-zinc-800 rounded-xl outline-none focus:ring-1 focus:ring-indigo-500 text-slate-800 dark:text-white"
               />
 

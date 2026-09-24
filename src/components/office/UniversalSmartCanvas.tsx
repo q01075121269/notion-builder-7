@@ -3,9 +3,10 @@ import type {
   OfficeDocument, 
   CanvasViewMode, 
   PlanTriad, 
+  PlanOption,
   OfficeCitation 
 } from '../../types/office';
-import { PlanTriadIncubator } from './PlanTriadIncubator';
+import { TriOptionIdeator } from './TriOptionIdeator';
 import { GovDocsCanvas } from './canvas/GovDocsCanvas';
 import { SlidesCanvas } from './canvas/SlidesCanvas';
 import { SheetsCanvas } from './canvas/SheetsCanvas';
@@ -18,8 +19,8 @@ interface UniversalSmartCanvasProps {
   viewMode: CanvasViewMode;
   onChangeViewMode: (mode: CanvasViewMode) => void;
   onChangeDocument: (updated: OfficeDocument, actionName: string) => void;
-  onSelectOption: (optionKey: 'A' | 'B' | 'C') => void;
-  onApplyPlanToDoc: (selectedKey: 'A' | 'B' | 'C', qaAnswers: { targetDetail: string; channelDetail: string }) => void;
+  onUpdatePlanTriad: (newTriad: PlanTriad) => void;
+  onApplyPlanToDoc: (selectedKey: 'A' | 'B' | 'C', qaAnswers: { targetDetail: string; channelDetail: string }, chosenOption?: PlanOption) => void;
   onSelectCitation?: (citation: OfficeCitation) => void;
   onSyncToLifeHub?: () => void;
 }
@@ -30,7 +31,7 @@ export const UniversalSmartCanvas: React.FC<UniversalSmartCanvasProps> = ({
   viewMode,
   onChangeViewMode,
   onChangeDocument,
-  onSelectOption,
+  onUpdatePlanTriad,
   onApplyPlanToDoc,
   onSelectCitation,
   onSyncToLifeHub
@@ -84,10 +85,10 @@ export const UniversalSmartCanvas: React.FC<UniversalSmartCanvasProps> = ({
       {/* 2. 본문 뷰 렌더러 (스크롤 가능) */}
       <div className="flex-1 overflow-y-auto">
         {viewMode === 'triad' && planTriad ? (
-          <PlanTriadIncubator
+          <TriOptionIdeator
             planTriad={planTriad}
-            onSelectOption={onSelectOption}
-            onApplyToDocument={onApplyPlanToDoc}
+            onUpdatePlanTriad={onUpdatePlanTriad}
+            onApplyPlanToDoc={onApplyPlanToDoc}
           />
         ) : (
           <div className="w-full min-h-full">
