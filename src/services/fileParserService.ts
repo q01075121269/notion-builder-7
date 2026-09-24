@@ -435,36 +435,99 @@ export async function parseSpreadsheet(file: File): Promise<{
   };
 }
 
+/**
+ * 바이너리 쓰레기값 및 깨진 외계어 텍스트 필터 (Garbage Guard)
+ * - %PDF 헤더나 PK 시그니처 시작 감지
+ * - 제어문자/바이너리 바이트 비율이 20% 이상 시 쓰레기값으로 처리
+ */
+export function isBinaryGarbageText(text: string): boolean {
+  if (!text || text.trim().length === 0) return true;
+  const trimmed = text.trim();
+
+  // 1. %PDF-1.x 외계어 헤더 및 PK 바이너리 시작 차단
+  if (/^%PDF/i.test(trimmed) || trimmed.includes('%PDF-1.') || /^PK\x03\x04/i.test(trimmed)) {
+    return true;
+  }
+
+  // 2. 비표준 제어문자 및 바이너리 바이트 비율 검사 (20% 이상 시 쓰레기값 처리)
+  let nonPrintableCount = 0;
+  for (let i = 0; i < text.length; i++) {
+    const code = text.charCodeAt(i);
+    // \t(9), \n(10), \r(13) 및 유효 한글/문자 이외의 제어문자/널바이트 검사
+    if ((code < 32 && code !== 9 && code !== 10 && code !== 13) || code === 65533) {
+      nonPrintableCount++;
+    }
+  }
+
+  const garbageRatio = nonPrintableCount / text.length;
+  return garbageRatio >= 0.20;
+}
+
 export async function parseWordOrTextDocument(file: File): Promise<string> {
   const ext = file.name.split('.').pop()?.toLowerCase() || '';
 
   if (ext === 'docx') {
     const arrayBuffer = await file.arrayBuffer();
-    // HTML 변환을 통해 제목(H1/H2) 및 목록 계층 보존
-    const htmlResult = await mammoth.convertToHtml({ arrayBuffer });
-    const rawResult = await mammoth.extractRawText({ arrayBuffer });
+    let markdown = '';
 
-    let markdown = htmlResult.value
-      .replace(/<h1>(.*?)<\/h1>/gi, '# $1\n')
-      .replace(/<h2>(.*?)<\/h2>/gi, '## $1\n')
-      .replace(/<h3>(.*?)<\/h3>/gi, '### $1\n')
-      .replace(/<ul>(.*?)<\/ul>/gis, '$1\n')
-      .replace(/<li>(.*?)<\/li>/gi, '- $1\n')
-      .replace(/<p>(.*?)<\/p>/gi, '$1\n\n')
-      .replace(/<strong>(.*?)<\/strong>/gi, '**$1**')
-      .replace(/<em>(.*?)<\/em>/gi, '*$1*')
-      .replace(/<[^>]+>/g, '') // 잔여 태그 제거
-      .trim();
+    // 1차: mammoth로 HTML/마크다운 추출 시도
+    try {
+      const htmlResult = await mammoth.convertToHtml({ arrayBuffer });
+      const rawResult = await mammoth.extractRawText({ arrayBuffer });
 
-    if (!markdown || markdown.length < 10) {
-      markdown = rawResult.value;
+      markdown = htmlResult.value
+        .replace(/<h1>(.*?)<\/h1>/gi, '# $1\n')
+        .replace(/<h2>(.*?)<\/h2>/gi, '## $1\n')
+        .replace(/<h3>(.*?)<\/h3>/gi, '### $1\n')
+        .replace(/<ul>(.*?)<\/ul>/gis, '$1\n')
+        .replace(/<li>(.*?)<\/li>/gi, '- $1\n')
+        .replace(/<p>(.*?)<\/p>/gi, '$1\n\n')
+        .replace(/<strong>(.*?)<\/strong>/gi, '**$1**')
+        .replace(/<em>(.*?)<\/em>/gi, '*$1*')
+        .replace(/<[^>]+>/g, '')
+        .trim();
+
+      if (!markdown || markdown.length < 10) {
+        markdown = (rawResult.value || '').trim();
+      }
+    } catch (mErr) {
+      console.warn('[Mammoth Parse Warning, switching to JSZip XML extractor]', mErr);
     }
 
-    return `📄 [워드 문서 구조 및 본문: "${file.name}"]\n\n${markdown}`;
+    // 2차 Fallback: JSZip으로 word/document.xml 압축 해제 후 <w:t> 순수 텍스트 추출
+    if (!markdown || markdown.length < 10 || isBinaryGarbageText(markdown)) {
+      try {
+        const zip = await JSZip.loadAsync(arrayBuffer);
+        const docXml = zip.file('word/document.xml');
+        if (docXml) {
+          const xmlContent = await docXml.async('text');
+          const parser = new DOMParser();
+          const xmlDoc = parser.parseFromString(xmlContent, 'application/xml');
+          const tElements = xmlDoc.getElementsByTagName('w:t');
+          const textChunks: string[] = [];
+          for (let i = 0; i < tElements.length; i++) {
+            const tVal = tElements[i].textContent || '';
+            if (tVal.trim()) textChunks.push(tVal.trim());
+          }
+          markdown = textChunks.join(' ').replace(/\s+/g, ' ').trim();
+        }
+      } catch (zipErr) {
+        console.warn('[DOCX JSZip Extract Error]', zipErr);
+      }
+    }
+
+    if (!markdown || markdown.length < 10 || isBinaryGarbageText(markdown)) {
+      throw new Error('Word(.docx) 문서 내 순수 텍스트를 추출하지 못했습니다.');
+    }
+
+    return `📄 [Word 문서 본문: "${file.name}"]\n\n${markdown}`;
   }
 
   // 텍스트 파일 (.txt, .md, .json)
   const textContent = await file.text();
+  if (isBinaryGarbageText(textContent)) {
+    throw new Error('텍스트 문서 내 바이너리 깨진 문자가 감지되어 첨부가 취소되었습니다.');
+  }
   const docLabel = ext === 'json' ? 'JSON 데이터' : '텍스트 문서';
   return `📝 [${docLabel} 내용: "${file.name}"]\n\n${textContent.slice(0, 15000)}`;
 }
@@ -483,7 +546,7 @@ export async function parsePdfDocument(file: File): Promise<string> {
     });
 
     const pdf = await loadingTask.promise;
-    const maxPages = Math.min(pdf.numPages, 10); // 최대 10페이지 파싱
+    const maxPages = Math.min(pdf.numPages, 15);
 
     for (let pageNum = 1; pageNum <= maxPages; pageNum++) {
       const page = await pdf.getPage(pageNum);
@@ -495,22 +558,21 @@ export async function parsePdfDocument(file: File): Promise<string> {
       }
     }
 
-    if (pdf.numPages > 10) {
-      pagesText.push(`*... (총 ${pdf.numPages}페이지 중 상위 10페이지 추출 완료)*`);
+    const combined = pagesText.join('\n\n').trim();
+
+    if (!combined || combined.length < 10 || isBinaryGarbageText(combined)) {
+      throw new Error('PDF 내부 텍스트 추출에 실패했습니다. 한글 프로그램에서 [텍스트 문서(.txt)] 또는 [Word(.docx)]로 저장해 첨부해주세요.');
+    }
+
+    if (pdf.numPages > 15) {
+      pagesText.push(`*... (총 ${pdf.numPages}페이지 중 상위 15페이지 추출 완료)*`);
     }
 
     return `📕 [PDF 문서 텍스트: "${file.name}" (총 ${pdf.numPages}페이지)]\n\n${pagesText.join('\n\n')}`;
-  } catch (err) {
-    console.warn('[PDF.js fallback mode]', err);
-    // 방어용 Fallback: ArrayBuffer 내 UTF-8 / ASCII 텍스트 스트림 정규식 파싱
-    const decoder = new TextDecoder('utf-8', { fatal: false });
-    const rawString = decoder.decode(arrayBuffer);
-    const textMatches = rawString.match(/\(([^()]{3,})\)/g);
-    if (textMatches && textMatches.length > 5) {
-      const extracted = textMatches.map(m => m.slice(1, -1)).join(' ').slice(0, 3000);
-      return `📕 [PDF 문서 텍스트 추출본: "${file.name}"]\n\n${extracted}`;
-    }
-    return `📕 [PDF 문서: "${file.name}"] - 텍스트 추출이 제한된 문서입니다. 본문 요약 또는 직접 텍스트 입력을 권장합니다.`;
+  } catch (err: any) {
+    console.warn('[PDF Parsing Error/Fallback Blocked]', err);
+    // 깨진 바이너리를 절대로 반환하지 않고 즉시 예외(throw)로 차단
+    throw new Error('PDF 내부 텍스트 추출에 실패했습니다. 한글 프로그램에서 [텍스트 문서(.txt)] 또는 [Word(.docx)]로 저장해 첨부해주세요.');
   }
 }
 
@@ -826,28 +888,35 @@ export async function parseUploadedFile(file: File): Promise<AttachedFile> {
   } finally {
     attached.isParsing = false;
 
-    // 본문 텍스트 유효 길이(10자 미만) 검증
+    // 바이너리 깨진 쓰레기 텍스트 및 유효 길이(10자 미만) 검증
     if (!attached.error) {
-      let rawTextLength = 0;
-      if (attached.parsedContent) {
-        rawTextLength += attached.parsedContent.replace(/[#\-\|\*\s`]/g, '').length;
-      }
-      if (attached.sheets) {
-        attached.sheets.forEach((s) => {
-          s.rows.forEach((r) => {
-            Object.values(r).forEach((v) => {
-              if (v) rawTextLength += String(v).trim().length;
-            });
-          });
-        });
-      }
-
-      if (rawTextLength < 10) {
-        attached.isTooShort = true;
-        attached.error = MIN_TEXT_LENGTH_MSG;
+      if (attached.parsedContent && isBinaryGarbageText(attached.parsedContent)) {
+        attached.error = '⚠️ 파일 내 바이너리 깨진 문자가 감지되었습니다. [텍스트 문서(.txt)] 또는 [Word(.docx)]로 변환해 첨부해주세요.';
         attached.parsedContent = undefined;
         attached.sheets = undefined;
         attached.summaryBadge = undefined;
+      } else {
+        let rawTextLength = 0;
+        if (attached.parsedContent) {
+          rawTextLength += attached.parsedContent.replace(/[#\-\|\*\s`]/g, '').length;
+        }
+        if (attached.sheets) {
+          attached.sheets.forEach((s) => {
+            s.rows.forEach((r) => {
+              Object.values(r).forEach((v) => {
+                if (v) rawTextLength += String(v).trim().length;
+              });
+            });
+          });
+        }
+
+        if (rawTextLength < 10) {
+          attached.isTooShort = true;
+          attached.error = MIN_TEXT_LENGTH_MSG;
+          attached.parsedContent = undefined;
+          attached.sheets = undefined;
+          attached.summaryBadge = undefined;
+        }
       }
     }
 

@@ -12,6 +12,9 @@ import type {
  * 프롬프트 지시문/시스템 명령어/Echo 문구 완전 박멸을 위한 정규식 패턴 목록
  */
 export const INSTRUCTION_ECHO_PATTERNS = [
+  /\/?문서의\s*실제\s*시트명[^\s]*\s*/gi,
+  /컬럼\s*헤더[^\s]*\s*/gi,
+  /어\s*현재\s*템플릿을[^\s]*\s*/gi,
   /(?:천북|첨부)?\s*파일(?:을|의|에)?\s*(?:반영|참고|분석|기반)[^\s]*\s*/gi,
   /지침\s*:\s*/gi,
   /\[지침\]\s*/gi,
@@ -54,17 +57,22 @@ export function sanitizeTextContent(raw?: string): string {
 export function sanitizeTemplateTitle(rawTitle?: string, fallback = '마스터 워크스페이스'): string {
   if (!rawTitle) return fallback;
 
-  // 1. 프롬프트 지시어 및 Echo 패턴 정규식으로 차단
+  // 1. 업무일지 키워드 감지 시 30자 이내 정제된 공식 명사형 제목 강제 부여
+  if (/업무일지|일지|일일\s*업무/i.test(rawTitle)) {
+    return '[일일 업무일지] 업무 진행 및 실행 관제 OS';
+  }
+
+  // 2. 프롬프트 지시어 및 Echo 패턴 정규식으로 차단
   let cleaned = sanitizeTextContent(rawTitle);
 
-  // 2. 따옴표, 대괄호, 마크다운 특수기호 및 특수문자 정리
+  // 3. 따옴표, 대괄호, 마크다운 특수기호 및 특수문자 정리
   cleaned = cleaned
     .replace(/^["'‘“`]+|["'’”`]+$/g, '')
     .replace(/[\[\]]/g, '')
     .replace(/^[\s:\-\.=]+|[\s:\-\.=]+$/g, '')
     .trim();
 
-  // 3. 문장형 서술어 제거 및 핵심 도메인 명사구 정제
+  // 4. 문장형 서술어 제거 및 핵심 도메인 명사구 정제
   cleaned = cleaned
     .replace(/(?:을|를)\s*위한\s*/g, ' ')
     .replace(/(?:에|의)\s*관한\s*/g, ' ')
@@ -72,7 +80,7 @@ export function sanitizeTemplateTitle(rawTitle?: string, fallback = '마스터 �
     .replace(/(?:템플릿|페이지|워크스페이스)\s*(?:생성|제작|구축)?$/g, '')
     .trim();
 
-  // 4. 30자 이내 제한 및 핵심 도메인 명사형 제목 포맷팅
+  // 5. 30자 이내 제한 및 핵심 도메인 명사형 제목 포맷팅
   if (cleaned.length > 30) {
     cleaned = cleaned.substring(0, 30).trim();
     const lastSpace = cleaned.lastIndexOf(' ');
@@ -81,7 +89,7 @@ export function sanitizeTemplateTitle(rawTitle?: string, fallback = '마스터 �
     }
   }
 
-  // 5. 정제 후 비어있거나 무의미한 지시문이었던 경우 fallback 리턴
+  // 6. 정제 후 비어있거나 무의미한 지시문이었던 경우 fallback 리턴
   if (!cleaned || cleaned.length < 2 || /^(프롬프트|명령어|지침|템플릿|파일|문서)$/i.test(cleaned)) {
     const validFallback = fallback && fallback !== rawTitle ? sanitizeTemplateTitle(fallback, '마스터 워크스페이스') : '마스터 워크스페이스';
     return validFallback;
@@ -170,6 +178,65 @@ export function ensureTemplateAgentBlueprint(template: NotionTemplate): NotionTe
 export function buildDynamicDatabases(title: string, description?: string): NotionDatabase[] {
   const cleanTitle = sanitizeTemplateTitle(title);
   
+  // 업무일지 감지: 레거시 품질검수(Quality_Status, Verified) 대신 실무 업무일지 컬럼 스키마 구성
+  const isDailyReport = /업무일지|일지|일일\s*업무|작성자|업무내용|특이사항/i.test(title + ' ' + (description || ''));
+
+  if (isDailyReport) {
+    const todayStr = new Date().toISOString().split('T')[0];
+    return [
+      {
+        name: `📌 [일일 업무일지] 마스터 관제 트래커`,
+        description: description || `일일 업무 진행 상황, 작성자 및 특이사항 통합 관리 DB`,
+        view_type: 'table',
+        properties: [
+          { name: '업무 내용', type: 'title' },
+          { name: '작성일자', type: 'date' },
+          { name: '작성자', type: 'text' },
+          { name: '업무 분류', type: 'select', options: ['기획/분석', '개발/구현', '운영/관리', '회의/협의', '기타'] },
+          { name: '진행상태', type: 'status', options: ['대기', '진행중', '검토중', '완료'] },
+          { name: '우선순위', type: 'select', options: ['높음 (P1)', '보통 (P2)', '낮음 (P3)'] },
+          { name: '소요시간(h)', type: 'number' },
+          { name: '특이사항 및 이슈', type: 'text' }
+        ],
+        sample_rows: [
+          { '업무 내용': '주간 개발 모듈 리팩토링 및 릴리즈 검수', '작성일자': todayStr, '작성자': '홍길동', '업무 분류': '개발/구현', '진행상태': '완료', '우선순위': '높음 (P1)', '소요시간(h)': 4, '특이사항 및 이슈': '성능 이슈 1건 수정 완료' },
+          { '업무 내용': '신규 노션 빌더 AI 프롬프트 지시어 정제', '작성일자': todayStr, '작성자': '김철수', '업무 분류': '기획/분석', '진행상태': '진행중', '우선순위': '높음 (P1)', '소요시간(h)': 3, '특이사항 및 이슈': '정규식 필터링 테스트 수행 중' }
+        ]
+      },
+      {
+        name: `📋 세부 실행 과제 & 이슈 타임라인`,
+        description: `업무일지 연관 세부 과제 및 데드라인 관리 DB`,
+        view_type: 'table',
+        properties: [
+          { name: '세부 과제명', type: 'title' },
+          { name: '관련 업무일지', type: 'relation', target: `📌 [일일 업무일지] 마스터 관제 트래커` },
+          { name: '마감일', type: 'date' },
+          { name: '담당자', type: 'text' },
+          { name: '상태', type: 'status', options: ['시작전', '진행중', '완료'] },
+          { name: '비고', type: 'text' }
+        ],
+        sample_rows: [
+          { '세부 과제명': '파서 모듈 바이너리 쓰레기값 검증 로직 반영', '담당자': '홍길동', '상태': '진행중', '비고': 'Garbage Guard 20% 적용 완료' }
+        ]
+      },
+      {
+        name: `📂 업무 자료 & 산출물 아카이브`,
+        description: `업무일지 관련 첨부 파일, 참조 링크 및 보고서 보관 DB`,
+        view_type: 'table',
+        properties: [
+          { name: '자료명', type: 'title' },
+          { name: '관련 업무일지', type: 'relation', target: `📌 [일일 업무일지] 마스터 관제 트래커` },
+          { name: '구분', type: 'select', options: ['보고서', '참조문서', '산출물', '기타'] },
+          { name: '첨부/링크', type: 'url' },
+          { name: '비고', type: 'text' }
+        ],
+        sample_rows: [
+          { '자료명': '일일 업무 현황 리포트 문서', '구분': '보고서', '비고': 'PDF 파싱 검증 완료본' }
+        ]
+      }
+    ];
+  }
+
   return [
     {
       name: `📌 ${cleanTitle} 마스터 트래커`,
