@@ -16,7 +16,6 @@ import {
   Clock, 
   Send, 
   Mic, 
-  MicOff, 
   Paperclip, 
   Bot, 
   Database, 
@@ -26,7 +25,8 @@ import {
   CalendarDays, 
   Wallet,
   X,
-  Loader2
+  Loader2,
+  Square
 } from 'lucide-react';
 import { parseUploadedFile } from '../services/fileParserService';
 import type { AttachedFile } from '../types/fileAttachment';
@@ -123,6 +123,7 @@ export const HomePage: React.FC = () => {
   const handleSend = () => {
     const trimmed = inputPrompt.trim();
     if ((!trimmed && attachedFiles.length === 0) || isGenerating) return;
+    stopListening();
     const promptToSend = inputPrompt;
     const filesToSend = [...attachedFiles];
     setInputPrompt('');
@@ -158,15 +159,29 @@ export const HomePage: React.FC = () => {
     }
   };
 
-  // 음성 인식 (STT) 토글
+  const isListeningRef = useRef<boolean>(false);
+  const recognitionRef = useRef<any>(null);
+  const basePromptRef = useRef<string>('');
+
+  const stopListening = () => {
+    isListeningRef.current = false;
+    setIsListening(false);
+    if (recognitionRef.current) {
+      try { recognitionRef.current.stop(); } catch {}
+      recognitionRef.current = null;
+    }
+  };
+
+  // 음성 인식 (STT) 토글 - continuous & 침묵 방어 & 누적 버퍼
   const toggleListening = () => {
     if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
-      showToast('이 브라우저는 음성 인식을 지원하지 않습니다.', 'warning');
+      showToast('이 브라우저는 음성 인식을 지원하지 않습니다. Chrome/Edge를 사용해 주세요.', 'warning');
       return;
     }
 
     if (isListening) {
-      setIsListening(false);
+      stopListening();
+      showToast('⏹️ 음성 인식이 중지되었습니다.', 'info');
       return;
     }
 
@@ -174,33 +189,67 @@ export const HomePage: React.FC = () => {
       const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
       const recognition = new SpeechRecognition();
       recognition.lang = 'ko-KR';
-      recognition.continuous = false;
+      recognition.continuous = true;
       recognition.interimResults = true;
+
+      basePromptRef.current = inputPrompt ? inputPrompt.trim() + ' ' : '';
+      isListeningRef.current = true;
+      recognitionRef.current = recognition;
 
       recognition.onstart = () => {
         setIsListening(true);
-        showToast('🎙️ 음성을 듣고 있습니다...', 'info');
+        showToast('🎙️ 음성을 듣고 있습니다... (말이 끊겨도 계속 녹음됩니다)', 'info');
       };
 
       recognition.onresult = (event: any) => {
-        const transcript = Array.from(event.results)
-          .map((res: any) => res[0].transcript)
-          .join('');
-        setInputPrompt(transcript);
+        let interimTranscript = '';
+        let finalTranscript = '';
+
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          const res = event.results[i];
+          if (res.isFinal) {
+            finalTranscript += res[0].transcript + ' ';
+          } else {
+            interimTranscript += res[0].transcript;
+          }
+        }
+
+        if (finalTranscript) {
+          basePromptRef.current += finalTranscript;
+        }
+
+        const currentCombined = (basePromptRef.current + interimTranscript).trim();
+        setInputPrompt(currentCombined);
       };
 
-      recognition.onerror = () => {
-        setIsListening(false);
-        showToast('음성 인식 중 오류가 발생했습니다.', 'error');
+      recognition.onerror = (e: any) => {
+        console.warn('[STT] recognition error:', e);
+        if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
+          stopListening();
+          showToast('마이크 접근 권한이 거부되었습니다.', 'error');
+        }
       };
 
       recognition.onend = () => {
-        setIsListening(false);
+        // 사용자가 명시적으로 녹음 중지를 누르지 않았다면 침묵 방어로 자동 재시작
+        if (isListeningRef.current) {
+          try {
+            recognition.start();
+          } catch {
+            // start 실패시 안전하게 딜레이 후 재시도
+            setTimeout(() => {
+              if (isListeningRef.current) {
+                try { recognition.start(); } catch {}
+              }
+            }, 300);
+          }
+        }
       };
 
       recognition.start();
-    } catch {
-      setIsListening(false);
+    } catch (err) {
+      console.error('[STT] Initialization failed:', err);
+      stopListening();
     }
   };
 
@@ -418,14 +467,21 @@ export const HomePage: React.FC = () => {
 
                 <button
                   onClick={toggleListening}
-                  className={`p-2 rounded-xl transition cursor-pointer ${
+                  className={`flex items-center space-x-1 px-2.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
                     isListening
-                      ? 'bg-red-500 text-white animate-pulse'
+                      ? 'bg-red-500 text-white animate-pulse shadow-md'
                       : 'text-neutral-500 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800'
                   }`}
-                  title={isListening ? '음성 인식 중지' : '음성 입력'}
+                  title={isListening ? '녹음 중지 (클릭 시 종료)' : '음성 지속 입력 (클릭 시 시작)'}
                 >
-                  {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                  {isListening ? (
+                    <>
+                      <Square className="w-3.5 h-3.5 fill-current" />
+                      <span className="text-[11px]">녹음 중지</span>
+                    </>
+                  ) : (
+                    <Mic className="w-4 h-4" />
+                  )}
                 </button>
               </div>
 

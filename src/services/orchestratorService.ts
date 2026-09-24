@@ -86,7 +86,7 @@ export async function sendToOrchestrator(
   };
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 15000);
+  const timeoutId = setTimeout(() => controller.abort(), 90000);
 
   try {
     const response = await fetch('/api/orchestrator', {
