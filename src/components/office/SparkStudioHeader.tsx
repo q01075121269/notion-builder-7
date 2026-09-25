@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useSparkTheme, type SparkTheme } from '../../context/SparkThemeContext';
-import { Search, Mic, MicOff, Sparkles, Loader2 } from 'lucide-react';
+import { useSparkTheme } from '../../context/SparkThemeContext';
+import { Search, Mic, MicOff, Sparkles, Loader2, Sun, Moon } from 'lucide-react';
 
 interface SparkStudioHeaderProps {
   onStartResearch: (query: string) => void;
@@ -13,7 +13,7 @@ export const SparkStudioHeader: React.FC<SparkStudioHeaderProps> = ({
   isResearching = false,
   defaultQuery = '스마트 시설물 유지관리 및 AI 에이전트 행정 자동화'
 }) => {
-  const { theme, setTheme, themeConfig } = useSparkTheme();
+  const { theme, toggleTheme, themeConfig } = useSparkTheme();
   const [searchQuery, setSearchQuery] = useState(defaultQuery);
   const [isListening, setIsListening] = useState(false);
   const recognitionRef = useRef<any>(null);
@@ -79,12 +79,6 @@ export const SparkStudioHeader: React.FC<SparkStudioHeaderProps> = ({
       onStartResearch(searchQuery.trim());
     }
   };
-
-  const themes: { id: SparkTheme; label: string; icon: string }[] = [
-    { id: 'silicon-dark', label: '실리콘 다크', icon: '🌌' },
-    { id: 'clean-modern', label: '클린 모던', icon: '🏛️' },
-    { id: 'warm-editorial', label: '웜 에디토리얼', icon: '☕' }
-  ];
 
   return (
     <header className={`w-full border-b ${themeConfig.headerBorder} ${themeConfig.headerBg} px-4 lg:px-6 py-2.5 transition-colors duration-200 z-30 shrink-0 shadow-2xs`}>
@@ -162,30 +156,28 @@ export const SparkStudioHeader: React.FC<SparkStudioHeaderProps> = ({
           </div>
         </form>
 
-        {/* [원클릭 테마 전환 세그먼트]: 3대 테마 토글 버튼 그룹 */}
-        <div className="flex items-center space-x-1 p-1 rounded-xl bg-slate-900/60 dark:bg-black/40 border border-slate-700/50 backdrop-blur shrink-0">
-          {themes.map(t => {
-            const isActive = theme === t.id;
-            return (
-              <button
-                key={t.id}
-                type="button"
-                onClick={() => setTheme(t.id)}
-                className={`
-                  flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 cursor-pointer whitespace-nowrap
-                  ${isActive
-                    ? 'bg-slate-800/90 text-white shadow-sm ring-1 ring-white/10 font-bold'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/30'
-                  }
-                `}
-                title={`${t.label} 비주얼 테마로 전환`}
-              >
-                <span className="text-sm">{t.icon}</span>
-                <span className="hidden sm:inline">{t.label}</span>
-              </button>
-            );
-          })}
-        </div>
+        {/* [Google NotebookLM 단일 2단 Dark / Light 토글 스위치] */}
+        <button
+          type="button"
+          onClick={toggleTheme}
+          className={`
+            flex items-center space-x-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer whitespace-nowrap border shrink-0
+            ${themeConfig.pillBg} ${themeConfig.pillBorder} ${themeConfig.textPrimary} hover:opacity-90 shadow-xs
+          `}
+          title={theme === 'dark' ? '라이트 모드로 전환' : '다크 모드로 전환'}
+        >
+          {theme === 'dark' ? (
+            <>
+              <Sun className="w-4 h-4 text-amber-400 shrink-0" />
+              <span>라이트 모드</span>
+            </>
+          ) : (
+            <>
+              <Moon className="w-4 h-4 text-[#1a73e8] shrink-0" />
+              <span>다크 모드</span>
+            </>
+          )}
+        </button>
 
       </div>
     </header>
