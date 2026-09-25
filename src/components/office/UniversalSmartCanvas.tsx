@@ -60,33 +60,33 @@ export const UniversalSmartCanvas: React.FC<UniversalSmartCanvasProps> = ({
     <div className={`w-full h-full flex flex-col ${themeConfig.appBg} overflow-hidden select-none relative transition-colors duration-200`}>
       
       {/* 1. 상단 모드 전환 탭 바 (3-Way 기획 vs Bento Grid 스파크 캔버스) */}
-      <div className={`px-4 sm:px-6 py-2 border-b ${themeConfig.headerBorder} ${themeConfig.headerBg} flex items-center justify-between shrink-0 shadow-2xs transition-colors duration-200`}>
-        <div className="flex items-center space-x-1 sm:space-x-2 bg-black/20 p-1 rounded-xl border border-white/5">
+      <div className={`px-4 sm:px-6 py-2 border-b border-[var(--border-color)] bg-[var(--bg-surface)] flex items-center justify-between shrink-0 shadow-xs transition-colors duration-200`}>
+        <div className="flex items-center space-x-1 sm:space-x-2 bg-slate-200/80 dark:bg-black/40 p-1 rounded-xl border border-slate-300 dark:border-white/10">
           <button
             onClick={() => onChangeViewMode('canvas')}
             className={`
-              flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer whitespace-nowrap
+              flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs transition cursor-pointer whitespace-nowrap
               ${viewMode === 'canvas'
-                ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 font-bold shadow-xs'
-                : 'text-slate-400 hover:text-white'
+                ? 'bg-slate-900 text-white dark:bg-blue-600/30 dark:text-blue-300 dark:border dark:border-blue-500/50 font-semibold shadow-sm'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 font-medium'
               }
             `}
           >
-            <LayoutDashboard className="w-4 h-4 mr-1 text-cyan-400 shrink-0" />
+            <LayoutDashboard className="w-4 h-4 mr-1 text-blue-500 dark:text-blue-400 shrink-0" />
             <span>스파크 캔버스 (Bento Grid)</span>
           </button>
 
           <button
             onClick={() => onChangeViewMode('triad')}
             className={`
-              flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer whitespace-nowrap
+              flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs transition cursor-pointer whitespace-nowrap
               ${viewMode === 'triad'
-                ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 font-bold shadow-xs'
-                : 'text-slate-400 hover:text-white'
+                ? 'bg-slate-900 text-white dark:bg-blue-600/30 dark:text-blue-300 dark:border dark:border-blue-500/50 font-semibold shadow-sm'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 font-medium'
               }
             `}
           >
-            <Sparkles className="w-4 h-4 mr-1 text-indigo-400 shrink-0" />
+            <Sparkles className="w-4 h-4 mr-1 text-indigo-500 dark:text-indigo-400 shrink-0" />
             <span>3-Way 전략 비교</span>
           </button>
         </div>

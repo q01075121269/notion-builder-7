@@ -368,14 +368,14 @@ export const SparkpageCanvas: React.FC<SparkpageCanvasProps> = ({
               
               {/* 메타 태그 */}
               <div className="flex flex-wrap items-center gap-2.5 mb-3">
-                <span className={`inline-flex items-center space-x-1.5 px-3 py-1 rounded-full text-xs font-bold border ${themeConfig.pillBg} ${themeConfig.pillBorder} ${themeConfig.pillText}`}>
-                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                <span className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full text-xs font-medium border bg-emerald-50 dark:bg-emerald-950/70 text-emerald-800 dark:text-emerald-300 border-emerald-300 dark:border-emerald-600/50 shadow-xs">
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
                   <span>Verified by {displaySources.length} Web Sources</span>
-                  <span className="font-mono font-extrabold text-emerald-500">(신뢰도 {heroConfidence}%)</span>
+                  <span className="font-mono font-extrabold text-emerald-700 dark:text-emerald-300">(신뢰도 {heroConfidence}%)</span>
                 </span>
 
-                <span className={`inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-[11px] font-semibold ${themeConfig.pillBg} ${themeConfig.textMuted}`}>
-                  <Sparkles className="w-3 h-3 text-[#a8c7fa] shrink-0" />
+                <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-[11px] font-medium border bg-sky-50 dark:bg-sky-950/70 text-sky-800 dark:text-sky-300 border-sky-300 dark:border-sky-600/50">
+                  <Sparkles className="w-3 h-3 text-sky-600 dark:text-sky-400 shrink-0" />
                   <span>Google Search Grounding Live</span>
                 </span>
 
@@ -394,7 +394,7 @@ export const SparkpageCanvas: React.FC<SparkpageCanvasProps> = ({
                   setHeroTitle(newT);
                   syncToDocument(newT);
                 }}
-                className={`text-2xl sm:text-3xl lg:text-4xl font-extrabold tracking-tight break-keep text-balance leading-tight cursor-text outline-none p-1 rounded-xl transition hover:bg-white/5 focus:ring-2 focus:ring-[#a8c7fa]/30 ${themeConfig.textPrimary}`}
+                className={`text-2xl sm:text-3xl lg:text-4xl font-extrabold tracking-tight break-keep text-balance leading-tight cursor-text outline-none p-1 rounded-xl transition hover:bg-black/5 dark:hover:bg-white/5 focus:ring-2 focus:ring-[#a8c7fa]/30 ${themeConfig.textPrimary}`}
                 title="클릭하여 보고서 제목을 직접 수정하세요"
               >
                 {heroTitle}
@@ -405,7 +405,7 @@ export const SparkpageCanvas: React.FC<SparkpageCanvasProps> = ({
                 contentEditable
                 suppressContentEditableWarning
                 onBlur={(e) => setHeroSummary(e.currentTarget.textContent || '')}
-                className={`mt-3 text-sm sm:text-base font-normal leading-relaxed break-keep text-balance outline-none p-1 rounded-xl hover:bg-white/5 ${themeConfig.textSecondary}`}
+                className={`mt-3 text-sm sm:text-base font-normal leading-relaxed break-keep text-balance outline-none p-1 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 ${themeConfig.textSecondary}`}
                 title="클릭하여 요약 브리핑을 직접 수정하세요"
               >
                 {heroSummary}
@@ -413,13 +413,13 @@ export const SparkpageCanvas: React.FC<SparkpageCanvasProps> = ({
             </div>
 
             {/* 우측 리서치 일시 */}
-            <div className={`shrink-0 flex md:flex-col items-end justify-between p-3 rounded-2xl border ${themeConfig.pillBg} ${themeConfig.pillBorder}`}>
-              <div className={`flex items-center space-x-1.5 text-xs font-mono ${themeConfig.textMuted}`}>
-                <Clock className="w-3.5 h-3.5 text-[#a8c7fa]" />
+            <div className="shrink-0 flex md:flex-col items-end justify-between p-3 rounded-2xl border bg-sky-50 dark:bg-sky-950/70 border-sky-300 dark:border-sky-600/50 shadow-xs">
+              <div className="flex items-center space-x-1.5 text-xs font-mono text-sky-800 dark:text-sky-300 font-medium">
+                <Clock className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400" />
                 <span>{sparkpageData?.generatedAt ? new Date(sparkpageData.generatedAt).toLocaleDateString() : '2026.09.25'} 리서치 완료</span>
               </div>
-              <div className="mt-1 flex items-center space-x-1 text-[11px] text-emerald-500 font-semibold">
-                <Activity className="w-3 h-3 animate-pulse" />
+              <div className="mt-1 flex items-center space-x-1 text-[11px] text-emerald-700 dark:text-emerald-300 font-semibold">
+                <Activity className="w-3 h-3 animate-pulse text-emerald-600 dark:text-emerald-400" />
                 <span>Google Grounding Sync</span>
               </div>
             </div>

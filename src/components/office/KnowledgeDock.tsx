@@ -308,7 +308,7 @@ export const KnowledgeDock: React.FC<KnowledgeDockProps> = ({
           {/* 파일 업로드 버튼 */}
           <button
             onClick={() => fileInputRef.current?.click()}
-            className="flex items-center justify-center space-x-1 py-2 px-2 rounded-xl bg-[var(--bg-card)] hover:opacity-90 border border-[var(--border-color)] text-[var(--text-primary)] text-xs font-bold transition shadow-xs cursor-pointer"
+            className="flex items-center justify-center space-x-1 py-2 px-2 rounded-xl bg-[var(--bg-card)] hover:opacity-90 border border-[var(--border-color)] text-slate-800 dark:text-slate-200 text-xs font-medium transition shadow-xs cursor-pointer"
             title="PDF, XLSX 파일 드래그앤드롭 업로드"
           >
             <FileUp className="w-3.5 h-3.5 text-blue-500" />
@@ -326,10 +326,10 @@ export const KnowledgeDock: React.FC<KnowledgeDockProps> = ({
           {/* URL 추가 버튼 */}
           <button
             onClick={() => setActiveInputTab(activeInputTab === 'url' ? 'none' : 'url')}
-            className={`flex items-center justify-center space-x-1 py-2 px-2 rounded-xl border text-xs font-bold transition shadow-xs cursor-pointer ${
+            className={`flex items-center justify-center space-x-1 py-2 px-2 rounded-xl border text-xs font-medium transition shadow-xs cursor-pointer ${
               activeInputTab === 'url'
                 ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30'
-                : 'bg-[var(--bg-card)] hover:opacity-90 border-[var(--border-color)] text-[var(--text-primary)]'
+                : 'bg-[var(--bg-card)] hover:opacity-90 border-[var(--border-color)] text-slate-800 dark:text-slate-200'
             }`}
             title="웹페이지 URL 소스 등록"
           >
@@ -340,10 +340,10 @@ export const KnowledgeDock: React.FC<KnowledgeDockProps> = ({
           {/* 음성 녹음 버튼 */}
           <button
             onClick={() => setActiveInputTab(activeInputTab === 'voice' ? 'none' : 'voice')}
-            className={`flex items-center justify-center space-x-1 py-2 px-2 rounded-xl border text-xs font-bold transition shadow-xs cursor-pointer ${
+            className={`flex items-center justify-center space-x-1 py-2 px-2 rounded-xl border text-xs font-medium transition shadow-xs cursor-pointer ${
               activeInputTab === 'voice'
                 ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30'
-                : 'bg-[var(--bg-card)] hover:opacity-90 border-[var(--border-color)] text-[var(--text-primary)]'
+                : 'bg-[var(--bg-card)] hover:opacity-90 border-[var(--border-color)] text-slate-800 dark:text-slate-200'
             }`}
             title="음성 메모 실시간 STT"
           >

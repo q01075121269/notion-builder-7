@@ -235,7 +235,7 @@ export const NotebookStudioPanel: React.FC<NotebookStudioPanelProps> = ({
       label: 'AI 오디오 오버뷰',
       desc: '2분 팟캐스트 요약',
       icon: Headphones,
-      color: 'from-amber-500/20 to-orange-500/20 text-amber-500 border-amber-500/30',
+      color: 'from-amber-500/20 to-orange-500/20 text-amber-600 dark:text-amber-400 border-amber-500/30',
       activeColor: 'ring-2 ring-amber-500 bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400',
       isFormat: false,
       onClick: onOpenAudioBriefing
@@ -246,7 +246,7 @@ export const NotebookStudioPanel: React.FC<NotebookStudioPanelProps> = ({
       label: '슬라이드 자료',
       desc: '16:9 발표 카드 슬라이드',
       icon: Presentation,
-      color: 'from-blue-500/20 to-indigo-500/20 text-blue-500 border-blue-500/30',
+      color: 'from-blue-500/20 to-indigo-500/20 text-blue-600 dark:text-blue-400 border-blue-500/30',
       activeColor: 'ring-2 ring-blue-500 bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400',
       isFormat: true,
       onClick: () => onChangeFormat('slides')
@@ -257,7 +257,7 @@ export const NotebookStudioPanel: React.FC<NotebookStudioPanelProps> = ({
       label: '마인드맵',
       desc: '시각적 인터랙티브 트리',
       icon: GitFork,
-      color: 'from-indigo-500/20 to-purple-500/20 text-indigo-500 border-indigo-500/30',
+      color: 'from-indigo-500/20 to-purple-500/20 text-indigo-600 dark:text-indigo-400 border-indigo-500/30',
       activeColor: 'ring-2 ring-indigo-500 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400',
       isFormat: true,
       onClick: () => onChangeFormat('mindmap')
@@ -268,7 +268,7 @@ export const NotebookStudioPanel: React.FC<NotebookStudioPanelProps> = ({
       label: '인포그래픽',
       desc: '고해상도 비주얼 벤토',
       icon: LayoutGrid,
-      color: 'from-purple-500/20 to-pink-500/20 text-purple-500 border-purple-500/30',
+      color: 'from-purple-500/20 to-pink-500/20 text-purple-600 dark:text-purple-400 border-purple-500/30',
       activeColor: 'ring-2 ring-purple-500 bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400',
       isFormat: true,
       onClick: () => onChangeFormat('infographic')
@@ -279,7 +279,7 @@ export const NotebookStudioPanel: React.FC<NotebookStudioPanelProps> = ({
       label: '공문서/기안서',
       desc: '행안부 표준 결재선 규격',
       icon: FileText,
-      color: 'from-emerald-500/20 to-teal-500/20 text-emerald-500 border-emerald-500/30',
+      color: 'from-emerald-500/20 to-teal-500/20 text-emerald-600 dark:text-emerald-400 border-emerald-500/30',
       activeColor: 'ring-2 ring-emerald-500 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400',
       isFormat: true,
       onClick: () => onChangeFormat('docs')
@@ -290,7 +290,7 @@ export const NotebookStudioPanel: React.FC<NotebookStudioPanelProps> = ({
       label: '데이터 표',
       desc: '=SUM() 인터랙티브 시트',
       icon: Table,
-      color: 'from-cyan-500/20 to-blue-500/20 text-cyan-500 border-cyan-500/30',
+      color: 'from-cyan-500/20 to-blue-500/20 text-cyan-600 dark:text-cyan-400 border-cyan-500/30',
       activeColor: 'ring-2 ring-cyan-500 bg-cyan-50 dark:bg-cyan-950/40 text-cyan-600 dark:text-cyan-400',
       isFormat: true,
       onClick: () => onChangeFormat('sheets')
@@ -301,7 +301,7 @@ export const NotebookStudioPanel: React.FC<NotebookStudioPanelProps> = ({
       label: '회의록 및 할 일',
       desc: 'STT 전사 및 액션 아이템',
       icon: Mic,
-      color: 'from-rose-500/20 to-red-500/20 text-rose-500 border-rose-500/30',
+      color: 'from-rose-500/20 to-red-500/20 text-rose-600 dark:text-rose-400 border-rose-500/30',
       activeColor: 'ring-2 ring-rose-500 bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400',
       isFormat: true,
       onClick: () => onChangeFormat('minutes')
@@ -312,7 +312,7 @@ export const NotebookStudioPanel: React.FC<NotebookStudioPanelProps> = ({
       label: '브리핑 리포트',
       desc: '경영진 1-Page 핵심 요약',
       icon: FileCheck,
-      color: 'from-teal-500/20 to-emerald-500/20 text-teal-500 border-teal-500/30',
+      color: 'from-teal-500/20 to-emerald-500/20 text-teal-600 dark:text-teal-400 border-teal-500/30',
       activeColor: 'ring-2 ring-teal-500 bg-teal-50 dark:bg-teal-950/40 text-teal-600 dark:text-teal-400',
       isFormat: true,
       onClick: () => onChangeFormat('briefing')
@@ -422,10 +422,10 @@ export const NotebookStudioPanel: React.FC<NotebookStudioPanelProps> = ({
                     </div>
 
                     <div>
-                      <div className={`text-xs font-bold truncate ${isActive ? 'text-[var(--accent-color)]' : 'text-[var(--text-primary)]'}`}>
+                      <div className={`text-xs font-semibold truncate ${isActive ? 'text-[var(--accent-color)]' : 'text-slate-900 dark:text-slate-100'}`}>
                         {gen.label}
                       </div>
-                      <div className="text-[10px] text-[var(--text-secondary)] truncate mt-0.5">
+                      <div className={`text-xs truncate mt-0.5 ${isActive ? 'text-[var(--accent-color)]/80' : 'text-slate-500 dark:text-slate-400'}`}>
                         {gen.desc}
                       </div>
                     </div>
