@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { OfficeDocument, DocSection, OfficeCitation } from '../../../types/office';
 import { Plus, Trash2, Info, Sparkles, Building2 } from 'lucide-react';
 import { FactCitationPopover } from '../FactCitationPopover';
@@ -17,12 +17,53 @@ export const GovDocsCanvas: React.FC<GovDocsCanvasProps> = ({
   const [activeTooltip, setActiveTooltip] = useState<string | null>(null);
   const [popoverCitation, setPopoverCitation] = useState<OfficeCitation | null>(null);
   const [approverStatus, setApproverStatus] = useState<Record<number, boolean>>({ 0: true, 1: true, 2: true, 3: false }); // [기안, 팀장, 본부장, 대표이사]
+  const [highlightedField, setHighlightedField] = useState<string | null>(null);
+
+  // 코파일럿 인플레이스 변이 시 해당 캔버스 영역 1.5초간 하이라이트 애니메이션
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const customEvent = e as CustomEvent<{ target: string }>;
+      const target = customEvent.detail?.target;
+      if (target) {
+        setHighlightedField(target);
+        const timer = setTimeout(() => {
+          setHighlightedField(null);
+        }, 1500);
+        return () => clearTimeout(timer);
+      }
+    };
+
+    window.addEventListener('anti-office-highlight', handler);
+    return () => window.removeEventListener('anti-office-highlight', handler);
+  }, []);
 
   const toggleApproval = (index: number) => {
     setApproverStatus(prev => ({
       ...prev,
       [index]: !prev[index]
     }));
+  };
+
+  const handleMetadataChange = (key: 'docNumber' | 'department' | 'author' | 'date', value: string) => {
+    onChangeDocument({
+      ...document,
+      metadata: {
+        ...document.metadata,
+        [key]: value
+      }
+    }, `문서 ${key} 수정`);
+  };
+
+  const handleApproverRoleChange = (idx: number, newRole: string) => {
+    const newApprovers = [...(document.metadata.approvers || ['기획(기안)', '박팀장(검토)', '이본부장(결재)'])];
+    newApprovers[idx] = newRole;
+    onChangeDocument({
+      ...document,
+      metadata: {
+        ...document.metadata,
+        approvers: newApprovers
+      }
+    }, `결재선 직급 수정`);
   };
 
   const handleSectionTextChange = (id: string, newText: string) => {
@@ -138,16 +179,23 @@ export const GovDocsCanvas: React.FC<GovDocsCanvasProps> = ({
       <div className="w-full max-w-[850px] bg-white dark:bg-zinc-900 rounded-2xl shadow-xl border border-slate-200 dark:border-zinc-800 p-6 sm:p-12 relative transition-all">
         
         {/* 상단 공문서 워터마크 & 헤더 */}
-        <div className="flex items-center justify-between border-b-2 border-slate-900 dark:border-zinc-100 pb-4 mb-6">
-          <div className="flex items-center space-x-2">
-            <Building2 className="w-6 h-6 text-slate-800 dark:text-zinc-200" />
-            <div>
-              <span className="text-[10px] font-bold tracking-widest text-slate-500 dark:text-zinc-400 uppercase">
+        <div className="flex items-center justify-between border-b-2 border-slate-900 dark:border-zinc-100 pb-4 mb-6 gap-4">
+          <div className="flex items-center space-x-2 flex-1 min-w-0">
+            <Building2 className="w-6 h-6 text-slate-800 dark:text-zinc-200 shrink-0" />
+            <div className="flex-1 min-w-0">
+              <span className="text-[10px] font-bold tracking-widest text-slate-500 dark:text-zinc-400 uppercase block">
                 Enterprise Official Document
               </span>
-              <h1 className="text-xl sm:text-2xl font-black text-slate-950 dark:text-white tracking-tight">
-                {document.title}
-              </h1>
+              <input
+                type="text"
+                value={document.title}
+                onChange={(e) => onChangeDocument({ ...document, title: e.target.value }, '문서 제목 변경')}
+                placeholder="문서 제목을 입력하세요"
+                title="클릭하여 문서 제목 직접 수정"
+                className={`w-full text-xl sm:text-2xl font-black text-slate-950 dark:text-white tracking-tight bg-transparent hover:bg-slate-100/70 dark:hover:bg-zinc-800/60 focus:bg-white dark:focus:bg-zinc-850 px-1.5 py-0.5 rounded-lg border border-transparent hover:border-slate-300 dark:hover:border-zinc-700 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-300 dark:focus:ring-indigo-800 outline-none transition ${
+                  highlightedField === 'title' ? 'ring-2 ring-indigo-400 bg-indigo-50/60 dark:bg-indigo-950/50' : ''
+                }`}
+              />
             </div>
           </div>
 
@@ -162,10 +210,19 @@ export const GovDocsCanvas: React.FC<GovDocsCanvasProps> = ({
                 key={idx} 
                 onClick={() => toggleApproval(idx)}
                 className="w-18 sm:w-20 border-r last:border-r-0 border-slate-300 dark:border-zinc-700 cursor-pointer hover:bg-slate-50 dark:hover:bg-zinc-800/50 transition relative"
-                title="클릭하여 전자 서명/승인 토글"
+                title="하단 서명란 클릭 시 서명/승인 토글, 상단 텍스트 클릭 시 직급 수정"
               >
-                <div className="bg-slate-50 dark:bg-zinc-800/80 py-1 text-[10px] font-semibold text-slate-600 dark:text-zinc-400 border-b border-slate-300 dark:border-zinc-700">
-                  {role}
+                <div 
+                  className="bg-slate-50 dark:bg-zinc-800/80 p-0.5 border-b border-slate-300 dark:border-zinc-700"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <input
+                    type="text"
+                    value={role}
+                    onChange={(e) => handleApproverRoleChange(idx, e.target.value)}
+                    className="w-full text-center bg-transparent hover:bg-white dark:hover:bg-zinc-700/60 focus:bg-white dark:focus:bg-zinc-800 text-[10px] font-semibold text-slate-700 dark:text-zinc-300 border border-transparent focus:border-indigo-400 focus:ring-1 focus:ring-indigo-300 outline-none rounded py-0.5 transition"
+                    title="클릭하여 직급/성함 직접 수정"
+                  />
                 </div>
                 <div className="h-12 flex flex-col items-center justify-center p-1">
                   {approverStatus[idx] ? (
@@ -184,28 +241,66 @@ export const GovDocsCanvas: React.FC<GovDocsCanvasProps> = ({
           </div>
         </div>
 
-        {/* 문서 메타데이터 표 */}
+        {/* 문서 메타데이터 표 (인라인 직접 타이핑 편집 지원) */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 py-3 px-4 bg-slate-50 dark:bg-zinc-850/70 rounded-xl border border-slate-200 dark:border-zinc-750 text-xs mb-8">
           <div>
-            <span className="text-[10px] text-slate-500 dark:text-zinc-400 block font-medium">문서 번호</span>
-            <span className="font-bold text-slate-800 dark:text-zinc-200">{document.metadata.docNumber}</span>
+            <span className="text-[10px] text-slate-500 dark:text-zinc-400 block font-medium mb-0.5">문서 번호</span>
+            <input
+              type="text"
+              value={document.metadata.docNumber}
+              onChange={(e) => handleMetadataChange('docNumber', e.target.value)}
+              placeholder="문서 번호"
+              className={`w-full font-bold text-slate-800 dark:text-zinc-200 bg-transparent hover:bg-slate-200/50 dark:hover:bg-zinc-700/50 focus:bg-white dark:focus:bg-zinc-800 px-1 py-0.5 rounded border border-transparent focus:border-indigo-400 focus:ring-1 focus:ring-indigo-300 outline-none transition text-xs ${
+                highlightedField === 'metadata-docNumber' || highlightedField === 'metadata' ? 'ring-2 ring-indigo-400 bg-indigo-50/60 dark:bg-indigo-950/50' : ''
+              }`}
+              title="클릭하여 문서 번호 직접 수정"
+            />
           </div>
           <div>
-            <span className="text-[10px] text-slate-500 dark:text-zinc-400 block font-medium">기안 부서</span>
-            <span className="font-bold text-slate-800 dark:text-zinc-200">{document.metadata.department}</span>
+            <span className="text-[10px] text-slate-500 dark:text-zinc-400 block font-medium mb-0.5">기안 부서</span>
+            <input
+              type="text"
+              value={document.metadata.department}
+              onChange={(e) => handleMetadataChange('department', e.target.value)}
+              placeholder="기안 부서"
+              className={`w-full font-bold text-slate-800 dark:text-zinc-200 bg-transparent hover:bg-slate-200/50 dark:hover:bg-zinc-700/50 focus:bg-white dark:focus:bg-zinc-800 px-1 py-0.5 rounded border border-transparent focus:border-indigo-400 focus:ring-1 focus:ring-indigo-300 outline-none transition text-xs ${
+                highlightedField === 'metadata-department' || highlightedField === 'metadata' ? 'ring-2 ring-indigo-400 bg-indigo-50/60 dark:bg-indigo-950/50' : ''
+              }`}
+              title="클릭하여 기안 부서 직접 수정"
+            />
           </div>
           <div>
-            <span className="text-[10px] text-slate-500 dark:text-zinc-400 block font-medium">기안자</span>
-            <span className="font-bold text-slate-800 dark:text-zinc-200">{document.metadata.author}</span>
+            <span className="text-[10px] text-slate-500 dark:text-zinc-400 block font-medium mb-0.5">기안자</span>
+            <input
+              type="text"
+              value={document.metadata.author}
+              onChange={(e) => handleMetadataChange('author', e.target.value)}
+              placeholder="기안자 성명"
+              className={`w-full font-bold text-slate-800 dark:text-zinc-200 bg-transparent hover:bg-slate-200/50 dark:hover:bg-zinc-700/50 focus:bg-white dark:focus:bg-zinc-800 px-1 py-0.5 rounded border border-transparent focus:border-indigo-400 focus:ring-1 focus:ring-indigo-300 outline-none transition text-xs ${
+                highlightedField === 'metadata-author' || highlightedField === 'metadata' ? 'ring-2 ring-indigo-400 bg-indigo-50/60 dark:bg-indigo-950/50' : ''
+              }`}
+              title="클릭하여 기안자 직접 수정"
+            />
           </div>
           <div>
-            <span className="text-[10px] text-slate-500 dark:text-zinc-400 block font-medium">시행 일자</span>
-            <span className="font-bold text-slate-800 dark:text-zinc-200">{document.metadata.date}</span>
+            <span className="text-[10px] text-slate-500 dark:text-zinc-400 block font-medium mb-0.5">시행 일자</span>
+            <input
+              type="text"
+              value={document.metadata.date}
+              onChange={(e) => handleMetadataChange('date', e.target.value)}
+              placeholder="시행 일자"
+              className={`w-full font-bold text-slate-800 dark:text-zinc-200 bg-transparent hover:bg-slate-200/50 dark:hover:bg-zinc-700/50 focus:bg-white dark:focus:bg-zinc-800 px-1 py-0.5 rounded border border-transparent focus:border-indigo-400 focus:ring-1 focus:ring-indigo-300 outline-none transition text-xs ${
+                highlightedField === 'metadata-date' || highlightedField === 'metadata' ? 'ring-2 ring-indigo-400 bg-indigo-50/60 dark:bg-indigo-950/50' : ''
+              }`}
+              title="클릭하여 시행 일자 직접 수정"
+            />
           </div>
         </div>
 
         {/* 본문 섹션: 개조식 WYSIWYG 계층 렌더링 */}
-        <div className="space-y-3">
+        <div className={`space-y-3 rounded-xl p-2 transition-all duration-300 ${
+          highlightedField === 'sections' ? 'ring-2 ring-indigo-400 bg-indigo-50/40 dark:bg-indigo-950/30' : ''
+        }`}>
           {document.content.docsContent.sections.map((section, index) => {
             const indentClass = {
               1: 'pl-0 font-extrabold text-slate-950 dark:text-white mt-4 border-b border-slate-100 dark:border-zinc-800 pb-1',

@@ -14,7 +14,9 @@ import {
   Send,
   Undo2,
   CheckCircle2,
-  Bot
+  Bot,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 
 interface CopilotMessage {
@@ -54,6 +56,7 @@ export const NotebookStudioPanel: React.FC<NotebookStudioPanelProps> = ({
 }) => {
   const [inputText, setInputText] = useState('');
   const [isListening, setIsListening] = useState(false);
+  const [isGeneratorsCollapsed, setIsGeneratorsCollapsed] = useState(false);
   const [messages, setMessages] = useState<CopilotMessage[]>([
     {
       id: 'msg-init',
@@ -162,9 +165,116 @@ export const NotebookStudioPanel: React.FC<NotebookStudioPanelProps> = ({
     let replyText = '';
     let actionName = '';
     let updatedDoc: OfficeDocument = { ...document };
+    let highlightTarget: string | null = null;
 
-    // 1. 마인드맵 관련 명령: "마인드맵 3번째 가지에 보안 정책 추가", "마인드맵 가지 추가"
-    if (text.includes('마인드맵') && (text.includes('가지') || text.includes('추가') || text.includes('노드'))) {
+    // 1. 문서 제목 변경 명령: "제목을 ... 로 변경", "제목 ... 로 바꿔", "제목: ..."
+    const titleMatch = text.match(/(?:제목을?|문서명(?:을)?)\s*(?:['"「](.+?)['"」]|(.+?))\s*(?:으로|로)?\s*(?:변경|바꿔|수정|설정|적용)/)
+      || text.match(/^제목\s*[:：]\s*(.+)$/);
+    if (titleMatch) {
+      const newTitle = (titleMatch[1] || titleMatch[2]).trim();
+      updatedDoc = {
+        ...updatedDoc,
+        title: newTitle
+      };
+      actionName = `제목을 [${newTitle}]로 변경`;
+      replyText = `문서 제목을 "${newTitle}"(으)로 즉시 변경했습니다. 중앙 캔버스에서 실시간 갱신을 확인하실 수 있습니다.`;
+      highlightTarget = 'title';
+      if (currentFormat !== 'docs') onChangeFormat('docs');
+    }
+    // 2. 기안자 변경 명령: "기안자를 ... 로 변경/바꿔"
+    else if (text.match(/기안자(?:를)?\s*(?:['"「](.+?)['"」]|(\S+))\s*(?:으로|로)?\s*(?:변경|바꿔|수정|설정)/)) {
+      const authorMatch = text.match(/기안자(?:를)?\s*(?:['"「](.+?)['"」]|(\S+))\s*(?:으로|로)?\s*(?:변경|바꿔|수정|설정)/);
+      const newAuthor = authorMatch ? (authorMatch[1] || authorMatch[2]).trim() : '홍길동 수석';
+      updatedDoc = {
+        ...updatedDoc,
+        metadata: {
+          ...updatedDoc.metadata,
+          author: newAuthor
+        }
+      };
+      actionName = `기안자를 [${newAuthor}]로 변경`;
+      replyText = `기안자를 "${newAuthor}"(으)로 즉각 변경했습니다.`;
+      highlightTarget = 'metadata-author';
+      if (currentFormat !== 'docs') onChangeFormat('docs');
+    }
+    // 3. 기안 부서 변경 명령: "부서를 ... 로 변경/바꿔"
+    else if (text.match(/(?:기안\s*)?부서(?:를)?\s*(?:['"「](.+?)['"」]|(\S+))\s*(?:으로|로)?\s*(?:변경|바꿔|수정|설정)/)) {
+      const deptMatch = text.match(/(?:기안\s*)?부서(?:를)?\s*(?:['"「](.+?)['"」]|(\S+))\s*(?:으로|로)?\s*(?:변경|바꿔|수정|설정)/);
+      const newDept = deptMatch ? (deptMatch[1] || deptMatch[2]).trim() : 'AI 전략기획팀';
+      updatedDoc = {
+        ...updatedDoc,
+        metadata: {
+          ...updatedDoc.metadata,
+          department: newDept
+        }
+      };
+      actionName = `기안 부서를 [${newDept}]로 변경`;
+      replyText = `기안 부서를 "${newDept}"(으)로 업데이트했습니다.`;
+      highlightTarget = 'metadata-department';
+      if (currentFormat !== 'docs') onChangeFormat('docs');
+    }
+    // 4. 추진 배경 또는 본문 내용 수정/추가 명령
+    else if (text.includes('추진 배경') || text.includes('추진배경') || (text.includes('내용') && (text.includes('수정') || text.includes('변경') || text.includes('추가')))) {
+      const sections = [...(updatedDoc.content.docsContent?.sections || [])];
+      
+      if (text.includes('추진 배경') || text.includes('추진배경')) {
+        const bgContentMatch = text.match(/(?:추진\s*배경|추진배경)(?:을|를)?\s*(?:['"「](.+?)['"」]|(.+?))\s*(?:으로|로)?\s*(?:수정|변경|업데이트)/);
+        const newBg = bgContentMatch ? (bgContentMatch[1] || bgContentMatch[2]).trim() : '2026년 차세대 AI 오피스 워크스페이스 도입에 따른 업무 생산성 300% 극대화';
+        
+        let found = false;
+        const newSections = sections.map(s => {
+          if (s.text.includes('추진 배경') || (s.level === 2 && !found)) {
+            found = true;
+            return { ...s, text: `□ ${newBg}` };
+          }
+          return s;
+        });
+        
+        if (!found) {
+          newSections.push({
+            id: `sec-bg-${Date.now()}`,
+            level: 2,
+            marker: '□',
+            text: newBg
+          });
+        }
+        
+        updatedDoc = {
+          ...updatedDoc,
+          content: {
+            ...updatedDoc.content,
+            docsContent: { sections: newSections }
+          }
+        };
+        actionName = '추진 배경 섹션 내용 실시간 수정';
+        replyText = `공문서 추진 배경 항목을 "${newBg}"(으)로 실시간 업데이트했습니다.`;
+      } else {
+        const addContentMatch = text.match(/(?:['"「](.+?)['"」]|(.+?))\s*(?:내용|문단|항목|섹션)?\s*(?:추가해줘|넣어줘|반영해줘)/);
+        const itemToAdd = addContentMatch ? (addContentMatch[1] || addContentMatch[2]).trim() : '전사 AI 거버넌스 및 보안 정책 준수 방안 수립';
+        
+        const newSec: DocSection = {
+          id: `sec-add-${Date.now()}`,
+          level: 3,
+          marker: '○',
+          text: itemToAdd
+        };
+        
+        updatedDoc = {
+          ...updatedDoc,
+          content: {
+            ...updatedDoc.content,
+            docsContent: { sections: [...sections, newSec] }
+          }
+        };
+        actionName = `본문 항목 [${itemToAdd.slice(0, 15)}] 추가`;
+        replyText = `공문서 본문에 새 항목 [${itemToAdd}]을 즉각 추가 반영했습니다.`;
+      }
+      
+      highlightTarget = 'sections';
+      if (currentFormat !== 'docs') onChangeFormat('docs');
+    }
+    // 5. 마인드맵 관련 명령: "마인드맵 3번째 가지에 보안 정책 추가", "마인드맵 가지 추가"
+    else if (text.includes('마인드맵') && (text.includes('가지') || text.includes('추가') || text.includes('노드'))) {
       const branchTopicMatch = text.match(/(?:가지에|노드에)?\s*(.*?)(?:를|을)?\s*(?:추가|반영)/);
       const branchTopic = branchTopicMatch && branchTopicMatch[1].trim() ? branchTopicMatch[1].trim() : '보안 정책 및 거버넌스 가이드라인';
       
@@ -191,7 +301,7 @@ export const NotebookStudioPanel: React.FC<NotebookStudioPanelProps> = ({
         onChangeFormat('mindmap');
       }
     }
-    // 2. 인포그래픽 관련 명령: "인포그래픽에 예산 수치 강조", "인포그래픽 ... 반영"
+    // 6. 인포그래픽 관련 명령: "인포그래픽에 예산 수치 강조", "인포그래픽 ... 반영"
     else if (text.includes('인포그래픽') || (text.includes('예산') && (text.includes('강조') || text.includes('증액') || text.includes('반영')))) {
       const { amount } = parseKoreanCurrency(text);
       const targetAmount = amount > 0 ? amount : 62000000;
@@ -224,7 +334,7 @@ export const NotebookStudioPanel: React.FC<NotebookStudioPanelProps> = ({
         onChangeFormat('infographic');
       }
     }
-    // 3. 스프레드시트 표 행 추가
+    // 7. 스프레드시트 표 행 추가
     else if (text.includes('표') || text.includes('시트') || text.includes('항목')) {
       const { amount, matchedStr } = parseKoreanCurrency(text);
       let itemName = text
@@ -263,7 +373,7 @@ export const NotebookStudioPanel: React.FC<NotebookStudioPanelProps> = ({
         onChangeFormat('sheets');
       }
     }
-    // 4. 공문서 개조식 어조 변환
+    // 8. 공문서 개조식 어조 변환
     else if (text.includes('개조식') || text.includes('어조') || text.includes('다듬')) {
       const sections = updatedDoc.content.docsContent?.sections || [];
       const updatedSections = sections.map(s => {
@@ -282,14 +392,19 @@ export const NotebookStudioPanel: React.FC<NotebookStudioPanelProps> = ({
 
       actionName = '공문서 행안부 표준 개조식 종결어미(-함) 일괄 정돈';
       replyText = '공문서 본문의 모든 문장을 행정안전부 표준 개조식 종결어미(-함, -임)로 깔끔하게 정돈했습니다.';
+      highlightTarget = 'sections';
       if (currentFormat !== 'docs') {
         onChangeFormat('docs');
       }
     }
-    // 5. 기본 질의 및 요약
+    // 9. 기본 질의 및 요약
     else {
       actionName = 'AI 기획안 심층 질의 응답';
       replyText = `요청하신 내용을 분석하여 문서의 핵심 파이프라인에 동기화했습니다. 상단 스튜디오의 [마인드맵], [인포그래픽], [공문서] 버튼을 통해 다양한 형태로 바로 확인하실 수 있습니다.`;
+    }
+
+    if (highlightTarget) {
+      window.dispatchEvent(new CustomEvent('anti-office-highlight', { detail: { target: highlightTarget } }));
     }
 
     onChangeDocument(updatedDoc, actionName);
@@ -427,51 +542,90 @@ export const NotebookStudioPanel: React.FC<NotebookStudioPanelProps> = ({
         </button>
       </div>
 
-      {/* 2. 스튜디오 8대 출력 생성기 그리드 (2열 둥근 버튼 레이아웃) */}
-      <div className="p-3 border-b border-slate-200 dark:border-zinc-800 bg-slate-50/40 dark:bg-zinc-950/40 shrink-0">
-        <div className="text-[11px] font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider mb-2 flex items-center justify-between">
-          <span>출력물 원클릭 변환기 (8대 포맷)</span>
-          <span className="text-[10px] text-indigo-500 font-semibold font-mono">1:1 양방향 동기화</span>
-        </div>
+      {/* 2. 스튜디오 8대 출력 생성기 아코디언 (접기/펼치기 토글) */}
+      <div className="border-b border-slate-200 dark:border-zinc-800 bg-slate-50/60 dark:bg-zinc-950/40 shrink-0">
+        <button
+          onClick={() => setIsGeneratorsCollapsed(!isGeneratorsCollapsed)}
+          className="w-full p-3 flex items-center justify-between text-[11px] font-bold text-slate-600 dark:text-zinc-300 uppercase tracking-wider hover:bg-slate-100/70 dark:hover:bg-zinc-900/60 transition cursor-pointer"
+          title={isGeneratorsCollapsed ? '8대 포맷 펼치기' : '8대 포맷 접기 (대화창 공간 극대화)'}
+        >
+          <div className="flex items-center space-x-1.5">
+            <span>출력물 원클릭 변환기 (8대 포맷)</span>
+            <span className="text-[10px] text-indigo-600 dark:text-indigo-400 font-semibold font-mono bg-indigo-50 dark:bg-indigo-950 px-1.5 py-0.2 rounded border border-indigo-200/50 dark:border-indigo-800/50">
+              {isGeneratorsCollapsed ? '미니바' : '1:1 동기화'}
+            </span>
+          </div>
+          <div className="flex items-center space-x-1 text-slate-400 dark:text-zinc-500">
+            <span className="text-[10px] font-normal">{isGeneratorsCollapsed ? '펼치기' : '접기'}</span>
+            {isGeneratorsCollapsed ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronUp className="w-3.5 h-3.5" />}
+          </div>
+        </button>
 
-        <div className="grid grid-cols-2 gap-2">
-          {STUDIO_GENERATORS.map(gen => {
-            const Icon = gen.icon;
-            const isActive = gen.isFormat && currentFormat === gen.format;
+        {isGeneratorsCollapsed ? (
+          /* 접힘 상태: 1줄 컴팩트 미니 아이콘 바 */
+          <div className="px-3 pb-2.5 pt-0.5 flex items-center justify-between gap-1 overflow-x-auto scrollbar-none animate-fadeIn">
+            {STUDIO_GENERATORS.map(gen => {
+              const Icon = gen.icon;
+              const isActive = gen.isFormat && currentFormat === gen.format;
+              return (
+                <button
+                  key={gen.id}
+                  onClick={gen.onClick}
+                  className={`p-1.5 rounded-lg border transition cursor-pointer shrink-0 ${
+                    isActive 
+                      ? 'bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 border-indigo-300 dark:border-indigo-700 shadow-2xs font-bold ring-1 ring-indigo-400' 
+                      : 'bg-white dark:bg-zinc-850 text-slate-600 dark:text-zinc-400 border-slate-200 dark:border-zinc-750 hover:bg-slate-50 dark:hover:bg-zinc-800 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                  title={`${gen.label} (${gen.desc})`}
+                >
+                  <Icon className="w-3.5 h-3.5" />
+                </button>
+              );
+            })}
+          </div>
+        ) : (
+          /* 펼침 상태: 2열 카드 그리드 */
+          <div className="px-3 pb-3 pt-0.5 animate-fadeIn">
+            <div className="grid grid-cols-2 gap-2">
+              {STUDIO_GENERATORS.map(gen => {
+                const Icon = gen.icon;
+                const isActive = gen.isFormat && currentFormat === gen.format;
 
-            return (
-              <button
-                key={gen.id}
-                onClick={gen.onClick}
-                className={`
-                  p-2.5 rounded-2xl border text-left transition-all duration-200 cursor-pointer flex flex-col justify-between group relative overflow-hidden
-                  ${isActive
-                    ? gen.activeColor + ' shadow-sm font-bold border-indigo-300 dark:border-indigo-700'
-                    : 'bg-white dark:bg-zinc-900 border-slate-200 dark:border-zinc-800 hover:border-slate-300 dark:hover:border-zinc-700 hover:shadow-xs'
-                  }
-                `}
-              >
-                <div className="flex items-center justify-between w-full mb-1.5">
-                  <div className={`p-1.5 rounded-xl border ${gen.color} group-hover:scale-105 transition-transform`}>
-                    <Icon className="w-4 h-4" />
-                  </div>
-                  {isActive && (
-                    <span className="w-2 h-2 rounded-full bg-indigo-500 ring-2 ring-indigo-300" />
-                  )}
-                </div>
+                return (
+                  <button
+                    key={gen.id}
+                    onClick={gen.onClick}
+                    className={`
+                      p-2.5 rounded-2xl border text-left transition-all duration-200 cursor-pointer flex flex-col justify-between group relative overflow-hidden
+                      ${isActive
+                        ? gen.activeColor + ' shadow-sm font-bold border-indigo-300 dark:border-indigo-700'
+                        : 'bg-white dark:bg-zinc-900 border-slate-200 dark:border-zinc-800 hover:border-slate-300 dark:hover:border-zinc-700 hover:shadow-xs'
+                      }
+                    `}
+                  >
+                    <div className="flex items-center justify-between w-full mb-1.5">
+                      <div className={`p-1.5 rounded-xl border ${gen.color} group-hover:scale-105 transition-transform`}>
+                        <Icon className="w-4 h-4" />
+                      </div>
+                      {isActive && (
+                        <span className="w-2 h-2 rounded-full bg-indigo-500 ring-2 ring-indigo-300" />
+                      )}
+                    </div>
 
-                <div>
-                  <div className={`text-xs font-bold truncate ${isActive ? 'text-slate-900 dark:text-white' : 'text-slate-800 dark:text-zinc-200'}`}>
-                    {gen.label}
-                  </div>
-                  <div className="text-[10px] text-slate-400 dark:text-zinc-500 truncate mt-0.5">
-                    {gen.desc}
-                  </div>
-                </div>
-              </button>
-            );
-          })}
-        </div>
+                    <div>
+                      <div className={`text-xs font-bold truncate ${isActive ? 'text-slate-900 dark:text-white' : 'text-slate-800 dark:text-zinc-200'}`}>
+                        {gen.label}
+                      </div>
+                      <div className="text-[10px] text-slate-400 dark:text-zinc-500 truncate mt-0.5">
+                        {gen.desc}
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* 3. 하단 코파일럿 대화창 및 실시간 조작부 (스크롤 메시지 + 음성 STT + 채팅 인풋) */}

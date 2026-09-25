@@ -22,21 +22,52 @@ import { NotionWikiDeployModal } from './NotionWikiDeployModal';
 import { useApp } from '../../context/AppContext';
 import { 
   Folder, 
-  Plus, 
-  ChevronLeft,
-  ChevronRight,
+  Plus,
   Undo2,
   CheckCircle2,
   Sparkles,
-  Share2
+  Share2,
+  PanelLeftOpen,
+  PanelLeftClose
 } from 'lucide-react';
+
+const STORAGE_KEY = 'anti_office_studio_projects_v1';
 
 export const OfficeStudioContainer: React.FC = () => {
   const { showToast, setCurrentView } = useApp();
 
-  // 1. 프로젝트 상태
-  const [projects, setProjects] = useState<OfficeProject[]>(SEED_PROJECTS);
-  const [activeProjectId, setActiveProjectId] = useState<string>(SEED_PROJECTS[0].id);
+  // 1. 프로젝트 상태 (localStorage 연동 영구 보존)
+  const [projects, setProjects] = useState<OfficeProject[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {
+      console.error('Failed to load projects from localStorage', e);
+    }
+    return SEED_PROJECTS;
+  });
+  const [activeProjectId, setActiveProjectId] = useState<string>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed[0].id;
+      }
+    } catch {}
+    return SEED_PROJECTS[0].id;
+  });
+
+  // 프로젝트 변경 시 localStorage 자동 동기화
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(projects));
+    } catch (e) {
+      console.error('Failed to save projects to localStorage', e);
+    }
+  }, [projects]);
 
   const activeProject = projects.find(p => p.id === activeProjectId) || projects[0];
   const currentDoc = activeProject.currentDoc;
@@ -362,13 +393,13 @@ export const OfficeStudioContainer: React.FC = () => {
         
         {/* 좌측: 사이드바 접기/펼치기 화살표 + 프로젝트 탭 목록 + 새 프로젝트 버튼 */}
         <div className="flex items-center space-x-1.5 overflow-x-auto whitespace-nowrap scrollbar-none flex-1 min-w-0 py-0.5">
-          {/* 사이드바 접기/펼치기 화살표 버튼 */}
+          {/* 사이드바 접기/펼치기 버튼 */}
           <button
             onClick={() => setIsCollapsed(!isCollapsed)}
             className="p-1.5 rounded-lg border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-slate-100 dark:hover:bg-zinc-700 text-slate-600 dark:text-zinc-300 transition cursor-pointer shrink-0 shadow-2xs"
             title={isCollapsed ? '지식 창고 펼치기' : '지식 창고 접기 (전폭 캔버스)'}
           >
-            {isCollapsed ? <ChevronRight className="w-3.5 h-3.5 text-slate-600 dark:text-zinc-300" /> : <ChevronLeft className="w-3.5 h-3.5 text-slate-600 dark:text-zinc-300" />}
+            {isCollapsed ? <PanelLeftOpen className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" /> : <PanelLeftClose className="w-3.5 h-3.5 text-slate-600 dark:text-zinc-300" />}
           </button>
 
           {/* 프로젝트 탭 목록 */}
@@ -451,7 +482,7 @@ export const OfficeStudioContainer: React.FC = () => {
         {!isCollapsed && (
           <div 
             style={{ width: `${sidebarWidth}px` }} 
-            className="h-full shrink-0 flex flex-col transition-[width] duration-75 relative no-print"
+            className="h-full shrink-0 flex flex-col transition-[width] duration-200 ease-in-out relative no-print overflow-hidden"
           >
             <KnowledgeDock
               sources={activeProject.sources}
@@ -459,6 +490,7 @@ export const OfficeStudioContainer: React.FC = () => {
               onAddSource={handleAddSource}
               onDeleteSource={handleDeleteSource}
               onOpenTemplateInjector={handleOpenTemplateInjector}
+              onCollapse={() => setIsCollapsed(true)}
             />
           </div>
         )}
@@ -479,8 +511,20 @@ export const OfficeStudioContainer: React.FC = () => {
           </div>
         )}
 
-        {/* (3) 중앙 메인 영역: Universal Smart Canvas */}
+        {/* (3) 중앙 메인 영역: Universal Smart Canvas (좌측 창 접힘 시 전폭 자동 확장) */}
         <div className="flex-1 h-full flex flex-col min-w-0 relative">
+          {/* 지식창고가 접혀있을 때 좌측 상단 원클릭 복원 플로팅 탭 */}
+          {isCollapsed && (
+            <button
+              onClick={() => setIsCollapsed(false)}
+              className="absolute left-0 top-3 z-30 py-2 px-3 bg-white dark:bg-zinc-850 hover:bg-slate-50 dark:hover:bg-zinc-800 text-slate-800 dark:text-zinc-200 border border-l-0 border-slate-300 dark:border-zinc-700 rounded-r-xl shadow-lg flex items-center space-x-1.5 cursor-pointer text-xs font-bold transition-all hover:pl-4 group animate-fadeIn"
+              title="지식 창고 다시 펼치기"
+            >
+              <PanelLeftOpen className="w-4 h-4 text-indigo-600 dark:text-indigo-400 group-hover:scale-110 transition-transform" />
+              <span className="font-bold text-slate-800 dark:text-zinc-200 whitespace-nowrap">📚 지식 창고</span>
+            </button>
+          )}
+
           <UniversalSmartCanvas
             document={currentDoc}
             planTriad={activeProject.planTriad}

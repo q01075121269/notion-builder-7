@@ -13,7 +13,8 @@ import {
   Database,
   Eye,
   X,
-  Building2
+  Building2,
+  PanelLeftClose
 } from 'lucide-react';
 
 interface KnowledgeDockProps {
@@ -23,6 +24,7 @@ interface KnowledgeDockProps {
   onDeleteSource: (sourceId: string) => void;
   onSelectSourcePreview?: (source: OfficeSource) => void;
   onOpenTemplateInjector?: (source?: OfficeSource) => void;
+  onCollapse?: () => void;
 }
 
 export const KnowledgeDock: React.FC<KnowledgeDockProps> = ({
@@ -31,7 +33,8 @@ export const KnowledgeDock: React.FC<KnowledgeDockProps> = ({
   onAddSource,
   onDeleteSource,
   onSelectSourcePreview: _onSelectSourcePreview,
-  onOpenTemplateInjector
+  onOpenTemplateInjector,
+  onCollapse
 }) => {
   // 모달 및 입력창 상태
   const [activeInputTab, setActiveInputTab] = useState<'none' | 'url' | 'voice' | 'deep_research'>('none');
@@ -214,16 +217,27 @@ export const KnowledgeDock: React.FC<KnowledgeDockProps> = ({
       
       {/* 1. 상단 타이틀 & 팩트 그라운딩 요약 인디케이터 */}
       <div className="p-4 border-b border-slate-200 dark:border-zinc-800 shrink-0 bg-white dark:bg-zinc-850">
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center space-x-2">
-            <Database className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-            <h2 className="text-xs sm:text-sm font-black text-slate-900 dark:text-white">
+        <div className="flex items-center justify-between mb-2 gap-1.5">
+          <div className="flex items-center space-x-2 min-w-0">
+            <Database className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
+            <h2 className="text-xs sm:text-sm font-black text-slate-900 dark:text-white truncate">
               지식 창고 (Knowledge Dock)
             </h2>
           </div>
-          <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 font-bold border border-indigo-200 dark:border-indigo-800">
-            {selectedSources.length}/{sources.length}건 활성
-          </span>
+          <div className="flex items-center space-x-1 shrink-0">
+            <span className="shrink-0 whitespace-nowrap px-2 py-0.5 text-xs font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200/60 rounded-full dark:bg-indigo-950 dark:text-indigo-300 dark:border-indigo-800">
+              {selectedSources.length}/{sources.length}건 활성
+            </span>
+            {onCollapse && (
+              <button
+                onClick={onCollapse}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-zinc-200 hover:bg-slate-100 dark:hover:bg-zinc-800 transition cursor-pointer shrink-0"
+                title="지식 창고 접기 (단축키 또는 원클릭)"
+              >
+                <PanelLeftClose className="w-4 h-4 text-slate-500 hover:text-slate-800 dark:text-zinc-400 dark:hover:text-zinc-200" />
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-zinc-400">
