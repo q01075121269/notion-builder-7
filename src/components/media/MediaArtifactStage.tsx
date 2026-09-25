@@ -11,7 +11,8 @@ import {
   Smartphone, 
   ShieldCheck, 
   Camera,
-  Check
+  Check,
+  Sparkles
 } from 'lucide-react';
 import type { MediaArtifact } from '../../types/media';
 import type { MVPipelineResult } from '../../lib/media/videoPipeline';
@@ -43,10 +44,18 @@ export const MediaArtifactStage: React.FC<MediaArtifactStageProps> = ({
   const [currentTime, setCurrentTime] = useState<number>(0);
   const [showSafeZone, setShowSafeZone] = useState<boolean>(false);
   const [isCopied, setIsCopied] = useState<boolean>(false);
+  const [isImageLoading, setIsImageLoading] = useState<boolean>(true);
 
-  // 비주얼 프롬프트 매칭 실제 고화질 이미지 리소스 도출
-  const visualInfo = resolveVisualAssetByPrompt(artifact.title || artifact.promptHistory[0]?.userRaw || '');
+  // 비주얼 프롬프트 매칭 실제 고화질 AI 생성 이미지 리소스 도출
+  const visualInfo = resolveVisualAssetByPrompt(
+    artifact.title || artifact.promptHistory[0]?.userRaw || '',
+    aspectRatio
+  );
   const displayImageUrl = artifact.previewUrl || visualInfo.imageUrl;
+
+  useEffect(() => {
+    setIsImageLoading(true);
+  }, [displayImageUrl]);
 
   const isVideoMode = artifact.domain === 'video';
   const totalDuration = mvData?.totalDuration || 16;
@@ -200,6 +209,22 @@ export const MediaArtifactStage: React.FC<MediaArtifactStageProps> = ({
         {/* 실제 고화질 캔버스 미디어 렌더러 (얼굴/머리 잘림 100% 방지: 듀얼 시네마틱 뷰) */}
         {/* ------------------------------------------------------------------- */}
         <div className="absolute inset-0 bg-zinc-950 flex items-center justify-center overflow-hidden">
+          {/* AI 신경망 실시간 렌더링 스켈레톤 인디케이터 */}
+          {isImageLoading && (
+            <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-3 bg-zinc-950/90 backdrop-blur-md p-6 text-center animate-fadeIn">
+              <div className="relative">
+                <div className="w-12 h-12 rounded-full border-2 border-emerald-500/20 border-t-emerald-400 animate-spin" />
+                <Sparkles className="w-5 h-5 text-emerald-400 absolute inset-0 m-auto animate-pulse" />
+              </div>
+              <p className="text-sm font-medium text-white drop-shadow tracking-tight">
+                🎨 AI 신경망이 요청하신 피사체와 배경을 실시간 렌더링 중입니다...
+              </p>
+              <span className="text-xs font-mono text-zinc-400">
+                Pollinations Flux 8K Realtime Synthesizer
+              </span>
+            </div>
+          )}
+
           {/* 뒤편 배경: 동일 이미지의 앰비언트 블러 글로우로 여백을 품격있게 채움 */}
           <img 
             src={displayImageUrl} 
@@ -213,7 +238,11 @@ export const MediaArtifactStage: React.FC<MediaArtifactStageProps> = ({
             <img 
               src={displayImageUrl} 
               alt={artifact.title}
-              className="max-h-full max-w-full object-contain rounded-2xl shadow-2xl transition-transform duration-500 ease-out group-hover:scale-[1.01]"
+              onLoad={() => setIsImageLoading(false)}
+              onError={() => setIsImageLoading(false)}
+              className={`max-h-full max-w-full object-contain rounded-2xl shadow-2xl transition-all duration-500 ease-out group-hover:scale-[1.01] ${
+                isImageLoading ? 'opacity-0 scale-98' : 'opacity-100 scale-100'
+              }`}
               loading="eager"
             />
           </div>

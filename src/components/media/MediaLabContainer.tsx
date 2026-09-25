@@ -45,7 +45,7 @@ import { generateBeatSyncMV } from '../../lib/media/videoPipeline';
 import type { MVPipelineResult } from '../../lib/media/videoPipeline';
 import { saveMediaItem, getRecentMediaItems, deleteMediaItem } from '../../lib/mediaStorage';
 import type { MediaItem } from '../../lib/mediaStorage';
-import { resolveVisualAssetByPrompt, extractSubjectTitle } from '../../lib/media/visualAssets';
+import { resolveVisualAssetByPrompt } from '../../lib/media/visualAssets';
 
 export const MediaLabContainer: React.FC = () => {
   const { showToast, notionApiKey } = useApp();
@@ -73,6 +73,20 @@ export const MediaLabContainer: React.FC = () => {
 
   // 비주얼 전용 상태 (비율 전환 16:9 / 9:16 / 1:1)
   const [visualRatio, setVisualRatio] = useState<'16:9' | '9:16' | '1:1'>('16:9');
+
+  const handleAspectRatioChange = (newRatio: '16:9' | '9:16' | '1:1') => {
+    setVisualRatio(newRatio);
+    if (artifact && artifact.domain === 'visual') {
+      const visualAsset = resolveVisualAssetByPrompt(
+        artifact.title || artifact.promptHistory[0]?.userRaw || '',
+        newRatio
+      );
+      setArtifact({
+        ...artifact,
+        previewUrl: visualAsset.imageUrl
+      });
+    }
+  };
 
   // 최근 IndexedDB 캐시 에셋 로드
   const loadCachedAssets = async () => {
@@ -139,15 +153,13 @@ export const MediaLabContainer: React.FC = () => {
     setVpoResult(vpo);
 
     if (effectiveDomain === 'visual') {
-      // 실사 비주얼 렌더러 모드: MV 비트 싱크 완전 배제
+      // 실사 비주얼 렌더러 모드: 실시간 AI 생성 엔진(Pollinations Flux 8K) 직결
       setMvPipelineResult(null);
 
-      if (is3D) {
-        setNoaResponseText('VPO 렌더링 파라미터를 결합하여 3D 정밀 메커니즘 캔버스를 도출했습니다. (Unreal Engine 5.5 / Octane Render / PBR Titanium 8K)');
-      } else {
-        const subjectTitle = extractSubjectTitle(promptSummary);
-        setNoaResponseText(`요청하신 [${subjectTitle}] 캐릭터를 VPO 실사 엔진으로 정밀 렌더링하여 캔버스에 안착했습니다.`);
-      }
+      const visualAsset = resolveVisualAssetByPrompt(promptSummary, visualRatio);
+      setNoaResponseText(
+        `요청하신 **[${visualAsset.title}]** 비주얼을 실시간 AI 신경망(Flux 8K)으로 정밀 렌더링하여 캔버스에 안착했습니다.\n\n> 🎯 **VPO 시맨틱 프롬프트**: *${visualAsset.semanticEnglish}*`
+      );
     } else {
       // 비디오/MV 모드
       const mv = generateBeatSyncMV(promptSummary, 120);
@@ -155,11 +167,11 @@ export const MediaLabContainer: React.FC = () => {
       setNoaResponseText('비트 타임스탬프에 맞춘 3개 씬 궤적 MV를 렌더링했습니다. (Spatial FaceID 99.4% Lock & 0s/4s/12s 비트 싱크 완료)');
     }
 
-    showToast('노아 PD가 캔버스에 고해상도 아티팩트를 렌더링 중입니다...', 'info');
+    showToast('노아 PD가 실시간 AI 신경망(Flux 8K)으로 아티팩트를 렌더링 중입니다...', 'info');
 
     setTimeout(() => {
-      const initialArt = createInitialArtifact(effectiveDomain, promptSummary, visualRatio);
-      const visualAsset = resolveVisualAssetByPrompt(promptSummary);
+      const visualAsset = resolveVisualAssetByPrompt(promptSummary, visualRatio);
+      const initialArt = createInitialArtifact(effectiveDomain, visualAsset.title, visualRatio);
       if (effectiveDomain === 'visual') {
         initialArt.title = visualAsset.title;
         initialArt.previewUrl = visualAsset.imageUrl;
@@ -168,16 +180,16 @@ export const MediaLabContainer: React.FC = () => {
       initialArt.promptHistory = [
         {
           userRaw: promptSummary,
-          optimizedVPO: vpo.optimizedPrompt
+          optimizedVPO: visualAsset.semanticEnglish
         }
       ];
 
       setArtifact(initialArt);
       setHistory([createCheckpoint(initialArt)]);
       setFsmState('REFINING');
-      showToast('초안 렌더링이 완료되었습니다. 조종석에서 피드백을 지시해 주세요.', 'success');
+      showToast('실시간 AI 렌더링이 완료되었습니다. 조종석에서 피드백을 지시해 주세요.', 'success');
       loadCachedAssets();
-    }, 1000);
+    }, 800);
   };
 
   // 듀얼 트랙 대화형 오케스트레이터 입력 핸들러
@@ -235,61 +247,46 @@ export const MediaLabContainer: React.FC = () => {
     // 4. 실시간 배경 교체 인텐트 직결 (Inpainting State Mutation & Character Lock)
     const isBackgroundIntent = 
       trimmed.includes('배경') || 
+      trimmed.includes('바닷가') ||
+      trimmed.includes('해변') ||
       trimmed.includes('숲속') || 
       trimmed.includes('숲') || 
-      trimmed.includes('볕내림') || 
-      trimmed.includes('햇살') || 
-      (trimmed.includes('바꿔') && (trimmed.includes('뒤') || trimmed.includes('환경')));
+      trimmed.includes('설산') || 
+      trimmed.includes('사막') || 
+      trimmed.includes('도시') || 
+      (trimmed.includes('바꿔') && (trimmed.includes('뒤') || trimmed.includes('환경') || trimmed.includes('보이게')));
 
     if (isBackgroundIntent) {
       setUserPromptText(trimmed);
       setCurrentDomain('visual');
       setMvPipelineResult(null);
 
-      const isForestTheme = 
-        trimmed.includes('숲') || 
-        trimmed.includes('숲속') || 
-        trimmed.includes('볕내림') || 
-        trimmed.includes('햇살') || 
-        trimmed.includes('신비로운') || 
-        trimmed.includes('배경 바꿔') || 
-        trimmed.includes('배경 변경') ||
-        trimmed.includes('뒷배경');
-
-      const visualAsset = isForestTheme
-        ? resolveVisualAssetByPrompt('숲속 볕내림')
-        : resolveVisualAssetByPrompt(trimmed);
-
-      const vpo = optimizePrompt(trimmed, 'visual', 'photo');
-      setVpoResult(vpo);
+      // 이전 피사체 이름 추출하여 Character Lock 파라미터로 주입
+      const previousSubject = artifact?.title ? artifact.title.split('(')[0].trim() : undefined;
+      const visualAsset = resolveVisualAssetByPrompt(trimmed, visualRatio, previousSubject);
 
       if (artifact) {
         const updatedPromptHistory = [
           ...artifact.promptHistory,
           {
             userRaw: trimmed,
-            optimizedVPO: vpo.optimizedPrompt
+            optimizedVPO: visualAsset.semanticEnglish
           }
         ];
-        const currentSubject = artifact.title || '인물 캐릭터';
         const updatedArt: MediaArtifact = {
           ...artifact,
           domain: 'visual',
-          title: isForestTheme 
-            ? `${currentSubject} (햇살 쏟아지는 울창한 숲속 앰비언스)`
-            : `${currentSubject} (${visualAsset.title})`,
+          title: visualAsset.title,
           previewUrl: visualAsset.imageUrl,
           promptHistory: updatedPromptHistory,
           progressPercent: 95,
-          currentStepText: '인물 정체성 보존(Character Lock) & 배경 인페인팅 안착'
+          currentStepText: `배경 [${visualAsset.theme}] 실시간 AI 변환 완료`
         };
         setArtifact(updatedArt);
         setHistory((prev) => [...prev, createCheckpoint(updatedArt)]);
       } else {
-        const newArt = createInitialArtifact('visual', trimmed, visualRatio);
-        newArt.title = isForestTheme 
-          ? '햇살 쏟아지는 울창한 숲속 앰비언스'
-          : visualAsset.title;
+        const newArt = createInitialArtifact('visual', visualAsset.title, visualRatio);
+        newArt.title = visualAsset.title;
         newArt.previewUrl = visualAsset.imageUrl;
         setArtifact(newArt);
         setHistory([createCheckpoint(newArt)]);
@@ -297,23 +294,19 @@ export const MediaLabContainer: React.FC = () => {
 
       setFsmState('REFINING');
 
-      if (isForestTheme) {
-        setNoaResponseText('인물의 스타일과 정체성을 유지한 채, 배경을 햇살이 쏟아지는 울창한 숲속 앰비언스로 교체하여 캔버스에 안착했습니다.');
-        showToast('인물 스타일을 보존한 채, 배경을 햇살 숲속으로 교체했습니다.', 'success');
-      } else {
-        setNoaResponseText(`인물의 정체성을 유지한 채, 배경을 ${visualAsset.title} 앰비언스로 교체하여 캔버스에 안착했습니다.`);
-        showToast(`배경을 "${visualAsset.title}"(으)로 교체했습니다.`, 'success');
-      }
+      setNoaResponseText(
+        `피사체의 정체성과 스타일을 유지한 채, 배경을 **[${visualAsset.theme}]**(으)로 실시간 AI 생성하여 캔버스에 안착했습니다.\n\n> 🎯 **VPO 시맨틱 프롬프트**: *${visualAsset.semanticEnglish}*`
+      );
+      showToast(`배경을 "${visualAsset.theme}"(으)로 실시간 AI 교체했습니다.`, 'success');
 
       loadCachedAssets();
       return;
     }
 
     // 5. 인플레이스 변환 분기: 인물 피사체 정밀 치환 (Subject Swap with Composition Lock)
-    if ((trimmed.includes('인물') || trimmed.includes('피사체') || trimmed.includes('ceo') || trimmed.includes('사람') || trimmed.includes('아이') || trimmed.includes('소녀')) && (trimmed.includes('바꿔') || trimmed.includes('치환') || trimmed.includes('변경'))) {
+    if ((trimmed.includes('인물') || trimmed.includes('피사체') || trimmed.includes('사람') || trimmed.includes('할아버지') || trimmed.includes('아이') || trimmed.includes('소녀') || trimmed.includes('디렉터') || trimmed.includes('ceo')) && (trimmed.includes('바꿔') || trimmed.includes('치환') || trimmed.includes('변경'))) {
       setUserPromptText(trimmed);
-      const targetSubject = extractSubjectTitle(trimmed);
-      const visualAsset = resolveVisualAssetByPrompt(targetSubject);
+      const visualAsset = resolveVisualAssetByPrompt(trimmed, visualRatio);
       setCurrentDomain('visual');
       setMvPipelineResult(null);
 
@@ -324,14 +317,16 @@ export const MediaLabContainer: React.FC = () => {
           title: visualAsset.title,
           previewUrl: visualAsset.imageUrl,
           progressPercent: 95,
-          currentStepText: `피사체 [${targetSubject}] 치환 완료`
+          currentStepText: `피사체 [${visualAsset.title}] 실시간 AI 치환 완료`
         };
         setArtifact(updatedArt);
         setHistory((prev) => [...prev, createCheckpoint(updatedArt)]);
       }
 
-      setNoaResponseText(`구도와 포즈 앵커를 99% 묶은 채, 피사체를 [${targetSubject}] 속성으로 정밀 치환했습니다.`);
-      showToast(`피사체를 "${targetSubject}"(으)로 구도 락 치환했습니다.`, 'success');
+      setNoaResponseText(
+        `구도와 앵커를 정밀 고정한 채, 피사체를 **[${visualAsset.title}]** 속성으로 실시간 AI 치환했습니다.\n\n> 🎯 **VPO 시맨틱 프롬프트**: *${visualAsset.semanticEnglish}*`
+      );
+      showToast(`피사체를 "${visualAsset.title}"(으)로 실시간 AI 치환했습니다.`, 'success');
       return;
     }
 
@@ -362,17 +357,22 @@ export const MediaLabContainer: React.FC = () => {
         const vpo = optimizePrompt(trimmed, artifact.domain);
         setVpoResult(vpo);
 
+        const visualAsset = artifact.domain === 'visual'
+          ? resolveVisualAssetByPrompt(`${artifact.title}, ${trimmed}`, visualRatio)
+          : null;
+
         const updatedPromptHistory = [
           ...artifact.promptHistory,
           {
             userRaw: trimmed,
-            optimizedVPO: vpo.optimizedPrompt
+            optimizedVPO: visualAsset ? visualAsset.semanticEnglish : vpo.optimizedPrompt
           }
         ];
 
         const updated: MediaArtifact = {
           ...artifact,
-          title: `${artifact.title} (수정본)`,
+          title: visualAsset ? visualAsset.title : `${artifact.title} (수정본)`,
+          previewUrl: visualAsset ? visualAsset.imageUrl : artifact.previewUrl,
           promptHistory: updatedPromptHistory,
           progressPercent: 95,
           currentStepText: `피드백 반영: "${trimmed}"`
@@ -380,7 +380,9 @@ export const MediaLabContainer: React.FC = () => {
 
         setArtifact(updated);
         setHistory((prev) => [...prev, createCheckpoint(updated)]);
-        setNoaResponseText(`피드백 "${trimmed}"을(를) 정밀 반영하여 라이브 캔버스를 갱신했습니다.`);
+        setNoaResponseText(
+          `피드백을 반영하여 실시간 AI 캔버스를 갱신했습니다.\n\n> 🎯 **반영된 VPO 키워드**: *${visualAsset?.semanticEnglish || vpo.optimizedPrompt}*`
+        );
         showToast(`피드백 "${trimmed}"을(를) 반영하여 캔버스를 갱신했습니다.`, 'success');
       }
       return;
@@ -855,7 +857,7 @@ export const MediaLabContainer: React.FC = () => {
                 mvData={mvPipelineResult}
                 vpoData={vpoResult}
                 aspectRatio={visualRatio}
-                onAspectRatioChange={setVisualRatio}
+                onAspectRatioChange={handleAspectRatioChange}
                 onSave4K={handleActionSave4K}
                 onNotionSync={handleActionNotionSync}
                 onCopyLink={handleActionCopyLink}
