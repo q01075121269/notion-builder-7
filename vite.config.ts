@@ -196,6 +196,61 @@ function geminiApiProxyPlugin(): Plugin {
           return
         }
 
+        // /api/spark/research 로컬 개발 서버 프록시 및 Google Search Grounding 핸들러
+        if (req.url && req.url.startsWith('/api/spark/research')) {
+          if (req.method === 'OPTIONS') {
+            res.statusCode = 204
+            res.setHeader('Access-Control-Allow-Origin', '*')
+            res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
+            res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-gemini-api-key')
+            res.end()
+            return
+          }
+
+          let bodyBuffer = ''
+          req.on('data', (chunk) => {
+            bodyBuffer += chunk
+          })
+
+          req.on('end', async () => {
+            try {
+              const sparkHandler = (await import('./api/spark/research.ts')).default
+              const mockRes: any = {
+                statusCode: 200,
+                headers: {},
+                setHeader(k: string, v: string) {
+                  this.headers[k] = v
+                  res.setHeader(k, v)
+                },
+                status(code: number) {
+                  this.statusCode = code
+                  res.statusCode = code
+                  return this
+                },
+                json(data: any) {
+                  res.setHeader('Content-Type', 'application/json')
+                  res.end(JSON.stringify(data))
+                },
+                end(data?: any) {
+                  if (data) res.write(data)
+                  res.end()
+                }
+              }
+              const mockReq: any = {
+                method: req.method,
+                headers: req.headers,
+                body: bodyBuffer
+              }
+              await sparkHandler(mockReq, mockRes)
+            } catch (err: any) {
+              res.statusCode = 500
+              res.setHeader('Content-Type', 'application/json')
+              res.end(JSON.stringify({ error: err.message || 'Spark research handler failed' }))
+            }
+          })
+          return
+        }
+
         // /api/orchestrator 로컬 개발 서버 프록시 및 멀티모달 오케스트레이터 핸들러 (404 방지)
         if (req.url && req.url.startsWith('/api/orchestrator')) {
           if (req.method === 'OPTIONS') {

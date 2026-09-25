@@ -17,11 +17,16 @@ import { InfographicCanvas } from './canvas/InfographicCanvas';
 import { BriefingReportCanvas } from './canvas/BriefingReportCanvas';
 import { Sparkles, LayoutDashboard } from 'lucide-react';
 import { useSparkTheme } from '../../context/SparkThemeContext';
+import type { SparkpagePayload } from '../../types/spark';
 
 interface UniversalSmartCanvasProps {
   document: OfficeDocument;
   planTriad?: PlanTriad;
   sources?: OfficeSource[];
+  sparkpageData?: SparkpagePayload | null;
+  isResearching?: boolean;
+  researchStep?: number;
+  researchMessage?: string;
   viewMode: CanvasViewMode;
   onChangeViewMode: (mode: CanvasViewMode) => void;
   onChangeDocument: (updated: OfficeDocument, actionName: string) => void;
@@ -36,6 +41,10 @@ export const UniversalSmartCanvas: React.FC<UniversalSmartCanvasProps> = ({
   document,
   planTriad,
   sources = [],
+  sparkpageData,
+  isResearching = false,
+  researchStep = 1,
+  researchMessage = '',
   viewMode,
   onChangeViewMode,
   onChangeDocument,
@@ -108,6 +117,10 @@ export const UniversalSmartCanvas: React.FC<UniversalSmartCanvasProps> = ({
                 document={document}
                 planTriad={planTriad}
                 sources={sources}
+                sparkpageData={sparkpageData}
+                isResearching={isResearching}
+                researchStep={researchStep}
+                researchMessage={researchMessage}
                 onChangeDocument={onChangeDocument}
                 onApplyPlanToDoc={(key, qa) => onApplyPlanToDoc(key, qa)}
                 onSelectCitation={onSelectCitation}
