@@ -81,16 +81,75 @@ export const AudioOverviewPlayer: React.FC<AudioOverviewPlayerProps> = ({
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const [selectedVoice, setSelectedVoice] = useState<SpeechSynthesisVoice | null>(null);
+
+  // 최적의 한국어 자연어 보이스 탐색 헬퍼 (Natural/Neural 우선)
+  const getOptimalKoreanVoice = (): SpeechSynthesisVoice | null => {
+    if (typeof window === 'undefined' || !window.speechSynthesis) return null;
+    const voices = window.speechSynthesis.getVoices();
+    if (!voices || voices.length === 0) return null;
+
+    // 1순위: 한국어 Natural / Neural 고음질 보이스 (SunHi, InJoon, Google 한국어 등)
+    const naturalVoice = voices.find(v => {
+      const isKorean = v.lang === 'ko-KR' || v.lang.startsWith('ko');
+      if (!isKorean) return false;
+      const lowerName = v.name.toLowerCase();
+      return (
+        lowerName.includes('natural') || 
+        lowerName.includes('neural') || 
+        lowerName.includes('online') ||
+        lowerName.includes('sunhi') ||
+        lowerName.includes('injoon') ||
+        lowerName.includes('google 한국어')
+      );
+    });
+
+    if (naturalVoice) return naturalVoice;
+
+    // 2순위: 시스템 내장 'ko-KR' 고음질 보이스
+    const standardKoVoice = voices.find(v => v.lang === 'ko-KR' || v.lang.startsWith('ko'));
+    if (standardKoVoice) return standardKoVoice;
+
+    // 3순위: 한국어 포함 보이스 폴백
+    return voices.find(v => v.name.includes('Korean') || v.name.includes('한국어')) || null;
+  };
+
+  // 브라우저 보이스 로드 시 자동 매핑
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.speechSynthesis) return;
+
+    const updateVoice = () => {
+      const voice = getOptimalKoreanVoice();
+      if (voice) setSelectedVoice(voice);
+    };
+
+    updateVoice();
+    window.speechSynthesis.onvoiceschanged = updateVoice;
+    return () => {
+      if (window.speechSynthesis) {
+        window.speechSynthesis.onvoiceschanged = null;
+      }
+    };
+  }, []);
+
+  // 자연스러운 팟캐스트 호흡을 위한 스크립트 포맷팅 (쉼표/마침표 구간 호흡 딜레이)
+  const formatPodcastBreathing = (text: string) => {
+    return text
+      .replace(/([.!?])\s*/g, '$1 , ') // 마침표 뒤 자연스러운 호흡 텀
+      .replace(/([,])\s*/g, '$1 ');    // 쉼표 호흡 유지
+  };
 
   // 음성 텍스트 합성 헬퍼
   const getFullScriptText = () => {
-    return [
+    const rawScript = [
       `${documentTitle}. 2분 핵심 오디오 브리핑을 시작합니다.`,
       ...BRIEFING_SCRIPT.map(s => `${s.speakerName}. ${s.text}`)
     ].join(' ');
+
+    return formatPodcastBreathing(rawScript);
   };
 
-  // 실제 TTS 음성 재생 시작
+  // 실제 자연어 TTS 음성 재생 시작
   const startSpeech = (rate = playbackRate) => {
     if (typeof window === 'undefined' || !window.speechSynthesis) return;
 
@@ -99,13 +158,15 @@ export const AudioOverviewPlayer: React.FC<AudioOverviewPlayerProps> = ({
     const textToSpeak = getFullScriptText();
     const utterance = new SpeechSynthesisUtterance(textToSpeak);
     utterance.lang = 'ko-KR';
-    utterance.rate = rate;
+    
+    // 자연스러운 인토네이션 및 말속도 튜닝
+    utterance.pitch = 1.02; // 차분하면서도 명료한 팟캐스트 인토네이션
+    utterance.rate = rate || 1.0; // 기계적인 느낌을 줄이고 자연스러운 말속도 유지
 
-    // 한국어 보이스 선택
-    const voices = window.speechSynthesis.getVoices();
-    const koVoice = voices.find(v => v.lang === 'ko-KR' || v.lang.startsWith('ko'));
-    if (koVoice) {
-      utterance.voice = koVoice;
+    // 1순위 최적 보이스 적용
+    const voiceToUse = selectedVoice || getOptimalKoreanVoice();
+    if (voiceToUse) {
+      utterance.voice = voiceToUse;
     }
 
     utterance.onend = () => {

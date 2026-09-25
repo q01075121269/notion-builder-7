@@ -163,20 +163,20 @@ export const CompanyTemplateInjector: React.FC<CompanyTemplateInjectorProps> = (
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-fadeIn">
-      <div className="bg-white dark:bg-zinc-900 rounded-3xl max-w-2xl w-full p-6 sm:p-8 shadow-2xl border border-slate-200 dark:border-zinc-800 space-y-6 max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-fadeIn">
+      <div className="bg-zinc-900 rounded-3xl max-w-2xl w-full p-6 sm:p-8 shadow-2xl border border-zinc-800 space-y-6 max-h-[90vh] overflow-y-auto text-zinc-100">
         
         {/* 상단 타이틀 바 */}
-        <div className="flex items-center justify-between border-b border-slate-200 dark:border-zinc-800 pb-4">
+        <div className="flex items-center justify-between border-b border-zinc-800 pb-4">
           <div className="flex items-center space-x-2.5">
-            <div className="w-9 h-9 rounded-xl bg-slate-900 text-white dark:bg-zinc-100 dark:text-zinc-900 flex items-center justify-center shadow-xs">
-              <Building2 className="w-5 h-5 text-slate-200 dark:text-zinc-800" />
+            <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-xs">
+              <Building2 className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h3 className="text-base sm:text-lg font-black text-slate-900 dark:text-white">
+              <h3 className="text-base sm:text-lg font-black text-white">
                 사내 고유 양식 스캐너 & 1:1 캔버스 복제기
               </h3>
-              <p className="text-xs text-slate-500 dark:text-zinc-400">
+              <p className="text-xs text-zinc-400">
                 {sourceFileName 
                   ? `[${sourceFileName}] 원본 서식 구조를 스캔하여 캔버스에 즉시 주입합니다.`
                   : '사내 표준 결재선, 문서번호 규칙, 예산 표 그리드를 자동 추출하여 주입합니다.'
@@ -186,7 +186,7 @@ export const CompanyTemplateInjector: React.FC<CompanyTemplateInjectorProps> = (
           </div>
           <button 
             onClick={onClose}
-            className="text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 p-1.5 rounded-lg transition"
+            className="text-zinc-400 hover:text-zinc-200 p-1.5 rounded-lg transition"
             title="닫기"
           >
             <X className="w-5 h-5" />
@@ -195,7 +195,7 @@ export const CompanyTemplateInjector: React.FC<CompanyTemplateInjectorProps> = (
 
         {/* 템플릿 선택 카드 목록 */}
         <div className="space-y-2">
-          <label className="text-xs font-bold text-slate-700 dark:text-zinc-300">
+          <label className="text-xs font-bold text-zinc-300">
             적용할 사내 서식 프리셋 선택:
           </label>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
@@ -208,21 +208,21 @@ export const CompanyTemplateInjector: React.FC<CompanyTemplateInjectorProps> = (
                   onClick={() => setSelectedTemplateId(tmpl.id)}
                   className={`p-3.5 rounded-2xl text-left border transition cursor-pointer flex flex-col justify-between ${
                     isSelected 
-                      ? 'border-indigo-600 dark:border-indigo-500 bg-indigo-50/50 dark:bg-indigo-950/30 ring-2 ring-indigo-500/20 shadow-xs'
-                      : 'border-slate-200 dark:border-zinc-800 bg-slate-50 dark:bg-zinc-850 hover:border-slate-300 dark:hover:border-zinc-700'
+                      ? 'border-blue-500 bg-blue-950/20 text-white ring-1 ring-blue-500/50 shadow-sm'
+                      : 'bg-zinc-900/90 border-zinc-800 text-zinc-100 hover:border-zinc-700'
                   }`}
                 >
-                  <div className="space-y-1">
+                  <div className="space-y-1.5">
                     <div className="flex items-center justify-between">
-                      <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-slate-200 dark:bg-zinc-700 text-slate-700 dark:text-zinc-200 font-bold">
+                      <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-zinc-800 text-zinc-300 font-bold border border-zinc-700/60">
                         {tmpl.companyName}
                       </span>
-                      {isSelected && <Check className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />}
+                      {isSelected && <Check className="w-4 h-4 text-blue-400 shrink-0" />}
                     </div>
-                    <h4 className="text-xs font-black text-slate-900 dark:text-white pt-1">
+                    <h4 className="text-xs font-black text-white pt-0.5">
                       {tmpl.name}
                     </h4>
-                    <p className="text-[11px] text-slate-500 dark:text-zinc-400">
+                    <p className="text-xs text-zinc-400">
                       {tmpl.department}
                     </p>
                   </div>
@@ -233,30 +233,30 @@ export const CompanyTemplateInjector: React.FC<CompanyTemplateInjectorProps> = (
         </div>
 
         {/* 추출된 3대 감지 요소 디테일 프리뷰 */}
-        <div className="p-4 rounded-2xl bg-slate-50 dark:bg-zinc-800/60 border border-slate-200 dark:border-zinc-700/60 space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-200 dark:border-zinc-700 pb-2">
-            <span className="text-xs font-black text-slate-900 dark:text-white flex items-center gap-1.5">
-              <Layers className="w-4 h-4 text-slate-600 dark:text-zinc-300" />
+        <div className="p-4 rounded-2xl bg-zinc-950/90 border border-zinc-800 space-y-4">
+          <div className="flex items-center justify-between border-b border-zinc-800 pb-2">
+            <span className="text-xs font-black text-white flex items-center gap-1.5">
+              <Layers className="w-4 h-4 text-zinc-400" />
               <span>사내 서식 감지 및 파싱된 핵심 요소 (3대 규격)</span>
             </span>
-            <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+            <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-emerald-950 text-emerald-300 border border-emerald-800">
               100% 자동 정규화 완료
             </span>
           </div>
 
           {/* 1. 4단 결재선 구조 */}
           <div className="space-y-1.5">
-            <div className="flex items-center space-x-1.5 text-xs font-bold text-slate-700 dark:text-zinc-300">
-              <Users className="w-3.5 h-3.5 text-slate-500" />
+            <div className="flex items-center space-x-1.5 text-xs font-bold text-zinc-300">
+              <Users className="w-3.5 h-3.5 text-zinc-400" />
               <span>1) 결재선 구조 (4단 승인 라인):</span>
             </div>
             <div className="grid grid-cols-4 gap-1.5 text-center">
               {currentTemplate.approvers.map((appr, idx) => (
-                <div key={idx} className="p-2 rounded-xl bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 shadow-2xs">
-                  <div className="text-[10px] text-slate-400 dark:text-zinc-500 font-medium">
+                <div key={idx} className="p-2 rounded-xl bg-zinc-900 border border-zinc-800 shadow-2xs">
+                  <div className="text-[10px] text-zinc-400 font-medium">
                     {idx === 0 ? '기안자' : idx === 1 ? '1차 검토' : idx === 2 ? '2차 승인' : '최종 결재'}
                   </div>
-                  <div className="text-xs font-black text-slate-800 dark:text-zinc-200 truncate mt-0.5">
+                  <div className="text-xs font-black text-zinc-200 truncate mt-0.5">
                     {appr}
                   </div>
                 </div>
@@ -266,41 +266,41 @@ export const CompanyTemplateInjector: React.FC<CompanyTemplateInjectorProps> = (
 
           {/* 2. 부서 고유 메타데이터 */}
           <div className="space-y-1.5">
-            <div className="flex items-center space-x-1.5 text-xs font-bold text-slate-700 dark:text-zinc-300">
-              <Hash className="w-3.5 h-3.5 text-slate-500" />
+            <div className="flex items-center space-x-1.5 text-xs font-bold text-zinc-300">
+              <Hash className="w-3.5 h-3.5 text-zinc-400" />
               <span>2) 부서 메타데이터 및 문서 규칙:</span>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
-              <div className="p-2.5 rounded-xl bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700">
-                <span className="text-[10px] text-slate-400 block">문서번호 규칙</span>
-                <span className="font-mono font-bold text-slate-800 dark:text-zinc-200">{currentTemplate.docNumberFormat}</span>
+              <div className="p-2.5 rounded-xl bg-zinc-900 border border-zinc-800">
+                <span className="text-xs text-zinc-400 block mb-0.5">문서번호 규칙</span>
+                <span className="font-mono font-bold text-zinc-100">{currentTemplate.docNumberFormat}</span>
               </div>
-              <div className="p-2.5 rounded-xl bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700">
-                <span className="text-[10px] text-slate-400 block">보존연한</span>
-                <span className="font-bold text-slate-800 dark:text-zinc-200">{currentTemplate.retentionPeriod}</span>
+              <div className="p-2.5 rounded-xl bg-zinc-900 border border-zinc-800">
+                <span className="text-xs text-zinc-400 block mb-0.5">보존연한</span>
+                <span className="font-bold text-zinc-100">{currentTemplate.retentionPeriod}</span>
               </div>
-              <div className="p-2.5 rounded-xl bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700">
-                <span className="text-[10px] text-slate-400 block">주관 부서</span>
-                <span className="font-bold text-slate-800 dark:text-zinc-200 truncate block">{currentTemplate.department}</span>
+              <div className="p-2.5 rounded-xl bg-zinc-900 border border-zinc-800">
+                <span className="text-xs text-zinc-400 block mb-0.5">주관 부서</span>
+                <span className="font-bold text-zinc-100 truncate block">{currentTemplate.department}</span>
               </div>
             </div>
           </div>
 
           {/* 3. 사내 고유 표 컬럼 구조 */}
           <div className="space-y-1.5">
-            <div className="flex items-center space-x-1.5 text-xs font-bold text-slate-700 dark:text-zinc-300">
-              <FileSpreadsheet className="w-3.5 h-3.5 text-slate-500" />
+            <div className="flex items-center space-x-1.5 text-xs font-bold text-zinc-300">
+              <FileSpreadsheet className="w-3.5 h-3.5 text-zinc-400" />
               <span>3) 사내 표준 예산 표 그리드 컬럼 복제:</span>
             </div>
-            <div className="p-2.5 rounded-xl bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 overflow-x-auto">
+            <div className="p-2.5 rounded-xl bg-zinc-900 border border-zinc-800 overflow-x-auto">
               <div className="flex items-center gap-1.5 text-[11px] font-mono whitespace-nowrap">
                 {currentTemplate.tableHeaders.map((hdr, hIdx) => (
-                  <span key={hIdx} className="px-2 py-1 rounded bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 font-bold border border-slate-200 dark:border-zinc-700">
+                  <span key={hIdx} className="px-2 py-1 rounded bg-zinc-800 text-zinc-200 font-bold border border-zinc-700">
                     {hdr}
                   </span>
                 ))}
               </div>
-              <p className="text-[10px] text-slate-400 dark:text-zinc-500 mt-1.5">
+              <p className="text-xs text-zinc-400 mt-1.5">
                 * 캔버스 표 그리드에 1:1로 복제되며 합계 공식(=SUM)이 자동 바인딩됩니다.
               </p>
             </div>
@@ -309,19 +309,19 @@ export const CompanyTemplateInjector: React.FC<CompanyTemplateInjectorProps> = (
 
         {/* 진행 상태 인디케이터 (스캐닝 중) */}
         {isScanning && (
-          <div className="p-3.5 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 flex items-center space-x-3 text-xs font-bold text-indigo-700 dark:text-indigo-300 animate-pulse">
-            <Sparkles className="w-4 h-4 text-indigo-500 shrink-0 animate-spin" />
+          <div className="p-3.5 rounded-2xl bg-blue-950/60 border border-blue-800 flex items-center space-x-3 text-xs font-bold text-blue-300 animate-pulse">
+            <Sparkles className="w-4 h-4 text-blue-400 shrink-0 animate-spin" />
             <span>{scanStep}</span>
           </div>
         )}
 
         {/* 하단 액션 버튼 */}
-        <div className="flex items-center justify-end space-x-2 pt-2 border-t border-slate-200 dark:border-zinc-800">
+        <div className="flex items-center justify-end space-x-2 pt-2 border-t border-zinc-800">
           <button
             type="button"
             onClick={onClose}
             disabled={isScanning}
-            className="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-zinc-700 text-xs font-bold text-slate-600 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-800 transition cursor-pointer"
+            className="px-4 py-2.5 rounded-xl border border-zinc-700 text-xs font-bold text-zinc-300 hover:bg-zinc-800 transition cursor-pointer"
           >
             취소
           </button>
@@ -329,11 +329,11 @@ export const CompanyTemplateInjector: React.FC<CompanyTemplateInjectorProps> = (
             type="button"
             onClick={handleApply}
             disabled={isScanning}
-            className="px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200 text-xs font-bold flex items-center space-x-2 transition cursor-pointer shadow-sm active:scale-95 disabled:opacity-50"
+            className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold flex items-center space-x-2 transition cursor-pointer shadow-sm active:scale-95 disabled:opacity-50"
           >
-            <FileCheck2 className="w-4 h-4 text-slate-300 dark:text-zinc-700 shrink-0" />
+            <FileCheck2 className="w-4 h-4 text-blue-200 shrink-0" />
             <span>이 사내 양식 적용하기</span>
-            <ArrowRight className="w-3.5 h-3.5 text-slate-400 dark:text-zinc-500" />
+            <ArrowRight className="w-3.5 h-3.5 text-blue-300" />
           </button>
         </div>
 
@@ -341,3 +341,6 @@ export const CompanyTemplateInjector: React.FC<CompanyTemplateInjectorProps> = (
     </div>
   );
 };
+
+// 별칭 export 제공 (CompanyTemplateScannerModal)
+export const CompanyTemplateScannerModal = CompanyTemplateInjector;

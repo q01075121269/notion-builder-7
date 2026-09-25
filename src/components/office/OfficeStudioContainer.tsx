@@ -392,7 +392,7 @@ const OfficeStudioInner: React.FC = () => {
     };
     updateDocument(docWithFormat, `'${templateName}' 사내 서식 캔버스 복제 적용`);
     setViewMode('canvas');
-    showToast(`'${templateName}' 서식이 캔버스에 1:1 복제 적용되었습니다.`, 'success');
+    showToast('사내 표준 양식이 성공적으로 주입되었습니다', 'success');
   };
 
   // 3-Way 질문 답변 완료 후 문서·시트·슬라이드에 뼈대 완벽 자동 파이핑
