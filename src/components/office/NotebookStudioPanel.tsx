@@ -20,6 +20,7 @@ import {
   ChevronUp,
   Loader2
 } from 'lucide-react';
+import { useSparkTheme } from '../../context/SparkThemeContext';
 
 interface CopilotMessage {
   id: string;
@@ -318,38 +319,40 @@ export const NotebookStudioPanel: React.FC<NotebookStudioPanelProps> = ({
     }
   ];
 
+  const { themeConfig } = useSparkTheme();
+
   return (
-    <div className="w-[340px] sm:w-[380px] h-full flex flex-col bg-white dark:bg-zinc-900 border-l border-slate-200 dark:border-zinc-800 shrink-0 z-20 shadow-xl select-none">
+    <div className={`w-[340px] sm:w-[380px] h-full flex flex-col ${themeConfig.panelBg} ${themeConfig.panelText} border-l ${themeConfig.panelBorder} shrink-0 z-20 shadow-xl select-none transition-colors duration-200`}>
       
       {/* 1. 스튜디오 헤더: "스튜디오" 타이틀 + 접기 아이콘 */}
-      <div className="h-12 px-4 border-b border-slate-200 dark:border-zinc-800 flex items-center justify-between shrink-0 bg-slate-50/70 dark:bg-zinc-900/90">
+      <div className={`h-12 px-4 border-b ${themeConfig.panelBorder} flex items-center justify-between shrink-0 ${themeConfig.headerBg}`}>
         <div className="flex items-center space-x-2">
-          <div className="p-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800">
-            <Sparkles className="w-4 h-4" />
+          <div className={`p-1.5 rounded-lg ${themeConfig.accentBg} ${themeConfig.accentBorder} border`}>
+            <Sparkles className={`w-4 h-4 ${themeConfig.accentText}`} />
           </div>
           <div>
             <div className="flex items-center space-x-1.5">
-              <span className="text-sm font-extrabold text-slate-900 dark:text-white">스튜디오</span>
-              <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300">
+              <span className={`text-sm font-extrabold ${themeConfig.textPrimary}`}>스튜디오</span>
+              <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded ${themeConfig.pillBg} ${themeConfig.accentText} border ${themeConfig.pillBorder}`}>
                 NotebookLM
               </span>
             </div>
-            <p className="text-[10px] text-slate-400 dark:text-zinc-500">통합 멀티모달 산출물 생성 허브</p>
+            <p className={`text-[10px] ${themeConfig.panelSubtext}`}>통합 멀티모달 산출물 생성 허브</p>
           </div>
         </div>
 
         {/* 접기 버튼 */}
         <button
           onClick={onClose}
-          className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-zinc-200 hover:bg-slate-100 dark:hover:bg-zinc-800 transition cursor-pointer"
+          className={`p-1.5 rounded-lg transition cursor-pointer ${themeConfig.panelHover}`}
           title="스튜디오 패널 접기"
         >
-          <ChevronRight className="w-4 h-4" />
+          <ChevronRight className="w-4 h-4 text-slate-400 hover:text-slate-200" />
         </button>
       </div>
 
       {/* 2. 스튜디오 8대 출력 생성기 아코디언 (접기/펼치기 토글) */}
-      <div className="border-b border-slate-200 dark:border-zinc-800 bg-slate-50/60 dark:bg-zinc-950/40 shrink-0">
+      <div className={`border-b ${themeConfig.panelBorder} ${themeConfig.pillBg} shrink-0`}>
         <button
           onClick={() => setIsGeneratorsCollapsed(!isGeneratorsCollapsed)}
           className="w-full p-3 flex items-center justify-between text-[11px] font-bold text-slate-600 dark:text-zinc-300 uppercase tracking-wider hover:bg-slate-100/70 dark:hover:bg-zinc-900/60 transition cursor-pointer"

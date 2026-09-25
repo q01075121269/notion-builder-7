@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState } from 'react';
 
-export type SparkTheme = 'silicon-dark' | 'modern-navy' | 'warm-editorial';
+export type SparkTheme = 'silicon-dark' | 'clean-modern' | 'warm-editorial' | 'modern-navy';
 
 export interface SparkThemeClasses {
   id: SparkTheme;
@@ -9,6 +9,12 @@ export interface SparkThemeClasses {
   // 전체 배경 & 텍스트
   appBg: string;
   appText: string;
+  // 패널 (좌측 지식창고, 우측 스튜디오, 상단 바)
+  panelBg: string;
+  panelBorder: string;
+  panelText: string;
+  panelSubtext: string;
+  panelHover: string;
   // 카드 스타일
   cardBg: string;
   cardBorder: string;
@@ -40,19 +46,24 @@ export interface SparkThemeClasses {
 }
 
 export const THEME_CONFIGS: Record<SparkTheme, SparkThemeClasses> = {
-  // 1. 🌌 [Silicon Dark] (기본 추천)
+  // 1. 🌌 [실리콘 다크 (Silicon Dark)]
   'silicon-dark': {
     id: 'silicon-dark',
     name: '실리콘 다크',
     icon: '🌌',
     appBg: 'bg-slate-950 text-slate-100',
     appText: 'text-slate-100',
-    cardBg: 'bg-slate-900/85 backdrop-blur-xl',
-    cardBorder: 'border-slate-800/90',
-    cardShadow: 'shadow-2xl shadow-indigo-950/20',
-    cardHover: 'hover:border-cyan-500/40 hover:shadow-cyan-950/30',
-    headerBg: 'bg-slate-950/90 backdrop-blur-md',
-    headerBorder: 'border-slate-800/80',
+    panelBg: 'bg-slate-900',
+    panelBorder: 'border-slate-800',
+    panelText: 'text-slate-100',
+    panelSubtext: 'text-slate-400',
+    panelHover: 'hover:bg-slate-800/80',
+    cardBg: 'bg-slate-900/90 backdrop-blur-xl',
+    cardBorder: 'border-slate-700/60',
+    cardShadow: 'shadow-2xl shadow-indigo-950/30',
+    cardHover: 'hover:border-cyan-500/50 hover:shadow-cyan-950/40',
+    headerBg: 'bg-slate-950/95 backdrop-blur-md',
+    headerBorder: 'border-slate-800',
     textPrimary: 'text-slate-100',
     textSecondary: 'text-slate-300',
     textMuted: 'text-slate-500',
@@ -61,80 +72,126 @@ export const THEME_CONFIGS: Record<SparkTheme, SparkThemeClasses> = {
     accentBorder: 'border-cyan-500/30',
     accentRing: 'ring-cyan-500/20',
     accentGradient: 'from-cyan-400 via-indigo-400 to-purple-400',
-    pillBg: 'bg-slate-800/70',
-    pillBorder: 'border-slate-700/60',
+    pillBg: 'bg-slate-800/80',
+    pillBorder: 'border-slate-700/70',
     pillText: 'text-cyan-300',
-    inputBg: 'bg-slate-900/90',
+    inputBg: 'bg-slate-900/95',
     inputBorder: 'border-slate-700 focus:border-cyan-400',
     inputText: 'text-slate-100 placeholder-slate-500',
     btnPrimary: 'bg-gradient-to-r from-cyan-500 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 text-slate-950 font-bold shadow-lg shadow-cyan-500/20',
     btnSecondary: 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700'
   },
 
-  // 2. 🏛️ [Modern Navy] (맥킨지/대기업 컨설팅)
-  'modern-navy': {
-    id: 'modern-navy',
-    name: '모던 네이비',
+  // 2. 🏛️ [클린 모던 (Clean Modern)] - 확실한 고대비 화이트/그레이
+  'clean-modern': {
+    id: 'clean-modern',
+    name: '클린 모던',
     icon: '🏛️',
-    appBg: 'bg-[#0b1329] text-slate-50',
-    appText: 'text-slate-50',
-    cardBg: 'bg-[#111c44]/90 backdrop-blur-xl',
-    cardBorder: 'border-blue-900/60',
-    cardShadow: 'shadow-xl shadow-blue-950/40',
-    cardHover: 'hover:border-blue-500/50 hover:shadow-blue-900/30',
-    headerBg: 'bg-[#0b1329]/90 backdrop-blur-md',
-    headerBorder: 'border-blue-900/50',
-    textPrimary: 'text-slate-50',
-    textSecondary: 'text-blue-100/90',
-    textMuted: 'text-blue-300/60',
-    accentText: 'text-blue-400',
-    accentBg: 'bg-blue-500/10',
-    accentBorder: 'border-blue-500/30',
+    appBg: 'bg-slate-50 text-slate-900',
+    appText: 'text-slate-900',
+    panelBg: 'bg-white',
+    panelBorder: 'border-slate-200',
+    panelText: 'text-slate-800',
+    panelSubtext: 'text-slate-500',
+    panelHover: 'hover:bg-slate-100',
+    cardBg: 'bg-white shadow-md',
+    cardBorder: 'border-slate-300',
+    cardShadow: 'shadow-md shadow-slate-200/60',
+    cardHover: 'hover:border-blue-500/50 hover:shadow-lg',
+    headerBg: 'bg-white/95 backdrop-blur-md',
+    headerBorder: 'border-slate-200',
+    textPrimary: 'text-slate-900',
+    textSecondary: 'text-slate-700',
+    textMuted: 'text-slate-500',
+    accentText: 'text-blue-600',
+    accentBg: 'bg-blue-50',
+    accentBorder: 'border-blue-200',
     accentRing: 'ring-blue-500/20',
-    accentGradient: 'from-blue-400 via-sky-300 to-amber-300',
-    pillBg: 'bg-[#1a275a]/70',
-    pillBorder: 'border-blue-800/60',
-    pillText: 'text-blue-300',
-    inputBg: 'bg-[#111c44]/95',
-    inputBorder: 'border-blue-800/80 focus:border-blue-400',
-    inputText: 'text-slate-100 placeholder-blue-300/40',
-    btnPrimary: 'bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-500 hover:to-indigo-600 text-white font-bold shadow-lg shadow-blue-600/30',
-    btnSecondary: 'bg-[#1a275a] hover:bg-[#233375] text-blue-100 border-blue-800'
+    accentGradient: 'from-blue-600 via-indigo-600 to-slate-900',
+    pillBg: 'bg-slate-100',
+    pillBorder: 'border-slate-300',
+    pillText: 'text-slate-800',
+    inputBg: 'bg-white',
+    inputBorder: 'border-slate-300 focus:border-blue-600',
+    inputText: 'text-slate-900 placeholder-slate-400',
+    btnPrimary: 'bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-500 hover:to-indigo-600 text-white font-bold shadow-md shadow-blue-500/20',
+    btnSecondary: 'bg-slate-100 hover:bg-slate-200 text-slate-800 border-slate-300'
   },
 
-  // 3. ☕ [Warm Editorial] (노션 프리미엄 감성)
+  // modern-navy (clean-modern의 별칭으로 유지)
+  'modern-navy': {
+    id: 'clean-modern',
+    name: '클린 모던',
+    icon: '🏛️',
+    appBg: 'bg-slate-50 text-slate-900',
+    appText: 'text-slate-900',
+    panelBg: 'bg-white',
+    panelBorder: 'border-slate-200',
+    panelText: 'text-slate-800',
+    panelSubtext: 'text-slate-500',
+    panelHover: 'hover:bg-slate-100',
+    cardBg: 'bg-white shadow-md',
+    cardBorder: 'border-slate-300',
+    cardShadow: 'shadow-md shadow-slate-200/60',
+    cardHover: 'hover:border-blue-500/50 hover:shadow-lg',
+    headerBg: 'bg-white/95 backdrop-blur-md',
+    headerBorder: 'border-slate-200',
+    textPrimary: 'text-slate-900',
+    textSecondary: 'text-slate-700',
+    textMuted: 'text-slate-500',
+    accentText: 'text-blue-600',
+    accentBg: 'bg-blue-50',
+    accentBorder: 'border-blue-200',
+    accentRing: 'ring-blue-500/20',
+    accentGradient: 'from-blue-600 via-indigo-600 to-slate-900',
+    pillBg: 'bg-slate-100',
+    pillBorder: 'border-slate-300',
+    pillText: 'text-slate-800',
+    inputBg: 'bg-white',
+    inputBorder: 'border-slate-300 focus:border-blue-600',
+    inputText: 'text-slate-900 placeholder-slate-400',
+    btnPrimary: 'bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-500 hover:to-indigo-600 text-white font-bold shadow-md shadow-blue-500/20',
+    btnSecondary: 'bg-slate-100 hover:bg-slate-200 text-slate-800 border-slate-300'
+  },
+
+  // 3. ☕ [웜 에디토리얼 (Warm Editorial)] - 고대비 차콜 & 딥 세피아 가독성 교정
   'warm-editorial': {
     id: 'warm-editorial',
     name: '웜 에디토리얼',
     icon: '☕',
-    appBg: 'bg-[#faf8f5] text-[#2d2a26]',
-    appText: 'text-[#2d2a26]',
+    appBg: 'bg-[#f7f4ed] text-[#1f1e1c]',
+    appText: 'text-[#1f1e1c]',
+    panelBg: 'bg-[#efebe2]',
+    panelBorder: 'border-[#e2dcd2]',
+    panelText: 'text-[#1f1e1c]',
+    panelSubtext: 'text-[#5a554e]',
+    panelHover: 'hover:bg-[#e6e1d7]',
     cardBg: 'bg-white/95 backdrop-blur-md',
-    cardBorder: 'border-[#e8e4de]',
-    cardShadow: 'shadow-lg shadow-stone-200/60',
-    cardHover: 'hover:border-amber-400/50 hover:shadow-stone-300/70',
-    headerBg: 'bg-[#faf8f5]/90 backdrop-blur-md',
-    headerBorder: 'border-[#e8e4de]',
-    textPrimary: 'text-[#2d2a26]',
-    textSecondary: 'text-stone-700',
-    textMuted: 'text-stone-400',
-    accentText: 'text-amber-800',
-    accentBg: 'bg-amber-500/10',
-    accentBorder: 'border-amber-600/30',
-    accentRing: 'ring-amber-500/20',
-    accentGradient: 'from-amber-700 via-orange-600 to-stone-800',
-    pillBg: 'bg-[#f4efe8]',
-    pillBorder: 'border-[#dfd8cd]',
-    pillText: 'text-amber-900',
+    cardBorder: 'border-[#dfd8cc]',
+    cardShadow: 'shadow-md shadow-stone-300/50',
+    cardHover: 'hover:border-amber-600/50 hover:shadow-lg',
+    headerBg: 'bg-[#f7f4ed]/95 backdrop-blur-md',
+    headerBorder: 'border-[#e2dcd2]',
+    textPrimary: 'text-[#1f1e1c]',
+    textSecondary: 'text-[#38342e]',
+    textMuted: 'text-[#6e685f]',
+    accentText: 'text-[#8b4513]',
+    accentBg: 'bg-[#eaddcf]',
+    accentBorder: 'border-[#d0c0af]',
+    accentRing: 'ring-amber-800/20',
+    accentGradient: 'from-[#8b4513] via-[#a0522d] to-[#1f1e1c]',
+    pillBg: 'bg-[#e8e2d5]',
+    pillBorder: 'border-[#d7cfbf]',
+    pillText: 'text-[#2a241e]',
     inputBg: 'bg-white',
-    inputBorder: 'border-stone-300 focus:border-amber-600',
-    inputText: 'text-stone-900 placeholder-stone-400',
-    btnPrimary: 'bg-gradient-to-r from-[#2d2a26] to-[#453f3a] hover:from-[#1f1d1a] hover:to-[#38332f] text-amber-50 font-bold shadow-md shadow-stone-400/20',
-    btnSecondary: 'bg-stone-100 hover:bg-stone-200 text-stone-800 border-stone-300'
+    inputBorder: 'border-[#cfc6b5] focus:border-[#8b4513]',
+    inputText: 'text-[#1f1e1c] placeholder-[#8c8577]',
+    btnPrimary: 'bg-gradient-to-r from-[#2d2822] to-[#4a4237] hover:from-[#1b1814] hover:to-[#383229] text-amber-50 font-bold shadow-md shadow-stone-400/30',
+    btnSecondary: 'bg-[#e2dcd0] hover:bg-[#d5cebf] text-[#2d2822] border-[#cfc6b5]'
   }
 };
 
-const THEME_STORAGE_KEY = 'anti_spark_studio_theme_v1';
+const THEME_STORAGE_KEY = 'anti_spark_studio_theme_v2';
 
 interface SparkThemeContextValue {
   theme: SparkTheme;
@@ -156,9 +213,10 @@ export const SparkThemeProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   });
 
   const setTheme = (newTheme: SparkTheme) => {
-    setThemeState(newTheme);
+    const resolvedTheme = newTheme === 'modern-navy' ? 'clean-modern' : newTheme;
+    setThemeState(resolvedTheme);
     try {
-      localStorage.setItem(THEME_STORAGE_KEY, newTheme);
+      localStorage.setItem(THEME_STORAGE_KEY, resolvedTheme);
     } catch {}
   };
 

@@ -82,7 +82,7 @@ export const SparkStudioHeader: React.FC<SparkStudioHeaderProps> = ({
 
   const themes: { id: SparkTheme; label: string; icon: string }[] = [
     { id: 'silicon-dark', label: '실리콘 다크', icon: '🌌' },
-    { id: 'modern-navy', label: '모던 네이비', icon: '🏛️' },
+    { id: 'clean-modern', label: '클린 모던', icon: '🏛️' },
     { id: 'warm-editorial', label: '웜 에디토리얼', icon: '☕' }
   ];
 

@@ -18,6 +18,8 @@ import {
   Search
 } from 'lucide-react';
 
+import { useSparkTheme } from '../../context/SparkThemeContext';
+
 interface KnowledgeDockProps {
   sources: OfficeSource[];
   onToggleSelectSource: (sourceId: string) => void;
@@ -39,6 +41,7 @@ export const KnowledgeDock: React.FC<KnowledgeDockProps> = ({
   onOpenTemplateInjector,
   onCollapse
 }) => {
+  const { themeConfig } = useSparkTheme();
   // 모달 및 입력창 상태
   const [activeInputTab, setActiveInputTab] = useState<'none' | 'url' | 'voice' | 'deep_research'>('none');
   const [highlightedSourceId, setHighlightedSourceId] = useState<string | null>(null);
@@ -264,36 +267,36 @@ export const KnowledgeDock: React.FC<KnowledgeDockProps> = ({
   };
 
   return (
-    <div className="w-full h-full flex flex-col bg-slate-50/90 dark:bg-zinc-900 border-r border-slate-200 dark:border-zinc-800 overflow-hidden select-none">
+    <div className={`w-full h-full flex flex-col ${themeConfig.panelBg} ${themeConfig.panelText} border-r ${themeConfig.panelBorder} overflow-hidden select-none transition-colors duration-200`}>
       
       {/* 1. 상단 타이틀 & 팩트 그라운딩 요약 인디케이터 */}
-      <div className="p-4 border-b border-slate-200 dark:border-zinc-800 shrink-0 bg-white dark:bg-zinc-850">
+      <div className={`p-4 border-b ${themeConfig.panelBorder} shrink-0 ${themeConfig.headerBg}`}>
         <div className="flex items-center justify-between mb-2 gap-1.5">
           <div className="flex items-center space-x-2 min-w-0">
-            <Database className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
-            <h2 className="text-xs sm:text-sm font-black text-slate-900 dark:text-white truncate">
+            <Database className={`w-4 h-4 ${themeConfig.accentText} shrink-0`} />
+            <h2 className={`text-xs sm:text-sm font-black truncate ${themeConfig.textPrimary}`}>
               지식 창고 (Knowledge Dock)
             </h2>
           </div>
           <div className="flex items-center space-x-1 shrink-0">
-            <span className="shrink-0 whitespace-nowrap px-2.5 py-0.5 text-xs font-bold text-indigo-700 bg-indigo-50 border border-indigo-200/80 rounded-full dark:bg-indigo-950 dark:text-indigo-300 dark:border-indigo-800 shadow-2xs">
+            <span className={`shrink-0 whitespace-nowrap px-2.5 py-0.5 text-xs font-bold rounded-full border shadow-2xs ${themeConfig.pillBg} ${themeConfig.pillBorder} ${themeConfig.pillText}`}>
               {selectedSources.length}/{sources.length}건 활성 {totalTokens > 0 ? `(${totalTokens.toLocaleString()} tokens)` : ''}
             </span>
             {onCollapse && (
               <button
                 onClick={onCollapse}
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-zinc-200 hover:bg-slate-100 dark:hover:bg-zinc-800 transition cursor-pointer shrink-0"
+                className={`p-1 rounded-lg transition cursor-pointer shrink-0 ${themeConfig.panelHover}`}
                 title="지식 창고 접기 (단축키 또는 원클릭)"
               >
-                <PanelLeftClose className="w-4 h-4 text-slate-500 hover:text-slate-800 dark:text-zinc-400 dark:hover:text-zinc-200" />
+                <PanelLeftClose className="w-4 h-4 text-slate-400 hover:text-slate-200" />
               </button>
             )}
           </div>
         </div>
 
-        <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-zinc-400">
+        <div className={`flex items-center justify-between text-[11px] ${themeConfig.panelSubtext}`}>
           <span>문서·기획 반영 누적 토큰:</span>
-          <span className="font-mono font-bold text-indigo-600 dark:text-indigo-400">
+          <span className={`font-mono font-bold ${themeConfig.accentText}`}>
             {totalTokens.toLocaleString()} tokens
           </span>
         </div>

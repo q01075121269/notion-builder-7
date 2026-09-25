@@ -498,10 +498,10 @@ const OfficeStudioInner: React.FC = () => {
           {/* 사이드바 접기/펼치기 버튼 */}
           <button
             onClick={() => setIsCollapsed(!isCollapsed)}
-            className="p-1.5 rounded-lg border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-slate-100 dark:hover:bg-zinc-700 text-slate-600 dark:text-zinc-300 transition cursor-pointer shrink-0 shadow-2xs"
+            className={`p-1.5 rounded-lg border transition cursor-pointer shrink-0 shadow-2xs ${themeConfig.pillBg} ${themeConfig.pillBorder} ${themeConfig.textPrimary} hover:opacity-80`}
             title={isCollapsed ? '지식 창고 펼치기' : '지식 창고 접기 (전폭 캔버스)'}
           >
-            {isCollapsed ? <PanelLeftOpen className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" /> : <PanelLeftClose className="w-3.5 h-3.5 text-slate-600 dark:text-zinc-300" />}
+            {isCollapsed ? <PanelLeftOpen className="w-3.5 h-3.5 text-cyan-400" /> : <PanelLeftClose className="w-3.5 h-3.5 text-slate-400" />}
           </button>
 
           {/* 프로젝트 탭 목록 */}
@@ -512,8 +512,8 @@ const OfficeStudioInner: React.FC = () => {
               className={`
                 flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition whitespace-nowrap cursor-pointer shrink-0 border
                 ${activeProjectId === proj.id
-                  ? 'bg-slate-100 dark:bg-zinc-800 text-slate-900 dark:text-white border-slate-300 dark:border-zinc-600 shadow-2xs font-bold'
-                  : 'bg-transparent text-slate-500 hover:text-slate-800 dark:text-zinc-400 dark:hover:text-zinc-200 border-transparent hover:bg-slate-100/60 dark:hover:bg-zinc-800/60'
+                  ? `${themeConfig.pillBg} ${themeConfig.pillBorder} ${themeConfig.textPrimary} font-bold shadow-2xs`
+                  : `bg-transparent text-slate-400 hover:${themeConfig.textPrimary} border-transparent hover:bg-white/5`
                 }
               `}
               title={proj.title}
@@ -526,7 +526,7 @@ const OfficeStudioInner: React.FC = () => {
           {/* 새 프로젝트 생성 버튼 */}
           <button
             onClick={handleCreateNewProject}
-            className="flex items-center space-x-1 px-2.5 py-1.5 rounded-lg bg-transparent hover:bg-slate-100 dark:hover:bg-zinc-800 text-slate-600 dark:text-zinc-400 text-xs font-medium transition cursor-pointer shrink-0 border border-dashed border-slate-300 dark:border-zinc-700"
+            className={`flex items-center space-x-1 px-2.5 py-1.5 rounded-lg bg-transparent text-slate-400 hover:text-white text-xs font-medium transition cursor-pointer shrink-0 border border-dashed ${themeConfig.panelBorder} hover:bg-white/5`}
             title="새 프로젝트 생성"
           >
             <Plus className="w-3.5 h-3.5 text-slate-400" />
@@ -536,18 +536,18 @@ const OfficeStudioInner: React.FC = () => {
 
         {/* 우측: 자동 저장 상태 + 되돌리기 + 스튜디오 토글 + [ 🚀 최종 저장 및 출하 ] */}
         <div className="flex items-center space-x-2 shrink-0">
-          <div className="hidden lg:flex items-center space-x-1 text-[11px] text-slate-400 dark:text-zinc-500">
-            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+          <div className="hidden lg:flex items-center space-x-1 text-[11px] text-slate-400">
+            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
             <span>자동 저장됨</span>
           </div>
 
           <button
             onClick={handleUndo}
             disabled={historyStack.length === 0}
-            className="flex items-center space-x-1 px-2.5 py-1.5 rounded-lg bg-white dark:bg-zinc-800 hover:bg-slate-100 dark:hover:bg-zinc-700 disabled:opacity-30 border border-slate-200 dark:border-zinc-700 text-xs font-semibold text-slate-700 dark:text-zinc-300 transition cursor-pointer shadow-2xs"
+            className={`flex items-center space-x-1 px-2.5 py-1.5 rounded-lg disabled:opacity-30 border text-xs font-semibold transition cursor-pointer shadow-2xs ${themeConfig.pillBg} ${themeConfig.pillBorder} ${themeConfig.textPrimary}`}
             title={historyStack.length > 0 ? `되돌리기: ${historyStack[historyStack.length - 1].action}` : '되돌릴 작업 없음'}
           >
-            <Undo2 className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+            <Undo2 className="w-3.5 h-3.5 text-slate-400 shrink-0" />
             <span className="hidden sm:inline">되돌리기</span>
           </button>
 
