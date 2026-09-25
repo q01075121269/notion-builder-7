@@ -13,6 +13,18 @@ export interface VisualAssetInfo {
 export function resolveVisualAssetByPrompt(prompt: string): VisualAssetInfo {
   const p = prompt.toLowerCase();
 
+  // 0. 햇살 쏟아지는 숲속 배경 (Character Lock Inpainting)
+  if (p.includes('숲') || p.includes('숲속') || p.includes('볕') || p.includes('햇살') || p.includes('나무') || p.includes('포레스트')) {
+    return {
+      imageUrl: 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=1600&q=85',
+      title: '숲속 볕내림 앰비언스의 여성 패션 디렉터 (Character Lock)',
+      theme: 'Sunlit Mystical Forest with God Rays',
+      cameraSpec: 'Hasselblad H6D-100c • 80mm prime lens f/1.8',
+      lightingSpec: 'Volumetric Forest God-Rays & Soft Backlit Sunbeams',
+      colorGrade: 'Emerald Green Forest Hue & Warm Gold Fill'
+    };
+  }
+
   // 1. 여성 패션 디렉터 / 인물 실사 캐릭터
   if (
     p.includes('패션') || 

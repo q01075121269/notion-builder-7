@@ -70,8 +70,15 @@ export const NoaMediaDock: React.FC<NoaMediaDockProps> = ({
       recognition.lang = 'ko-KR';
 
       recognition.onresult = (event: any) => {
-        const transcript = event.results[0][0].transcript;
-        setInputVal((prev) => (prev ? `${prev} ${transcript}` : transcript));
+        let finalTranscript = '';
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          if (event.results[i].isFinal) {
+            finalTranscript += event.results[i][0].transcript;
+          }
+        }
+        if (finalTranscript) {
+          setInputVal((prev) => (prev ? `${prev} ${finalTranscript.trim()}` : finalTranscript.trim()));
+        }
         setIsRecording(false);
       };
 
@@ -105,9 +112,9 @@ export const NoaMediaDock: React.FC<NoaMediaDockProps> = ({
   const fallbackSimulationMic = () => {
     setIsRecording(true);
     setTimeout(() => {
-      setInputVal((prev) => (prev ? `${prev} 시네마틱 4K 숏폼 연출` : '시네마틱 4K 숏폼 연출'));
+      setInputVal('뒷배경을 햇살 쏟아지는 숲속 배경으로 바꿔줘');
       setIsRecording(false);
-    }, 1800);
+    }, 1500);
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {

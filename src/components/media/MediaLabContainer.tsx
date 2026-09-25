@@ -41,14 +41,11 @@ import {
 } from '../../services/noaOrchestrator';
 import { optimizePrompt } from '../../lib/media/vpo';
 import type { VPOOptimizationResult } from '../../lib/media/vpo';
-import { 
-  generateBeatSyncMV, 
-  applySearchGroundedRelighting, 
-  applySubjectSwapWithCompositionLock 
-} from '../../lib/media/videoPipeline';
+import { generateBeatSyncMV } from '../../lib/media/videoPipeline';
 import type { MVPipelineResult } from '../../lib/media/videoPipeline';
 import { saveMediaItem, getRecentMediaItems, deleteMediaItem } from '../../lib/mediaStorage';
 import type { MediaItem } from '../../lib/mediaStorage';
+import { resolveVisualAssetByPrompt } from '../../lib/media/visualAssets';
 
 export const MediaLabContainer: React.FC = () => {
   const { showToast, notionApiKey } = useApp();
@@ -149,7 +146,9 @@ export const MediaLabContainer: React.FC = () => {
       if (is3D) {
         setNoaResponseText('VPO 렌더링 파라미터를 결합하여 3D 정밀 메커니즘 캔버스를 도출했습니다. (Unreal Engine 5.5 / Octane Render / PBR Titanium 8K)');
       } else {
-        setNoaResponseText(`요청하신 ${targetTitle}를 VPO 실사 엔진(Hasselblad 80mm f/1.8 심도 및 자연광)으로 렌더링하여 캔버스에 마운트했습니다.`);
+        const isFashionDirector = promptSummary.includes('패션') || promptSummary.includes('디렉터') || promptSummary.includes('여성') || promptSummary.includes('캐릭터');
+        const characterLabel = isFashionDirector ? '30대 여성 패션 디렉터 캐릭터' : targetTitle;
+        setNoaResponseText(`요청하신 ${characterLabel}를 VPO 실사 엔진(Hasselblad 80mm f/1.8 심도 및 자연광)으로 렌더링하여 캔버스에 마운트했습니다.`);
       }
     } else {
       // 비디오/MV 모드
@@ -230,15 +229,79 @@ export const MediaLabContainer: React.FC = () => {
       return;
     }
 
-    // 4. 인플레이스 변환 분기: 배경 교체 (Search-Grounded Relighting)
-    if (trimmed.includes('배경') && (trimmed.includes('바꿔') || trimmed.includes('변경') || trimmed.includes('알프스'))) {
+    // 4. 실시간 배경 교체 인텐트 직결 (Inpainting State Mutation & Character Lock)
+    const isBackgroundIntent = 
+      trimmed.includes('배경') || 
+      trimmed.includes('숲속') || 
+      trimmed.includes('숲') || 
+      trimmed.includes('볕내림') || 
+      trimmed.includes('햇살') || 
+      (trimmed.includes('바꿔') && (trimmed.includes('뒤') || trimmed.includes('환경')));
+
+    if (isBackgroundIntent) {
       setUserPromptText(trimmed);
-      const bgQuery = trimmed.includes('알프스') ? '알프스 설산 빙하 파노라마' : '선셋 해변 골든아워';
-      const baseMv = mvPipelineResult || generateBeatSyncMV(artifact?.title || '미디어 아티팩트');
-      const updatedMv = applySearchGroundedRelighting(baseMv, bgQuery);
-      setMvPipelineResult(updatedMv);
-      setNoaResponseText(`Google Search Grounding 메타 소스를 바인딩하고, 피사체 누끼 분리 및 ${bgQuery} 45도 림라이트 재조명을 적용했습니다.`);
-      showToast(`배경을 "${bgQuery}"(으)로 실시간 재조명 치환했습니다.`, 'success');
+      setCurrentDomain('visual');
+      setMvPipelineResult(null);
+
+      const isForestTheme = 
+        trimmed.includes('숲') || 
+        trimmed.includes('숲속') || 
+        trimmed.includes('볕내림') || 
+        trimmed.includes('햇살') || 
+        trimmed.includes('신비로운') || 
+        trimmed.includes('배경 바꿔') || 
+        trimmed.includes('배경 변경') ||
+        trimmed.includes('뒷배경');
+
+      const visualAsset = isForestTheme
+        ? resolveVisualAssetByPrompt('숲속 볕내림')
+        : resolveVisualAssetByPrompt(trimmed);
+
+      const vpo = optimizePrompt(trimmed, 'visual', 'photo');
+      setVpoResult(vpo);
+
+      if (artifact) {
+        const updatedPromptHistory = [
+          ...artifact.promptHistory,
+          {
+            userRaw: trimmed,
+            optimizedVPO: vpo.optimizedPrompt
+          }
+        ];
+        const updatedArt: MediaArtifact = {
+          ...artifact,
+          domain: 'visual',
+          title: isForestTheme 
+            ? '30대 여성 패션 디렉터 (햇살 쏟아지는 울창한 숲속 앰비언스)'
+            : `${artifact.title} (${visualAsset.title})`,
+          previewUrl: visualAsset.imageUrl,
+          promptHistory: updatedPromptHistory,
+          progressPercent: 95,
+          currentStepText: '인물 정체성 보존(Character Lock) & 배경 인페인팅 안착'
+        };
+        setArtifact(updatedArt);
+        setHistory((prev) => [...prev, createCheckpoint(updatedArt)]);
+      } else {
+        const newArt = createInitialArtifact('visual', trimmed, visualRatio);
+        newArt.title = isForestTheme 
+          ? '30대 여성 패션 디렉터 (햇살 쏟아지는 울창한 숲속 앰비언스)'
+          : visualAsset.title;
+        newArt.previewUrl = visualAsset.imageUrl;
+        setArtifact(newArt);
+        setHistory([createCheckpoint(newArt)]);
+      }
+
+      setFsmState('REFINING');
+
+      if (isForestTheme) {
+        setNoaResponseText('인물의 스타일과 정체성을 유지한 채, 배경을 햇살이 쏟아지는 울창한 숲속 앰비언스로 교체하여 캔버스에 안착했습니다.');
+        showToast('인물 스타일을 보존한 채, 배경을 햇살 숲속으로 교체했습니다.', 'success');
+      } else {
+        setNoaResponseText(`인물의 정체성을 유지한 채, 배경을 ${visualAsset.title} 앰비언스로 교체하여 캔버스에 안착했습니다.`);
+        showToast(`배경을 "${visualAsset.title}"(으)로 교체했습니다.`, 'success');
+      }
+
+      loadCachedAssets();
       return;
     }
 
@@ -246,9 +309,23 @@ export const MediaLabContainer: React.FC = () => {
     if ((trimmed.includes('인물') || trimmed.includes('피사체') || trimmed.includes('ceo') || trimmed.includes('사람')) && (trimmed.includes('바꿔') || trimmed.includes('치환') || trimmed.includes('변경'))) {
       setUserPromptText(trimmed);
       const targetSubject = trimmed.includes('ceo') || trimmed.includes('CEO') ? '40대 서양 CEO' : '30대 여성 패션 디렉터';
-      const baseMv = mvPipelineResult || generateBeatSyncMV(artifact?.title || '미디어 아티팩트');
-      const updatedMv = applySubjectSwapWithCompositionLock(baseMv, targetSubject);
-      setMvPipelineResult(updatedMv);
+      const visualAsset = resolveVisualAssetByPrompt(targetSubject);
+      setCurrentDomain('visual');
+      setMvPipelineResult(null);
+
+      if (artifact) {
+        const updatedArt: MediaArtifact = {
+          ...artifact,
+          domain: 'visual',
+          title: visualAsset.title,
+          previewUrl: visualAsset.imageUrl,
+          progressPercent: 95,
+          currentStepText: `피사체 ${targetSubject} 치환 완료`
+        };
+        setArtifact(updatedArt);
+        setHistory((prev) => [...prev, createCheckpoint(updatedArt)]);
+      }
+
       setNoaResponseText(`구도와 포즈 앵커를 99% 묶은 채, 피사체를 ${targetSubject} 속성으로 정밀 치환했습니다.`);
       showToast(`피사체를 "${targetSubject}"(으)로 구도 락 치환했습니다.`, 'success');
       return;

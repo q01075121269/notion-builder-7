@@ -32,7 +32,7 @@ interface MediaArtifactStageProps {
 export const MediaArtifactStage: React.FC<MediaArtifactStageProps> = ({
   artifact,
   mvData,
-  vpoData,
+  vpoData: _vpoData,
   aspectRatio,
   onAspectRatioChange,
   onSave4K,
@@ -41,8 +41,7 @@ export const MediaArtifactStage: React.FC<MediaArtifactStageProps> = ({
 }) => {
   const [isPlaying, setIsPlaying] = useState<boolean>(true);
   const [currentTime, setCurrentTime] = useState<number>(0);
-  const [showSafeZone, setShowSafeZone] = useState<boolean>(true);
-  const [isHovered, setIsHovered] = useState<boolean>(false);
+  const [showSafeZone, setShowSafeZone] = useState<boolean>(false);
   const [isCopied, setIsCopied] = useState<boolean>(false);
 
   // 비주얼 프롬프트 매칭 실제 고화질 이미지 리소스 도출
@@ -87,9 +86,7 @@ export const MediaArtifactStage: React.FC<MediaArtifactStageProps> = ({
 
   return (
     <div 
-      className="w-full max-w-5xl mx-auto flex flex-col items-center justify-center relative group select-none animate-fadeIn pb-4"
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
+      className="w-full max-w-5xl mx-auto flex flex-col items-center justify-center relative select-none animate-fadeIn pb-4"
     >
       {/* ======================================================================= */}
       {/* 1. 상단 미니멀 컨트롤 바: 비율 원클릭 스위처 & 쇼츠 세이프존 토글 */}
@@ -159,15 +156,13 @@ export const MediaArtifactStage: React.FC<MediaArtifactStageProps> = ({
       {/* 2. 대형 캔버스 뷰어 컨테이너 (비율 물리 바인딩 & 호버 시 플로팅 알약) */}
       {/* ======================================================================= */}
       <div 
-        className={`${getAspectContainerClass()} bg-zinc-950 rounded-3xl border border-slate-200 dark:border-zinc-800 shadow-2xl relative overflow-hidden flex flex-col justify-between transition-all duration-300 ease-out`}
+        className={`${getAspectContainerClass()} bg-zinc-950 rounded-3xl border border-slate-200 dark:border-zinc-800 shadow-2xl relative overflow-hidden flex flex-col justify-between transition-all duration-300 ease-out group`}
       >
         {/* ------------------------------------------------------------------- */}
         {/* 마우스 호버(Hover) 시에만 나타나는 상단 플로팅 알약 UI */}
         {/* ------------------------------------------------------------------- */}
         <div 
-          className={`absolute top-4 left-1/2 -translate-x-1/2 z-40 flex items-center gap-1.5 p-1.5 rounded-full bg-white/95 dark:bg-zinc-900/95 border border-slate-200/90 dark:border-zinc-700/90 shadow-2xl backdrop-blur-xl transition-all duration-300 ${
-            isHovered ? 'opacity-100 translate-y-0 pointer-events-auto' : 'opacity-0 -translate-y-2 pointer-events-none'
-          }`}
+          className="absolute top-4 left-1/2 -translate-x-1/2 z-40 flex items-center gap-1.5 p-1.5 rounded-full bg-white/95 dark:bg-zinc-900/95 border border-slate-200/90 dark:border-zinc-700/90 shadow-2xl backdrop-blur-xl opacity-0 pointer-events-none transition-opacity duration-200 group-hover:opacity-100 group-hover:pointer-events-auto"
         >
           <button
             onClick={handleDownload}
@@ -202,21 +197,21 @@ export const MediaArtifactStage: React.FC<MediaArtifactStageProps> = ({
         </div>
 
         {/* ------------------------------------------------------------------- */}
-        {/* 실제 고화질 캔버스 미디어 렌더러 (실사 이미지 안착) */}
+        {/* 실제 고화질 캔버스 미디어 렌더러 (16:9 얼굴 잘림 방지: object-[center_15%]) */}
         {/* ------------------------------------------------------------------- */}
         <div className="absolute inset-0 bg-zinc-950 flex items-center justify-center overflow-hidden">
           <img 
             src={displayImageUrl} 
             alt={artifact.title}
-            className="w-full h-full object-cover transition-transform duration-700 ease-out hover:scale-103"
+            className="w-full h-full object-cover object-[center_15%] transition-transform duration-700 ease-out hover:scale-103"
             loading="eager"
           />
           {/* 부드러운 하단 그라디언트 비네팅 */}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent pointer-events-none" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-transparent pointer-events-none" />
         </div>
 
         {/* ------------------------------------------------------------------- */}
-        {/* 9:16 모바일 쇼츠 세이프존(Safe Zone) 마스크 가이드 */}
+        {/* 9:16 모바일 쇼츠 세이프존(Safe Zone) 마스크 가이드 (토글 시에만 노출) */}
         {/* ------------------------------------------------------------------- */}
         {aspectRatio === '9:16' && showSafeZone && (
           <div className="absolute inset-0 pointer-events-none z-20 flex flex-col justify-between p-3.5">
@@ -247,31 +242,23 @@ export const MediaArtifactStage: React.FC<MediaArtifactStageProps> = ({
         )}
 
         {/* ------------------------------------------------------------------- */}
-        {/* 캔버스 하단 단정하고 우아한 프롬프트 메타데이터 뱃지 바 */}
+        {/* 캔버스 하단 단정하고 우아한 프롬프트 메타데이터 뱃지 바 (영문 메타 전면 삭제) */}
         {/* ------------------------------------------------------------------- */}
         <div className="relative z-30 p-4 sm:p-5 flex flex-col gap-2 mt-auto">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm sm:text-base font-bold text-white drop-shadow-md tracking-tight flex items-center gap-2">
-              <Camera className="w-4 h-4 text-zinc-300" strokeWidth={1.5} />
-              <span>{artifact.title || visualInfo.title}</span>
+          <div className="flex items-center justify-between gap-3">
+            <h3 className="text-sm sm:text-base text-white drop-shadow-md tracking-tight flex items-center gap-2 break-keep font-medium truncate max-w-xs sm:max-w-md">
+              <Camera className="w-4 h-4 text-zinc-300 shrink-0" strokeWidth={1.5} />
+              <span className="truncate">{artifact.title || visualInfo.title}</span>
             </h3>
 
-            <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-black/50 text-zinc-300 backdrop-blur-md border border-white/10">
-              {aspectRatio} • 8K Master
-            </span>
-          </div>
-
-          {/* VPO 메타데이터 뱃지 */}
-          <div className="flex flex-wrap items-center gap-1.5 text-[10px] font-mono text-zinc-300">
-            <span className="px-2 py-0.5 rounded bg-black/60 backdrop-blur-md border border-white/10">
-              {vpoData?.technicalSpecs.engineOrCamera || visualInfo.cameraSpec}
-            </span>
-            <span className="px-2 py-0.5 rounded bg-black/60 backdrop-blur-md border border-white/10">
-              {vpoData?.technicalSpecs.lighting || visualInfo.lightingSpec}
-            </span>
-            <span className="px-2 py-0.5 rounded bg-black/60 backdrop-blur-md border border-white/10 text-amber-300">
-              {vpoData?.technicalSpecs.colorGrade || visualInfo.colorGrade}
-            </span>
+            <div className="flex items-center gap-1.5 shrink-0">
+              <span className="text-[10px] font-medium px-2.5 py-1 rounded-full bg-black/60 text-emerald-400 backdrop-blur-md border border-emerald-500/20 shadow-xs">
+                📸 포토리얼 실사 8K
+              </span>
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-black/50 text-zinc-300 backdrop-blur-md border border-white/10">
+                {aspectRatio}
+              </span>
+            </div>
           </div>
 
           {/* 비디오 모드일 때만 재생 바 시각화 */}
