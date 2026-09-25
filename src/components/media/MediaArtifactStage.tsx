@@ -197,17 +197,29 @@ export const MediaArtifactStage: React.FC<MediaArtifactStageProps> = ({
         </div>
 
         {/* ------------------------------------------------------------------- */}
-        {/* 실제 고화질 캔버스 미디어 렌더러 (16:9 얼굴 잘림 방지: object-[center_15%]) */}
+        {/* 실제 고화질 캔버스 미디어 렌더러 (얼굴/머리 잘림 100% 방지: 듀얼 시네마틱 뷰) */}
         {/* ------------------------------------------------------------------- */}
         <div className="absolute inset-0 bg-zinc-950 flex items-center justify-center overflow-hidden">
+          {/* 뒤편 배경: 동일 이미지의 앰비언트 블러 글로우로 여백을 품격있게 채움 */}
           <img 
             src={displayImageUrl} 
-            alt={artifact.title}
-            className="w-full h-full object-cover object-[center_15%] transition-transform duration-700 ease-out hover:scale-103"
-            loading="eager"
+            alt="" 
+            aria-hidden="true"
+            className="absolute inset-0 w-full h-full object-cover blur-3xl opacity-35 scale-110 pointer-events-none select-none"
           />
+
+          {/* 전면 메인 뷰: 머리끝 정수리부터 턱/어깨선까지 100% 온전하게 보이는 object-contain 뷰 */}
+          <div className="w-full h-full max-h-[520px] flex items-center justify-center p-3 sm:p-5 relative z-10">
+            <img 
+              src={displayImageUrl} 
+              alt={artifact.title}
+              className="max-h-full max-w-full object-contain rounded-2xl shadow-2xl transition-transform duration-500 ease-out group-hover:scale-[1.01]"
+              loading="eager"
+            />
+          </div>
+
           {/* 부드러운 하단 그라디언트 비네팅 */}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-transparent pointer-events-none" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent pointer-events-none z-15" />
         </div>
 
         {/* ------------------------------------------------------------------- */}

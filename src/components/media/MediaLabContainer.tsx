@@ -45,7 +45,7 @@ import { generateBeatSyncMV } from '../../lib/media/videoPipeline';
 import type { MVPipelineResult } from '../../lib/media/videoPipeline';
 import { saveMediaItem, getRecentMediaItems, deleteMediaItem } from '../../lib/mediaStorage';
 import type { MediaItem } from '../../lib/mediaStorage';
-import { resolveVisualAssetByPrompt } from '../../lib/media/visualAssets';
+import { resolveVisualAssetByPrompt, extractSubjectTitle } from '../../lib/media/visualAssets';
 
 export const MediaLabContainer: React.FC = () => {
   const { showToast, notionApiKey } = useApp();
@@ -142,13 +142,11 @@ export const MediaLabContainer: React.FC = () => {
       // 실사 비주얼 렌더러 모드: MV 비트 싱크 완전 배제
       setMvPipelineResult(null);
 
-      const targetTitle = promptSummary.length > 25 ? `${promptSummary.slice(0, 25)}...` : promptSummary;
       if (is3D) {
         setNoaResponseText('VPO 렌더링 파라미터를 결합하여 3D 정밀 메커니즘 캔버스를 도출했습니다. (Unreal Engine 5.5 / Octane Render / PBR Titanium 8K)');
       } else {
-        const isFashionDirector = promptSummary.includes('패션') || promptSummary.includes('디렉터') || promptSummary.includes('여성') || promptSummary.includes('캐릭터');
-        const characterLabel = isFashionDirector ? '30대 여성 패션 디렉터 캐릭터' : targetTitle;
-        setNoaResponseText(`요청하신 ${characterLabel}를 VPO 실사 엔진(Hasselblad 80mm f/1.8 심도 및 자연광)으로 렌더링하여 캔버스에 마운트했습니다.`);
+        const subjectTitle = extractSubjectTitle(promptSummary);
+        setNoaResponseText(`요청하신 [${subjectTitle}] 캐릭터를 VPO 실사 엔진으로 정밀 렌더링하여 캔버스에 안착했습니다.`);
       }
     } else {
       // 비디오/MV 모드
@@ -161,6 +159,11 @@ export const MediaLabContainer: React.FC = () => {
 
     setTimeout(() => {
       const initialArt = createInitialArtifact(effectiveDomain, promptSummary, visualRatio);
+      const visualAsset = resolveVisualAssetByPrompt(promptSummary);
+      if (effectiveDomain === 'visual') {
+        initialArt.title = visualAsset.title;
+        initialArt.previewUrl = visualAsset.imageUrl;
+      }
       initialArt.waveformData = generateWaveformData(48);
       initialArt.promptHistory = [
         {
@@ -268,12 +271,13 @@ export const MediaLabContainer: React.FC = () => {
             optimizedVPO: vpo.optimizedPrompt
           }
         ];
+        const currentSubject = artifact.title || '인물 캐릭터';
         const updatedArt: MediaArtifact = {
           ...artifact,
           domain: 'visual',
           title: isForestTheme 
-            ? '30대 여성 패션 디렉터 (햇살 쏟아지는 울창한 숲속 앰비언스)'
-            : `${artifact.title} (${visualAsset.title})`,
+            ? `${currentSubject} (햇살 쏟아지는 울창한 숲속 앰비언스)`
+            : `${currentSubject} (${visualAsset.title})`,
           previewUrl: visualAsset.imageUrl,
           promptHistory: updatedPromptHistory,
           progressPercent: 95,
@@ -284,7 +288,7 @@ export const MediaLabContainer: React.FC = () => {
       } else {
         const newArt = createInitialArtifact('visual', trimmed, visualRatio);
         newArt.title = isForestTheme 
-          ? '30대 여성 패션 디렉터 (햇살 쏟아지는 울창한 숲속 앰비언스)'
+          ? '햇살 쏟아지는 울창한 숲속 앰비언스'
           : visualAsset.title;
         newArt.previewUrl = visualAsset.imageUrl;
         setArtifact(newArt);
@@ -306,9 +310,9 @@ export const MediaLabContainer: React.FC = () => {
     }
 
     // 5. 인플레이스 변환 분기: 인물 피사체 정밀 치환 (Subject Swap with Composition Lock)
-    if ((trimmed.includes('인물') || trimmed.includes('피사체') || trimmed.includes('ceo') || trimmed.includes('사람')) && (trimmed.includes('바꿔') || trimmed.includes('치환') || trimmed.includes('변경'))) {
+    if ((trimmed.includes('인물') || trimmed.includes('피사체') || trimmed.includes('ceo') || trimmed.includes('사람') || trimmed.includes('아이') || trimmed.includes('소녀')) && (trimmed.includes('바꿔') || trimmed.includes('치환') || trimmed.includes('변경'))) {
       setUserPromptText(trimmed);
-      const targetSubject = trimmed.includes('ceo') || trimmed.includes('CEO') ? '40대 서양 CEO' : '30대 여성 패션 디렉터';
+      const targetSubject = extractSubjectTitle(trimmed);
       const visualAsset = resolveVisualAssetByPrompt(targetSubject);
       setCurrentDomain('visual');
       setMvPipelineResult(null);
@@ -320,13 +324,13 @@ export const MediaLabContainer: React.FC = () => {
           title: visualAsset.title,
           previewUrl: visualAsset.imageUrl,
           progressPercent: 95,
-          currentStepText: `피사체 ${targetSubject} 치환 완료`
+          currentStepText: `피사체 [${targetSubject}] 치환 완료`
         };
         setArtifact(updatedArt);
         setHistory((prev) => [...prev, createCheckpoint(updatedArt)]);
       }
 
-      setNoaResponseText(`구도와 포즈 앵커를 99% 묶은 채, 피사체를 ${targetSubject} 속성으로 정밀 치환했습니다.`);
+      setNoaResponseText(`구도와 포즈 앵커를 99% 묶은 채, 피사체를 [${targetSubject}] 속성으로 정밀 치환했습니다.`);
       showToast(`피사체를 "${targetSubject}"(으)로 구도 락 치환했습니다.`, 'success');
       return;
     }

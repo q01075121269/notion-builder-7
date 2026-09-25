@@ -6,7 +6,6 @@ import {
   Plus, 
   Paperclip, 
   Mic, 
-  MicOff, 
   ArrowUp, 
   X,
   FileText,
@@ -46,6 +45,8 @@ export const NoaMediaDock: React.FC<NoaMediaDockProps> = ({
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const recognitionRef = useRef<any>(null);
   const toolsMenuRef = useRef<HTMLDivElement | null>(null);
+  const isListeningRef = useRef<boolean>(false);
+  const finalTranscriptRef = useRef<string>('');
 
   // 외부 클릭 시 도구 팝업 닫기
   useEffect(() => {
@@ -58,51 +59,104 @@ export const NoaMediaDock: React.FC<NoaMediaDockProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // 음성 인식 (Web Speech API 연동 및 시뮬레이션 지원)
+  // 음성 인식 (Web Speech API 무중단 지속 녹음 연동)
   useEffect(() => {
     const SpeechRecognition = 
       (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
     if (SpeechRecognition) {
       const recognition = new SpeechRecognition();
-      recognition.continuous = false;
-      recognition.interimResults = false;
+      recognition.continuous = true; // 사용자가 마이크를 다시 누르기 전까지 끊지 않음
+      recognition.interimResults = true; // 말하는 중간 과정도 감지
       recognition.lang = 'ko-KR';
 
       recognition.onresult = (event: any) => {
-        let finalTranscript = '';
+        let interimTranscript = '';
+        let newFinal = '';
+
         for (let i = event.resultIndex; i < event.results.length; ++i) {
+          const transcript = event.results[i][0].transcript;
           if (event.results[i].isFinal) {
-            finalTranscript += event.results[i][0].transcript;
+            newFinal += transcript;
+          } else {
+            interimTranscript += transcript;
           }
         }
-        if (finalTranscript) {
-          setInputVal((prev) => (prev ? `${prev} ${finalTranscript.trim()}` : finalTranscript.trim()));
+
+        if (newFinal) {
+          finalTranscriptRef.current = finalTranscriptRef.current 
+            ? `${finalTranscriptRef.current} ${newFinal.trim()}`
+            : newFinal.trim();
         }
-        setIsRecording(false);
+
+        const combined = [finalTranscriptRef.current, interimTranscript.trim()]
+          .filter(Boolean)
+          .join(' ')
+          .trim();
+
+        if (combined) {
+          setInputVal(combined);
+        }
       };
 
-      recognition.onerror = () => setIsRecording(false);
-      recognition.onend = () => setIsRecording(false);
+      recognition.onend = () => {
+        // 사용자가 수동으로 마이크를 끄지 않았다면(isListeningRef.current === true), 
+        // 침묵이 발생해도 자동으로 즉시 다시 감청(start)을 유지하도록 루프 형성
+        if (isListeningRef.current) {
+          try {
+            recognition.start();
+          } catch (e) {
+            // 이미 실행 중이거나 일시적 오류 시 무시
+          }
+        } else {
+          setIsRecording(false);
+        }
+      };
+
+      recognition.onerror = (event: any) => {
+        if (event.error === 'no-speech' && isListeningRef.current) {
+          return;
+        }
+        if (event.error === 'aborted') {
+          return;
+        }
+        console.warn('Speech recognition error:', event.error);
+      };
 
       recognitionRef.current = recognition;
     }
+
+    return () => {
+      isListeningRef.current = false;
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.stop();
+        } catch (e) {}
+      }
+    };
   }, []);
 
   const handleToggleMic = () => {
     if (isRecording) {
-      if (recognitionRef.current) recognitionRef.current.stop();
+      isListeningRef.current = false;
       setIsRecording(false);
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.stop();
+        } catch (e) {}
+      }
       return;
     }
+
+    isListeningRef.current = true;
+    setIsRecording(true);
+    finalTranscriptRef.current = inputVal.trim();
 
     if (recognitionRef.current) {
       try {
         recognitionRef.current.start();
-        setIsRecording(true);
       } catch (err) {
-        console.warn('Speech recognition fallback:', err);
-        fallbackSimulationMic();
+        console.warn('Speech recognition start failed, using fallback:', err);
       }
     } else {
       fallbackSimulationMic();
@@ -112,8 +166,9 @@ export const NoaMediaDock: React.FC<NoaMediaDockProps> = ({
   const fallbackSimulationMic = () => {
     setIsRecording(true);
     setTimeout(() => {
-      setInputVal('뒷배경을 햇살 쏟아지는 숲속 배경으로 바꿔줘');
+      setInputVal('여섯살짜리 금발머리에 귀여운 여자 아이 를 실사 캐릭터로 만들어 줘');
       setIsRecording(false);
+      isListeningRef.current = false;
     }, 1500);
   };
 
@@ -142,6 +197,16 @@ export const NoaMediaDock: React.FC<NoaMediaDockProps> = ({
     const trimmed = inputVal.trim();
     if (!trimmed && !attachedFile) return;
     if (isProcessing) return;
+
+    // 전송 시 마이크도 깔끔하게 중지 및 리셋
+    isListeningRef.current = false;
+    setIsRecording(false);
+    finalTranscriptRef.current = '';
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.stop();
+      } catch (err) {}
+    }
 
     onSubmit(trimmed, attachedFile || undefined);
     setInputVal('');
@@ -275,16 +340,19 @@ export const NoaMediaDock: React.FC<NoaMediaDockProps> = ({
               <button
                 type="button"
                 onClick={handleToggleMic}
-                className={`p-2 rounded-full transition cursor-pointer shrink-0 ${
+                className={`p-2 rounded-full transition-all cursor-pointer shrink-0 relative ${
                   isRecording
-                    ? 'bg-rose-500/10 text-rose-500 dark:bg-rose-500/20 animate-pulse'
+                    ? 'bg-rose-500/15 text-rose-500 dark:bg-rose-500/25 ring-2 ring-rose-500/40 animate-pulse'
                     : 'text-zinc-400 hover:text-zinc-600 dark:text-zinc-400 dark:hover:text-zinc-200 hover:bg-slate-100 dark:hover:bg-zinc-800'
                 }`}
-                title={isRecording ? '음성 녹음 중지' : '음성으로 지시하기'}
+                title={isRecording ? '음성 녹음 중지 (클릭하여 끄기)' : '음성으로 지속 지시하기'}
                 aria-label="음성 마이크"
               >
                 {isRecording ? (
-                  <MicOff className="w-4 h-4 text-rose-500" strokeWidth={1.5} />
+                  <>
+                    <Mic className="w-4 h-4 text-rose-500" strokeWidth={2} />
+                    <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-rose-500 animate-ping" />
+                  </>
                 ) : (
                   <Mic className="w-4 h-4 text-zinc-500 dark:text-zinc-400" strokeWidth={1.5} />
                 )}
