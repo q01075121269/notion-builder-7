@@ -8,7 +8,7 @@ import type {
   PlanTriad,
   PlanOption
 } from '../../types/office';
-import { SEED_PROJECTS } from '../../services/officeSeedData';
+import { SEED_PROJECTS, createCleanBlankDocument } from '../../services/officeSeedData';
 import { KnowledgeDock } from './KnowledgeDock';
 import { UniversalSmartCanvas } from './UniversalSmartCanvas';
 import { NotebookStudioPanel } from './NotebookStudioPanel';
@@ -214,9 +214,10 @@ export const OfficeStudioContainer: React.FC = () => {
     setViewMode('canvas');
   };
 
-  // 새 프로젝트 추가
+  // 새 프로젝트 추가 (이전 문서 잔상 없는 클린 백지 기안서 템플릿으로 초기화)
   const handleCreateNewProject = () => {
     const newProjId = `proj-${Date.now()}`;
+    const cleanDoc = createCleanBlankDocument(newProjId, '새 기획 프로젝트 공식 기안서');
     const newProj: OfficeProject = {
       id: newProjId,
       title: '새 기획 프로젝트 2026',
@@ -224,12 +225,7 @@ export const OfficeStudioContainer: React.FC = () => {
       createdAt: new Date().toISOString().slice(0, 16).replace('T', ' '),
       updatedAt: new Date().toISOString().slice(0, 16).replace('T', ' '),
       sources: [],
-      currentDoc: {
-        ...currentDoc,
-        id: `doc-${Date.now()}`,
-        projectId: newProjId,
-        title: '새 기획 프로젝트 공식 기안서'
-      },
+      currentDoc: cleanDoc,
       planTriad: activeProject.planTriad
     };
 

@@ -333,3 +333,104 @@ export const SEED_PROJECTS: OfficeProject[] = [
     planTriad: INITIAL_PLAN_TRIAD
   }
 ];
+
+export const createCleanBlankDocument = (projectId: string, title = '새 기획 프로젝트 공식 기안서'): OfficeDocument => ({
+  id: `doc-${Date.now()}`,
+  projectId,
+  title,
+  format: 'docs',
+  metadata: {
+    author: '담당 매니저',
+    department: '기획운영팀',
+    approvers: ['기안자(기안)', '팀장(검토)', '본부장(결재)'],
+    docNumber: `기안-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-01`,
+    date: new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })
+  },
+  content: {
+    docsContent: {
+      sections: [
+        {
+          id: `sec-${Date.now()}-1`,
+          level: 1,
+          marker: '1.',
+          text: '추진 배경 및 목적'
+        },
+        {
+          id: `sec-${Date.now()}-2`,
+          level: 2,
+          marker: '□',
+          text: '새로운 프로젝트 추진을 위한 목적 및 배경 기재'
+        },
+        {
+          id: `sec-${Date.now()}-3`,
+          level: 3,
+          marker: '○',
+          text: '우측 코파일럿에 원하시는 주제(예: 스마트 시설 유지 관리)를 말씀하시면 실무급 공문서가 즉시 자동 작성됩니다.'
+        },
+        {
+          id: `sec-${Date.now()}-4`,
+          level: 1,
+          marker: '2.',
+          text: '주요 사업 내용 및 추진 방안'
+        },
+        {
+          id: `sec-${Date.now()}-5`,
+          level: 2,
+          marker: '□',
+          text: '핵심 실행 과제 및 단계별 추진 로드맵'
+        },
+        {
+          id: `sec-${Date.now()}-6`,
+          level: 3,
+          marker: '○',
+          text: '단계별 마일스톤 및 주요 유관 부서 협업 체계 구축'
+        },
+        {
+          id: `sec-${Date.now()}-7`,
+          level: 1,
+          marker: '3.',
+          text: '소요 예산 및 기대 효과'
+        },
+        {
+          id: `sec-${Date.now()}-8`,
+          level: 2,
+          marker: '□',
+          text: '예산 집행 계획 및 정량적/정성적 기대 효과'
+        }
+      ]
+    },
+    sheetsContent: {
+      headers: ['번호', '항목명', '산출 근거', '예산(원)', '집행 비고'],
+      rows: [
+        { id: `row-${Date.now()}-1`, cells: [1, '초기 솔루션 구축비', '기본 라이선스 및 인프라', 20000000, '계약 체결 시'] },
+        { id: `row-${Date.now()}-2`, cells: [2, '시스템 커스터마이징', '현장 환경 연동 및 최적화', 15000000, '중도금'] },
+        { id: `row-${Date.now()}-3`, cells: [3, '운영자 교육 및 기술지원', '현업 실무자 가이드 배포', 7000000, '검수 완료 시'] }
+      ]
+    },
+    slidesContent: {
+      slides: [
+        {
+          id: `slide-${Date.now()}-1`,
+          title: '새 프로젝트 기획 제안',
+          subtitle: '실시간 AI 코파일럿 기안',
+          bullets: ['신규 프로젝트 개요', '핵심 추진 전략', '기대 효과 및 로드맵']
+        },
+        {
+          id: `slide-${Date.now()}-2`,
+          title: '추진 전략 및 실행 방안',
+          subtitle: '단계별 마일스톤',
+          bullets: ['사전 검토 및 요구사항 정의', '핵심 시스템 구축', '전사 배포 및 안정화']
+        }
+      ]
+    },
+    citations: []
+  },
+  history: [
+    {
+      action: '새 프로젝트 백지 기안서 템플릿 생성',
+      timestamp: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }),
+      snapshot: null
+    }
+  ]
+});
+

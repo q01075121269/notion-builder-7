@@ -83,7 +83,7 @@ export const NotebookStudioPanel: React.FC<NotebookStudioPanelProps> = ({
 
   if (!isOpen) return null;
 
-  // Web Speech API STT
+  // Web Speech API STT (무중단 연속 인식 & 단어 중복 방지)
   const handleToggleVoice = () => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SpeechRecognition) {
@@ -95,45 +95,79 @@ export const NotebookStudioPanel: React.FC<NotebookStudioPanelProps> = ({
       try {
         const recognition = new SpeechRecognition();
         recognition.lang = 'ko-KR';
-        recognition.continuous = false;
-        recognition.interimResults = true;
+        recognition.continuous = true;
+        recognition.interimResults = false;
 
         recognition.onstart = () => {
           setIsListening(true);
         };
 
         recognition.onresult = (event: any) => {
-          const transcript = Array.from(event.results)
-            .map((res: any) => res[0].transcript)
-            .join('');
-          setInputText(transcript);
+          let finalTranscript = '';
+          for (let i = event.resultIndex; i < event.results.length; i++) {
+            if (event.results[i].isFinal) {
+              const piece = event.results[i][0].transcript.trim();
+              if (piece) {
+                finalTranscript += (finalTranscript ? ' ' : '') + piece;
+              }
+            }
+          }
+          if (finalTranscript.trim()) {
+            setInputText(prev => {
+              const trimmedPrev = prev.trim();
+              const trimmedNew = finalTranscript.trim();
+              if (!trimmedPrev) return trimmedNew;
+              if (trimmedPrev.endsWith(trimmedNew)) return trimmedPrev;
+              return `${trimmedPrev} ${trimmedNew}`;
+            });
+          }
         };
 
-        recognition.onerror = () => {
-          setIsListening(false);
+        recognition.onerror = (e: any) => {
+          if (e.error !== 'no-speech') {
+            setIsListening(false);
+          }
         };
 
         recognition.onend = () => {
+          if (recognitionRef.current && isListening) {
+            try {
+              recognition.start();
+              return;
+            } catch {}
+          }
           setIsListening(false);
         };
 
         recognitionRef.current = recognition;
         recognition.start();
-      } catch {
+      } catch (err) {
+        console.error('Failed to start speech recognition:', err);
         setIsListening(false);
       }
     } else {
       if (recognitionRef.current) {
-        recognitionRef.current.stop();
+        const rec = recognitionRef.current;
+        recognitionRef.current = null;
+        try { rec.stop(); } catch {}
       }
       setIsListening(false);
     }
   };
 
   // Jev형 지능형 의도 분류기(Intent Classifier) 및 Gemini 실무 작문 엔진 연동
-  const handleSendMessage = (textToSend?: string) => {
+  const handleSendMessage = async (textToSend?: string) => {
     const text = (textToSend || inputText).trim();
     if (!text || isThinking) return;
+
+    // 0. 음성 녹음 중이면 전송 시 안전하게 마이크 중단
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.stop();
+        recognitionRef.current = null;
+      } catch {}
+      setIsListening(false);
+    }
 
     // 1. 입력창 즉시 초기화 (누락 버그 완전 해결)
     setInputText('');
@@ -148,28 +182,28 @@ export const NotebookStudioPanel: React.FC<NotebookStudioPanelProps> = ({
     setMessages(prev => [...prev, userMsg]);
     setIsThinking(true);
 
-    // 2. Jev형 인텐트 판단기 호출 (단순 키워드 매칭이 아닌 명확한 의도 구조체 분류)
-    const classifiedIntent = classifyOfficeIntent(text, document);
+    try {
+      // 2. Jev형 인텐트 판단기 호출 (단순 키워드 매칭이 아닌 명확한 의도 구조체 분류)
+      const classifiedIntent = classifyOfficeIntent(text, document);
 
-    // 3. Gemini 심층 작문 및 지식 창고 기반 캔버스 변이 실행
-    const result = executeOfficeIntent(classifiedIntent, text, document, sources);
+      // 3. Gemini 심층 작문 및 백엔드 실연동 캔버스 변이 실행
+      const result = await executeOfficeIntent(classifiedIntent, text, document, sources);
 
-    // 4. 캔버스 상태 즉각 갱신 및 Undo 히스토리 바인딩
-    onChangeDocument(result.updatedDoc, result.actionName);
-    toast(result.actionName, 'success');
+      // 4. 캔버스 상태 즉각 갱신 및 Undo 히스토리 바인딩
+      onChangeDocument(result.updatedDoc, result.actionName);
+      toast(result.actionName, 'success');
 
-    // 5. 캔버스 하이라이트 애니메이션 발송
-    if (result.highlightTarget) {
-      window.dispatchEvent(new CustomEvent('anti-office-highlight', { detail: { target: result.highlightTarget } }));
-    }
+      // 5. 캔버스 하이라이트 애니메이션 발송
+      if (result.highlightTarget) {
+        window.dispatchEvent(new CustomEvent('anti-office-highlight', { detail: { target: result.highlightTarget } }));
+      }
 
-    // 6. 필요한 경우 포맷 자동 동기화
-    if (result.targetFormat && result.targetFormat !== currentFormat) {
-      onChangeFormat(result.targetFormat);
-    }
+      // 6. 필요한 경우 포맷 자동 동기화
+      if (result.targetFormat && result.targetFormat !== currentFormat) {
+        onChangeFormat(result.targetFormat);
+      }
 
-    // 7. 실무 브리핑 응답 메시지 반환
-    setTimeout(() => {
+      // 7. 실무 브리핑 응답 메시지 반환
       const aiMsg: CopilotMessage = {
         id: `msg-ai-${Date.now()}`,
         sender: 'ai',
@@ -179,8 +213,18 @@ export const NotebookStudioPanel: React.FC<NotebookStudioPanelProps> = ({
       };
 
       setMessages(prev => [...prev, aiMsg]);
+    } catch (err: any) {
+      console.error('[Copilot Error]:', err);
+      const errMsg: CopilotMessage = {
+        id: `msg-err-${Date.now()}`,
+        sender: 'ai',
+        text: `오류가 발생했습니다: ${err.message || '요청 처리 중 오류가 발생했습니다.'}`,
+        timestamp: '방금 전'
+      };
+      setMessages(prev => [...prev, errMsg]);
+    } finally {
       setIsThinking(false);
-    }, 280);
+    }
   };
 
   // 8대 출력 생성기 정의
@@ -448,6 +492,7 @@ export const NotebookStudioPanel: React.FC<NotebookStudioPanelProps> = ({
         {/* 빠른 추천 프롬프트 칩들 */}
         <div className="px-3 py-1.5 border-t border-slate-100 dark:border-zinc-800/80 flex items-center space-x-1.5 overflow-x-auto scrollbar-none shrink-0 bg-slate-50/30 dark:bg-zinc-950/20">
           {[
+            '지금 서류 내용을 스마트 시설 유지 관리로 바꿔줘',
             '지금 내용을 AI 에이전트 도입으로 바꿔봐',
             '제목을 아래 내용에 맞게 적당하게 해줘',
             '제목 두 줄로 나눠줘',
