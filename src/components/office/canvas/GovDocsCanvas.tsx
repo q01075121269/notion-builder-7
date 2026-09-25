@@ -178,21 +178,21 @@ export const GovDocsCanvas: React.FC<GovDocsCanvasProps> = ({
       {/* A4 표준 공문서 카드 컨테이너 */}
       <div className="w-full max-w-[850px] bg-white dark:bg-zinc-900 rounded-2xl shadow-xl border border-slate-200 dark:border-zinc-800 p-6 sm:p-12 relative transition-all">
         
-        {/* 상단 공문서 워터마크 & 헤더 */}
-        <div className="flex items-center justify-between border-b-2 border-slate-900 dark:border-zinc-100 pb-4 mb-6 gap-4">
-          <div className="flex items-center space-x-2 flex-1 min-w-0">
-            <Building2 className="w-6 h-6 text-slate-800 dark:text-zinc-200 shrink-0" />
+        {/* 상단 공문서 워터마크 & 헤더 (다중 행 줄바꿈 완전 개방) */}
+        <div className="flex items-start justify-between border-b-2 border-slate-900 dark:border-zinc-100 pb-4 mb-6 gap-4">
+          <div className="flex items-start space-x-2.5 flex-1 min-w-0 pr-4">
+            <Building2 className="w-6 h-6 text-slate-800 dark:text-zinc-200 shrink-0 mt-1" />
             <div className="flex-1 min-w-0">
-              <span className="text-[10px] font-bold tracking-widest text-slate-500 dark:text-zinc-400 uppercase block">
+              <span className="text-[10px] font-bold tracking-widest text-slate-500 dark:text-zinc-400 uppercase block mb-1">
                 Enterprise Official Document
               </span>
-              <input
-                type="text"
+              <textarea
                 value={document.title}
                 onChange={(e) => onChangeDocument({ ...document, title: e.target.value }, '문서 제목 변경')}
-                placeholder="문서 제목을 입력하세요"
-                title="클릭하여 문서 제목 직접 수정"
-                className={`w-full text-xl sm:text-2xl font-black text-slate-950 dark:text-white tracking-tight bg-transparent hover:bg-slate-100/70 dark:hover:bg-zinc-800/60 focus:bg-white dark:focus:bg-zinc-850 px-1.5 py-0.5 rounded-lg border border-transparent hover:border-slate-300 dark:hover:border-zinc-700 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-300 dark:focus:ring-indigo-800 outline-none transition ${
+                placeholder="문서 제목을 입력하세요 (두 줄 이상 자유 줄바꿈 지원)"
+                title="클릭하여 문서 제목 직접 수정 (Enter로 줄바꿈 가능)"
+                rows={Math.max(1, (document.title || '').split('\n').length)}
+                className={`w-full text-xl sm:text-2xl font-black text-slate-950 dark:text-white tracking-tight bg-transparent hover:bg-slate-100/70 dark:hover:bg-zinc-800/60 focus:bg-white dark:focus:bg-zinc-850 px-1.5 py-1 rounded-lg border border-transparent hover:border-slate-300 dark:hover:border-zinc-700 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-300 dark:focus:ring-indigo-800 outline-none transition resize-none whitespace-pre-wrap break-keep leading-tight ${
                   highlightedField === 'title' ? 'ring-2 ring-indigo-400 bg-indigo-50/60 dark:bg-indigo-950/50' : ''
                 }`}
               />

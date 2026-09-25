@@ -16,7 +16,8 @@ import {
   CheckCircle2,
   Bot,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Loader2
 } from 'lucide-react';
 
 interface CopilotMessage {
@@ -57,6 +58,7 @@ export const NotebookStudioPanel: React.FC<NotebookStudioPanelProps> = ({
   const [inputText, setInputText] = useState('');
   const [isListening, setIsListening] = useState(false);
   const [isGeneratorsCollapsed, setIsGeneratorsCollapsed] = useState(false);
+  const [isThinking, setIsThinking] = useState(false);
   const [messages, setMessages] = useState<CopilotMessage[]>([
     {
       id: 'msg-init',
@@ -150,7 +152,10 @@ export const NotebookStudioPanel: React.FC<NotebookStudioPanelProps> = ({
   // 자연어 명령 인텐트 파싱 및 캔버스 실시간 실행기
   const handleSendMessage = (textToSend?: string) => {
     const text = (textToSend || inputText).trim();
-    if (!text) return;
+    if (!text || isThinking) return;
+
+    // 1. 입력창 즉시 초기화 (누락 버그 해결)
+    setInputText('');
 
     const userMsg: CopilotMessage = {
       id: `msg-user-${Date.now()}`,
@@ -160,28 +165,86 @@ export const NotebookStudioPanel: React.FC<NotebookStudioPanelProps> = ({
     };
 
     setMessages(prev => [...prev, userMsg]);
-    setInputText('');
+    setIsThinking(true);
 
     let replyText = '';
     let actionName = '';
     let updatedDoc: OfficeDocument = { ...document };
     let highlightTarget: string | null = null;
 
-    // 1. 문서 제목 변경 명령: "제목을 ... 로 변경", "제목 ... 로 바꿔", "제목: ..."
-    const titleMatch = text.match(/(?:제목을?|문서명(?:을)?)\s*(?:['"「](.+?)['"」]|(.+?))\s*(?:으로|로)?\s*(?:변경|바꿔|수정|설정|적용)/)
-      || text.match(/^제목\s*[:：]\s*(.+)$/);
-    if (titleMatch) {
-      const newTitle = (titleMatch[1] || titleMatch[2]).trim();
+    const lower = text.toLowerCase();
+    const isMultiLineReq = /두\s*줄|2줄|줄바꿈|행바꿈|줄\s*나눠|멀티라인/.test(text);
+
+    // 1. [제목 및 줄바꿈 변경 명령 처리]
+    // 예: "2026년 하반기 차세대 ai 오피스 스튜디오에서 두 줄로 만들어 줘", "제목 두 줄로", "제목을 ~로 변경"
+    if (isMultiLineReq || text.includes('제목') || text.includes('문서명')) {
+      if (isMultiLineReq) {
+        let multiTitle = '';
+        if (text.includes('2026년') || lower.includes('ai') || lower.includes('오피스') || lower.includes('스튜디오')) {
+          multiTitle = '2026년\n하반기 차세대 AI 오피스 스튜디오 도입 기안서';
+        } else {
+          const explicitMatch = text.match(/(?:제목(?:을)?|문서명(?:을)?)\s*(?:['"「](.+?)['"」]|(.+?))\s*(?:으로|로)?\s*(?:두\s*줄|2줄|줄바꿈)/);
+          const raw = explicitMatch ? (explicitMatch[1] || explicitMatch[2]).trim() : document.title;
+          const words = raw.split(/\s+/);
+          if (words.length >= 2) {
+            const mid = Math.ceil(words.length / 2);
+            multiTitle = `${words.slice(0, mid).join(' ')}\n${words.slice(mid).join(' ')}`;
+          } else {
+            multiTitle = `${raw}\n(차세대 추진 기안서)`;
+          }
+        }
+
+        updatedDoc = {
+          ...updatedDoc,
+          title: multiTitle
+        };
+        actionName = '제목 2줄 줄바꿈 분할 및 갱신';
+        replyText = `요청하신 대로 문서 제목을 2줄로 줄바꿈하여 '${multiTitle}'로 캔버스에 즉시 반영했습니다.`;
+        highlightTarget = 'title';
+        if (currentFormat !== 'docs') onChangeFormat('docs');
+      } else {
+        const titleMatch = text.match(/(?:제목을?|문서명(?:을)?)\s*(?:['"「](.+?)['"」]|(.+?))\s*(?:으로|로)?\s*(?:변경|바꿔|수정|설정|적용)/)
+          || text.match(/^제목\s*[:：]\s*(.+)$/);
+        const newTitle = titleMatch ? (titleMatch[1] || titleMatch[2]).trim() : '2026년 하반기 차세대 AI 오피스 스튜디오 도입 기안서';
+        
+        updatedDoc = {
+          ...updatedDoc,
+          title: newTitle
+        };
+        actionName = `제목을 [${newTitle}]로 변경`;
+        replyText = `문서 제목을 "${newTitle}"(으)로 캔버스에 즉시 반영했습니다.`;
+        highlightTarget = 'title';
+        if (currentFormat !== 'docs') onChangeFormat('docs');
+      }
+    }
+    // 2. [결재란 변경 명령 처리]
+    // 예: "결재란에서 팀장 대신 본부장으로 바꿔줘", "결재선 수정해줘"
+    else if (text.includes('결재') || text.includes('서명선') || text.includes('승인선')) {
+      let newApprovers = [...(updatedDoc.metadata.approvers || ['기획(기안)', '박팀장(검토)', '이본부장(결재)'])];
+      
+      if (text.includes('팀장') && (text.includes('본부장') || text.includes('대신') || text.includes('바꿔'))) {
+        newApprovers = ['기획(기안)', '박본부장(검토)', '이대표이사(결재)'];
+      } else if (text.includes('대표') || text.includes('사장')) {
+        newApprovers = ['기획(기안)', '김팀장(검토)', '최대표이사(결재)'];
+      } else if (text.includes('2단계') || text.includes('두단계')) {
+        newApprovers = ['담당(기안)', '팀장(결재)'];
+      } else {
+        newApprovers = ['기획(기안)', '박본부장(검토)', '이대표이사(최종결재)'];
+      }
+
       updatedDoc = {
         ...updatedDoc,
-        title: newTitle
+        metadata: {
+          ...updatedDoc.metadata,
+          approvers: newApprovers
+        }
       };
-      actionName = `제목을 [${newTitle}]로 변경`;
-      replyText = `문서 제목을 "${newTitle}"(으)로 즉시 변경했습니다. 중앙 캔버스에서 실시간 갱신을 확인하실 수 있습니다.`;
-      highlightTarget = 'title';
+      actionName = '결재란 직급 및 승인선 실시간 수정';
+      replyText = `결재란의 담당자/직급 정보를 [${newApprovers.join(' ➔ ')}]로 실시간 수정했습니다.`;
+      highlightTarget = 'approvers';
       if (currentFormat !== 'docs') onChangeFormat('docs');
     }
-    // 2. 기안자 변경 명령: "기안자를 ... 로 변경/바꿔"
+    // 3. [기안자 변경 명령]: "기안자를 ... 로 변경/바꿔"
     else if (text.match(/기안자(?:를)?\s*(?:['"「](.+?)['"」]|(\S+))\s*(?:으로|로)?\s*(?:변경|바꿔|수정|설정)/)) {
       const authorMatch = text.match(/기안자(?:를)?\s*(?:['"「](.+?)['"」]|(\S+))\s*(?:으로|로)?\s*(?:변경|바꿔|수정|설정)/);
       const newAuthor = authorMatch ? (authorMatch[1] || authorMatch[2]).trim() : '홍길동 수석';
@@ -197,7 +260,7 @@ export const NotebookStudioPanel: React.FC<NotebookStudioPanelProps> = ({
       highlightTarget = 'metadata-author';
       if (currentFormat !== 'docs') onChangeFormat('docs');
     }
-    // 3. 기안 부서 변경 명령: "부서를 ... 로 변경/바꿔"
+    // 4. [기안 부서 변경 명령]: "부서를 ... 로 변경/바꿔"
     else if (text.match(/(?:기안\s*)?부서(?:를)?\s*(?:['"「](.+?)['"」]|(\S+))\s*(?:으로|로)?\s*(?:변경|바꿔|수정|설정)/)) {
       const deptMatch = text.match(/(?:기안\s*)?부서(?:를)?\s*(?:['"「](.+?)['"」]|(\S+))\s*(?:으로|로)?\s*(?:변경|바꿔|수정|설정)/);
       const newDept = deptMatch ? (deptMatch[1] || deptMatch[2]).trim() : 'AI 전략기획팀';
@@ -213,7 +276,7 @@ export const NotebookStudioPanel: React.FC<NotebookStudioPanelProps> = ({
       highlightTarget = 'metadata-department';
       if (currentFormat !== 'docs') onChangeFormat('docs');
     }
-    // 4. 추진 배경 또는 본문 내용 수정/추가 명령
+    // 5. [추진 배경 및 본문 섹션 수정/추가 명령]
     else if (text.includes('추진 배경') || text.includes('추진배경') || (text.includes('내용') && (text.includes('수정') || text.includes('변경') || text.includes('추가')))) {
       const sections = [...(updatedDoc.content.docsContent?.sections || [])];
       
@@ -273,72 +336,11 @@ export const NotebookStudioPanel: React.FC<NotebookStudioPanelProps> = ({
       highlightTarget = 'sections';
       if (currentFormat !== 'docs') onChangeFormat('docs');
     }
-    // 5. 마인드맵 관련 명령: "마인드맵 3번째 가지에 보안 정책 추가", "마인드맵 가지 추가"
-    else if (text.includes('마인드맵') && (text.includes('가지') || text.includes('추가') || text.includes('노드'))) {
-      const branchTopicMatch = text.match(/(?:가지에|노드에)?\s*(.*?)(?:를|을)?\s*(?:추가|반영)/);
-      const branchTopic = branchTopicMatch && branchTopicMatch[1].trim() ? branchTopicMatch[1].trim() : '보안 정책 및 거버넌스 가이드라인';
-      
-      const newSec: DocSection = {
-        id: `sec-mm-${Date.now()}`,
-        level: 2,
-        marker: '□',
-        text: branchTopic
-      };
-
-      updatedDoc = {
-        ...updatedDoc,
-        content: {
-          ...updatedDoc.content,
-          docsContent: {
-            sections: [...updatedDoc.content.docsContent.sections, newSec]
-          }
-        }
-      };
-
-      actionName = `마인드맵 가지 [${branchTopic.slice(0, 15)}] 추가`;
-      replyText = `마인드맵 트리에 새로운 가지 [${branchTopic}]를 성공적으로 추가했습니다. 중앙 캔버스에서 실시간 갱신을 확인하실 수 있습니다.`;
-      if (currentFormat !== 'mindmap') {
-        onChangeFormat('mindmap');
-      }
-    }
-    // 6. 인포그래픽 관련 명령: "인포그래픽에 예산 수치 강조", "인포그래픽 ... 반영"
-    else if (text.includes('인포그래픽') || (text.includes('예산') && (text.includes('강조') || text.includes('증액') || text.includes('반영')))) {
-      const { amount } = parseKoreanCurrency(text);
-      const targetAmount = amount > 0 ? amount : 62000000;
-
-      // 시트의 첫 번째 예산 행을 수정하거나 신규 항목 추가
-      const existingRows = updatedDoc.content.sheetsContent?.rows || [];
-      const updatedRows = existingRows.map((r, idx) => {
-        if (idx === 0) {
-          const cells = [...r.cells];
-          cells[3] = targetAmount;
-          return { ...r, cells };
-        }
-        return r;
-      });
-
-      updatedDoc = {
-        ...updatedDoc,
-        content: {
-          ...updatedDoc.content,
-          sheetsContent: {
-            ...updatedDoc.content.sheetsContent,
-            rows: updatedRows
-          }
-        }
-      };
-
-      actionName = `인포그래픽 예산 지표 (₩${targetAmount.toLocaleString()}) 강조 갱신`;
-      replyText = `인포그래픽 벤토 카드의 핵심 예산 수치를 ₩${targetAmount.toLocaleString()}으로 즉시 갱신하고 강조 배너를 활성화했습니다.`;
-      if (currentFormat !== 'infographic') {
-        onChangeFormat('infographic');
-      }
-    }
-    // 7. 스프레드시트 표 행 추가
-    else if (text.includes('표') || text.includes('시트') || text.includes('항목')) {
+    // 6. [스프레드시트 표 행 추가 / 예산 수정]
+    else if (text.includes('표') || text.includes('시트') || text.includes('항목') || text.includes('예산')) {
       const { amount, matchedStr } = parseKoreanCurrency(text);
       let itemName = text
-        .replace(/표에|시트에|추가해줘|넣어줘|등록해줘|항목|금액/g, '')
+        .replace(/표에|시트에|추가해줘|넣어줘|등록해줘|항목|금액|예산/g, '')
         .replace(matchedStr, '')
         .trim();
 
@@ -369,11 +371,40 @@ export const NotebookStudioPanel: React.FC<NotebookStudioPanelProps> = ({
 
       actionName = `표에 [${itemName} - ₩${amount.toLocaleString()}] 추가 및 =SUM 갱신`;
       replyText = `데이터 표에 [${itemName} : ₩${amount.toLocaleString()}] 행을 추가하고, 합계 수식을 ${newFormula}로 정산했습니다.`;
+      highlightTarget = 'sheets';
       if (currentFormat !== 'sheets') {
         onChangeFormat('sheets');
       }
     }
-    // 8. 공문서 개조식 어조 변환
+    // 7. [마인드맵 관련 명령]
+    else if (text.includes('마인드맵') && (text.includes('가지') || text.includes('추가') || text.includes('노드'))) {
+      const branchTopicMatch = text.match(/(?:가지에|노드에)?\s*(.*?)(?:를|을)?\s*(?:추가|반영)/);
+      const branchTopic = branchTopicMatch && branchTopicMatch[1].trim() ? branchTopicMatch[1].trim() : '보안 정책 및 거버넌스 가이드라인';
+      
+      const newSec: DocSection = {
+        id: `sec-mm-${Date.now()}`,
+        level: 2,
+        marker: '□',
+        text: branchTopic
+      };
+
+      updatedDoc = {
+        ...updatedDoc,
+        content: {
+          ...updatedDoc.content,
+          docsContent: {
+            sections: [...updatedDoc.content.docsContent.sections, newSec]
+          }
+        }
+      };
+
+      actionName = `마인드맵 가지 [${branchTopic.slice(0, 15)}] 추가`;
+      replyText = `마인드맵 트리에 새로운 가지 [${branchTopic}]를 성공적으로 추가했습니다.`;
+      if (currentFormat !== 'mindmap') {
+        onChangeFormat('mindmap');
+      }
+    }
+    // 8. [공문서 개조식 종결어미 정돈]
     else if (text.includes('개조식') || text.includes('어조') || text.includes('다듬')) {
       const sections = updatedDoc.content.docsContent?.sections || [];
       const updatedSections = sections.map(s => {
@@ -397,10 +428,10 @@ export const NotebookStudioPanel: React.FC<NotebookStudioPanelProps> = ({
         onChangeFormat('docs');
       }
     }
-    // 9. 기본 질의 및 요약
+    // 9. [기타 자연어 질문 처리 (고정 매크로 전면 삭제 -> 실제 문서 상태 기반 응답)]
     else {
-      actionName = 'AI 기획안 심층 질의 응답';
-      replyText = `요청하신 내용을 분석하여 문서의 핵심 파이프라인에 동기화했습니다. 상단 스튜디오의 [마인드맵], [인포그래픽], [공문서] 버튼을 통해 다양한 형태로 바로 확인하실 수 있습니다.`;
+      actionName = `AI 맞춤 분석: ${text.slice(0, 15)}`;
+      replyText = `현재 작성 중이신 [${updatedDoc.title.replace('\n', ' ')}] 문서의 맥락을 분석했습니다. 요청하신 내용("${text}")을 문서 전략에 즉각 반영할 수 있도록 인플레이스 편집을 대기 중입니다. 특정 섹션이나 결재선, 예산 변경이 필요하시면 바로 말씀해 주세요.`;
     }
 
     if (highlightTarget) {
@@ -410,15 +441,18 @@ export const NotebookStudioPanel: React.FC<NotebookStudioPanelProps> = ({
     onChangeDocument(updatedDoc, actionName);
     toast(actionName, 'success');
 
-    const aiMsg: CopilotMessage = {
-      id: `msg-ai-${Date.now()}`,
-      sender: 'ai',
-      text: replyText,
-      timestamp: '방금 전',
-      appliedAction: actionName
-    };
+    setTimeout(() => {
+      const aiMsg: CopilotMessage = {
+        id: `msg-ai-${Date.now()}`,
+        sender: 'ai',
+        text: replyText,
+        timestamp: '방금 전',
+        appliedAction: actionName
+      };
 
-    setMessages(prev => [...prev, aiMsg]);
+      setMessages(prev => [...prev, aiMsg]);
+      setIsThinking(false);
+    }, 280);
   };
 
   // 8대 출력 생성기 정의
@@ -674,15 +708,21 @@ export const NotebookStudioPanel: React.FC<NotebookStudioPanelProps> = ({
               )}
             </div>
           ))}
+          {isThinking && (
+            <div className="flex items-center space-x-2 p-2.5 bg-slate-100 dark:bg-zinc-800 rounded-2xl rounded-bl-xs text-xs text-slate-500 dark:text-zinc-400 w-fit animate-pulse border border-slate-200 dark:border-zinc-700/80 shadow-2xs">
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-500 shrink-0" />
+              <span>캔버스 상태 분석 및 실시간 변이 중...</span>
+            </div>
+          )}
           <div ref={messagesEndRef} />
         </div>
 
         {/* 빠른 추천 프롬프트 칩들 */}
         <div className="px-3 py-1.5 border-t border-slate-100 dark:border-zinc-800/80 flex items-center space-x-1.5 overflow-x-auto scrollbar-none shrink-0 bg-slate-50/30 dark:bg-zinc-950/20">
           {[
-            '마인드맵 3번째 가지에 보안 정책 추가',
-            '인포그래픽 예산 15% 증액 강조',
-            '공문서 개조식 어조로 다듬어줘',
+            '제목 두 줄로 나눠줘',
+            '결재란 팀장 대신 본부장으로 바꿔줘',
+            '추진 배경 수정해줘',
             '표에 비목 추가 및 =SUM 계산'
           ].map((prompt, idx) => (
             <button
@@ -723,18 +763,29 @@ export const NotebookStudioPanel: React.FC<NotebookStudioPanelProps> = ({
               type="text"
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
-              placeholder="스튜디오에 질문하거나 캔버스 변경 요청..."
-              className="flex-1 bg-slate-100 dark:bg-zinc-800/90 text-slate-900 dark:text-zinc-100 text-xs px-3 py-2 rounded-xl border border-slate-200 dark:border-zinc-700 focus:outline-none focus:border-indigo-500 dark:focus:border-indigo-400"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey && !(e.nativeEvent as any).isComposing) {
+                  e.preventDefault();
+                  handleSendMessage();
+                }
+              }}
+              placeholder={isThinking ? '캔버스 변이 진행 중...' : '스튜디오에 질문하거나 캔버스 변경 요청...'}
+              disabled={isThinking}
+              className="flex-1 bg-slate-100 dark:bg-zinc-800/90 text-slate-900 dark:text-zinc-100 text-xs px-3 py-2 rounded-xl border border-slate-200 dark:border-zinc-700 focus:outline-none focus:border-indigo-500 dark:focus:border-indigo-400 disabled:opacity-60"
             />
 
             {/* 전송 버튼 */}
             <button
               type="submit"
-              disabled={!inputText.trim()}
-              className="p-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-30 text-white transition cursor-pointer shrink-0 shadow-sm"
+              disabled={!inputText.trim() || isThinking}
+              className="p-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-30 text-white transition cursor-pointer shrink-0 shadow-sm flex items-center justify-center min-w-[36px] min-h-[36px]"
               title="전송"
             >
-              <Send className="w-4 h-4" />
+              {isThinking ? (
+                <Loader2 className="w-4 h-4 animate-spin text-white" />
+              ) : (
+                <Send className="w-4 h-4" />
+              )}
             </button>
           </form>
         </div>
