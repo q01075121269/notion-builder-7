@@ -10,18 +10,22 @@ import { generateMediaData } from '../app/api/media/generate/route';
 export async function requestMediaGeneration(
   params: MediaGenerationRequest
 ): Promise<MediaGenerationResponse> {
+  const localApiKey = typeof window !== 'undefined' ? localStorage.getItem('gemini_api_key') || '' : '';
+  const apiKey = params.apiKey || localApiKey;
+
   try {
     const res = await fetch('/api/media/generate', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        ...(apiKey ? { 'x-gemini-api-key': apiKey } : {})
       },
-      body: JSON.stringify(params)
+      body: JSON.stringify({ ...params, apiKey })
     });
 
     if (res.ok) {
       const data: MediaGenerationResponse = await res.json();
-      if (data && data.success && data.imageUrl) {
+      if (data && data.success) {
         return data;
       }
     }
@@ -31,11 +35,12 @@ export async function requestMediaGeneration(
 
   // 로컬 지능형 오케스트레이터 0ms 안전망 (네트워크 단절 시에도 100% 정상 작동 보장)
   const activeSub = params.activeSubject || params.currentContext?.lastSubject;
-  return generateMediaData(
+  return await generateMediaData(
     params.userPrompt,
     params.history,
     activeSub,
     params.activeTitle,
-    params.aspectRatio
+    params.aspectRatio,
+    apiKey
   );
 }

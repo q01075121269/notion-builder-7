@@ -223,6 +223,22 @@ export const MediaLabContainer: React.FC = () => {
         aspectRatio: visualRatio
       });
 
+      if (!apiResult.shouldGenerate || apiResult.intent === 'CHAT' || !apiResult.imageUrl) {
+        setFsmState('IDLE');
+        const noaChatMsg: MediaMessage = {
+          id: `msg-n-${Date.now()}`,
+          role: 'noa',
+          text: apiResult.noaResponse,
+          timestamp: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
+        };
+        setMessages((prev) => [...prev, noaChatMsg]);
+        return;
+      }
+
+      const safeImageUrl = apiResult.imageUrl;
+      const safeTitle = apiResult.displayTitle || promptSummary;
+      const safeVpoPrompt = apiResult.vpoPrompt || promptSummary;
+
       if (apiResult.activeSubject) {
         setActiveSubject(apiResult.activeSubject);
       }
@@ -235,23 +251,23 @@ export const MediaLabContainer: React.FC = () => {
         timestamp: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }),
         artifact: {
           version: 1,
-          title: apiResult.displayTitle,
-          imageUrl: apiResult.imageUrl,
-          prompt: apiResult.vpoPrompt,
+          title: safeTitle,
+          imageUrl: safeImageUrl,
+          prompt: safeVpoPrompt,
           aspectRatio: visualRatio,
           activeSubject: apiResult.activeSubject
         }
       };
       setMessages((prev) => [...prev, noaMsg]);
 
-      const initialArt = createInitialArtifact(effectiveDomain, apiResult.displayTitle, visualRatio);
-      initialArt.title = apiResult.displayTitle;
-      initialArt.previewUrl = apiResult.imageUrl;
+      const initialArt = createInitialArtifact(effectiveDomain, safeTitle, visualRatio);
+      initialArt.title = safeTitle;
+      initialArt.previewUrl = safeImageUrl;
       initialArt.waveformData = generateWaveformData(48);
       initialArt.promptHistory = [
         {
           userRaw: promptSummary,
-          optimizedVPO: apiResult.vpoPrompt
+          optimizedVPO: safeVpoPrompt
         }
       ];
 
@@ -371,11 +387,28 @@ export const MediaLabContainer: React.FC = () => {
         aspectRatio: visualRatio
       });
 
+      // 백엔드 Gemini 인텐트 게이트웨이에서 CHAT/질문/항의로 판정된 경우: 이미지 생성 완전 차단 및 텍스트 응답만 제공
+      if (!apiResult.shouldGenerate || apiResult.intent === 'CHAT' || !apiResult.imageUrl) {
+        setFsmState(artifact ? 'REFINING' : 'IDLE');
+        const noaChatMsg: MediaMessage = {
+          id: `msg-n-${Date.now()}`,
+          role: 'noa',
+          text: apiResult.noaResponse,
+          timestamp: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
+        };
+        setMessages((prev) => [...prev, noaChatMsg]);
+        return;
+      }
+
       const nextVersion = (artifact?.promptHistory.length || 0) + 1;
       setActiveVersion(nextVersion);
       if (apiResult.activeSubject) {
         setActiveSubject(apiResult.activeSubject);
       }
+
+      const safeImageUrl = apiResult.imageUrl;
+      const safeTitle = apiResult.displayTitle || promptText.slice(0, 30);
+      const safeVpoPrompt = apiResult.vpoPrompt || promptText;
 
       const noaMsg: MediaMessage = {
         id: `msg-n-${Date.now()}`,
@@ -384,9 +417,9 @@ export const MediaLabContainer: React.FC = () => {
         timestamp: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }),
         artifact: {
           version: nextVersion,
-          title: apiResult.displayTitle,
-          imageUrl: apiResult.imageUrl,
-          prompt: apiResult.vpoPrompt,
+          title: safeTitle,
+          imageUrl: safeImageUrl,
+          prompt: safeVpoPrompt,
           aspectRatio: visualRatio,
           activeSubject: apiResult.activeSubject
         }
@@ -398,29 +431,29 @@ export const MediaLabContainer: React.FC = () => {
           ...artifact.promptHistory,
           {
             userRaw: promptText,
-            optimizedVPO: apiResult.vpoPrompt
+            optimizedVPO: safeVpoPrompt
           }
         ];
         const updatedArt: MediaArtifact = {
           ...artifact,
           domain: 'visual',
-          title: apiResult.displayTitle,
-          previewUrl: apiResult.imageUrl,
+          title: safeTitle,
+          previewUrl: safeImageUrl,
           promptHistory: updatedPromptHistory,
           progressPercent: 95,
-          currentStepText: `v${nextVersion} 갱신: ${apiResult.displayTitle}`
+          currentStepText: `v${nextVersion} 갱신: ${safeTitle}`
         };
         setArtifact(updatedArt);
         setHistory((prev) => [...prev, createCheckpoint(updatedArt)]);
       } else {
-        const initialArt = createInitialArtifact('visual', apiResult.displayTitle, visualRatio);
-        initialArt.title = apiResult.displayTitle;
-        initialArt.previewUrl = apiResult.imageUrl;
+        const initialArt = createInitialArtifact('visual', safeTitle, visualRatio);
+        initialArt.title = safeTitle;
+        initialArt.previewUrl = safeImageUrl;
         initialArt.waveformData = generateWaveformData(48);
         initialArt.promptHistory = [
           {
             userRaw: promptText,
-            optimizedVPO: apiResult.vpoPrompt
+            optimizedVPO: safeVpoPrompt
           }
         ];
         setArtifact(initialArt);
@@ -428,7 +461,7 @@ export const MediaLabContainer: React.FC = () => {
       }
 
       setFsmState('REFINING');
-      showToast(`v${nextVersion} [${apiResult.displayTitle}] 생성이 완료되었습니다.`, 'success');
+      showToast(`v${nextVersion} [${safeTitle}] 생성이 완료되었습니다.`, 'success');
       loadCachedAssets();
     };
 

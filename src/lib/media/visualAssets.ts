@@ -58,7 +58,7 @@ export function resolveVisualAssetByPrompt(
   return {
     imageUrl,
     title,
-    theme: semantic.detectedSetting || '시네마틱 실사 마스터',
+    theme: semantic.detectedSetting || '시네마틱 스튜디오 연출',
     semanticEnglish: semantic.englishPrompt,
     cameraSpec: 'Hasselblad H6D-100c Medium Format • 80mm f/1.8',
     lightingSpec: 'Rembrandt natural cinematic lighting & atmospheric volumetric fill',

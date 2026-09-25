@@ -20,9 +20,10 @@ export default async function handler(req: any, res: any) {
         body = JSON.parse(body);
       } catch (e) {}
     }
-    const { userPrompt = '', history, activeSubject, activeTitle, currentContext, aspectRatio = '16:9' } = body || {};
+    const { userPrompt = '', history, activeSubject, activeTitle, currentContext, aspectRatio = '16:9', apiKey } = body || {};
     const activeSub = activeSubject || currentContext?.lastSubject;
-    const result = generateMediaData(userPrompt, history, activeSub, activeTitle, aspectRatio);
+    const headerApiKey = req.headers ? req.headers['x-gemini-api-key'] : undefined;
+    const result = await generateMediaData(userPrompt, history, activeSub, activeTitle, aspectRatio, apiKey || headerApiKey);
 
     res.statusCode = 200;
     res.setHeader('Content-Type', 'application/json');

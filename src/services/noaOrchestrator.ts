@@ -170,7 +170,7 @@ export function isInspectCommand(prompt: string): boolean {
   );
 }
 
-// 취소/중단 명령인지 확인 (FSM 탈출용)
+// 취소/중단/거부/항의 명령인지 확인 (FSM 및 불필요한 생성 차단용)
 export function isCancelCommand(prompt: string): boolean {
   const p = prompt.trim().toLowerCase();
   return (
@@ -183,34 +183,80 @@ export function isCancelCommand(prompt: string): boolean {
     p === '처음으로' ||
     p === '리셋' ||
     p.includes('취소해') ||
-    p.includes('그만할래')
+    p.includes('그만할래') ||
+    isNegativeOrProtestCommand(prompt)
   );
 }
 
-// 질문, 대화, 기능 문의, 항의인지 감지 (좀비 FSM 방어용)
+// 명시적인 이미지/영상 생성 거부 및 항의 발화 감지
+export function isNegativeOrProtestCommand(prompt: string): boolean {
+  const p = prompt.trim().toLowerCase();
+  return (
+    p.includes('달라는 게 아니고') ||
+    p.includes('달라는게 아니고') ||
+    p.includes('달라는 게 아니') ||
+    p.includes('달라는게 아니') ||
+    p.includes('그리지 마') ||
+    p.includes('그리지마') ||
+    p.includes('생성하지 마') ||
+    p.includes('생성하지마') ||
+    p.includes('만들지 마') ||
+    p.includes('만들지마') ||
+    p.includes('아니라고') ||
+    p.includes('그림 말고') ||
+    p.includes('이미지 말고') ||
+    p.includes('사진 말고') ||
+    p.includes('영상 말고') ||
+    p.includes('누가 그리래') ||
+    p.includes('누가 만들래') ||
+    p.includes('왜 자꾸') ||
+    p.includes('그림 아니야') ||
+    p.includes('이미지 아니야') ||
+    p.includes('안 그린다고') ||
+    p.includes('그만 그려') ||
+    p.includes('그만 만들어')
+  );
+}
+
+// 질문, 대화, 기능 문의, 날씨, 상식, 항의인지 감지 (이미지 생성 무지성 루프 원천 차단)
 export function isConversationalOrQuestion(prompt: string): boolean {
   const p = prompt.trim().toLowerCase();
 
-  // 1. 제작/생성 요청 명령어가 명시적인 경우 제외
+  // 1. 최우선: 생성 거부 및 항의 발화는 100% 대화(CHAT)로 분류
+  if (isNegativeOrProtestCommand(prompt)) {
+    return true;
+  }
+
+  // 2. 날씨 / 일상 상식 / 시각 / 인사 관련 키워드
+  const commonInfoKeywords = [
+    '날씨', '기온', '비 와', '비와', '눈 와', '눈와', '우산', '더워', '추워', '미세먼지',
+    '몇 시', '몇시', '며칠', '오늘 날짜', '무슨 요일', '식사', '밥 먹', '배고파'
+  ];
+  if (commonInfoKeywords.some((kw) => p.includes(kw))) {
+    return true;
+  }
+
+  // 3. 제작/생성 요청 명령어가 명시적인 경우 제외
   const isGenerationTrigger = 
-    p.includes('만들어') ||
-    p.includes('생성해') ||
+    p.includes('만들어줘') ||
+    p.includes('생성해줘') ||
     p.includes('그려줘') ||
-    p.includes('작곡해') ||
-    p.includes('렌더링') ||
-    p.includes('변환해') ||
-    p.includes('바꿔줘');
+    p.includes('작곡해줘') ||
+    p.includes('렌더링해줘') ||
+    p.includes('바꿔줘') ||
+    p.includes('제작해줘');
 
   if (isGenerationTrigger) {
     return false;
   }
 
-  // 2. 인사 / 정체 / 기능 / 사용법 문의 / 질문 어미
+  // 4. 인사 / 정체 / 기능 / 사용법 문의 / 질문 어미
   const conversationalKeywords = [
     '누구', '뭐해', '뭐야', '뭘 할 수', '기능', '도움말', '어떤 거', '어떤거',
     '사용법', '어떻게 써', '어떻게 쓰', '어떻게 해', '설명해', '알려줘',
     '안녕', '반가워', '노아', 'noa', '안되', '안돼', '버그', '에러', '왜 이래',
-    '왜 그래', '왜 안', '뭐하는', '할줄', '능력', '가이드', '질문'
+    '왜 그래', '왜 안', '뭐하는', '할줄', '능력', '가이드', '질문', '궁금',
+    '어때', '생각해', '조언'
   ];
 
   const hasConversationalKeyword = conversationalKeywords.some((kw) => p.includes(kw));
@@ -222,6 +268,19 @@ export function isConversationalOrQuestion(prompt: string): boolean {
 // 질문 및 대화에 대한 노아 총괄 PD의 지능형 응답 생성기
 export function generateNoaConversationalResponse(prompt: string): string {
   const p = prompt.trim().toLowerCase();
+
+  // 항의 및 거부 대응
+  if (isNegativeOrProtestCommand(prompt)) {
+    return `대단히 죄송합니다! 의도치 않게 이미지를 생성하여 불편을 드렸습니다. 🙇‍♂️
+사용자님의 명시적인 제작 명령("~만들어줘", "~생성해줘")이 있기 전까지는 어떠한 이미지나 영상도 생성하지 않고, 오직 대화와 Q&A에만 집중하겠습니다.
+궁금하신 점이나 나누고 싶은 이야기를 편하게 말씀해 주세요!`;
+  }
+
+  // 날씨 관련 질문 대응
+  if (p.includes('날씨') || p.includes('기온') || p.includes('비 와') || p.includes('눈 와') || p.includes('우산')) {
+    return `제가 실시간 기상청 위성 센서에 직접 접속할 수는 없지만, 현재 계절과 무드에 맞는 미디어(예: '비 내리는 서울 밤거리의 차분한 네온사인', '햇살 가득한 해변')를 언제든 아름답게 연출해 드릴 수 있습니다! 🌦️
+정확한 오늘/내일 날씨는 기상청 날씨누리나 포털 날씨 앱에서 확인하시는 것을 추천드립니다. 미디어 랩에서 표현하고 싶은 분위기나 날씨 풍경이 있으시다면 언제든 말씀해 주세요!`;
+  }
 
   if (p.includes('누구') || p.includes('노아') || p.includes('noa') || p.includes('정체')) {
     return `안녕하세요! 저는 AI 미디어 랩의 총괄 크리에이티브 디렉터 **노아(NOA)**입니다. 🎬
