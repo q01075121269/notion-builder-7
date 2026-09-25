@@ -556,34 +556,34 @@ export const LifePage: React.FC = () => {
 
   const isNotionConnected = Boolean(notionApiKey && (createdNotionResource || selectedNotionDbId));
 
-  // 4대 뷰 모드 탭 목록
+  // 4대 뷰 모드 탭 목록 (단일 Lucide Monochrome 라인 아이콘 통일)
   const VIEW_TABS = [
-    { id: 'morning_command' as ViewModeTab, label: '☀️ 모닝 커맨드 센터', icon: Sun },
-    { id: 'para_second_brain' as ViewModeTab, label: '🧠 PARA 세컨드 브레인', icon: Brain },
-    { id: 'smart_finance' as ViewModeTab, label: '💰 스마트 재정', icon: Coins },
-    { id: 'health_routine' as ViewModeTab, label: '🏃 건강 & 루틴', icon: Activity }
+    { id: 'morning_command' as ViewModeTab, label: '모닝 커맨드 센터', icon: Sun },
+    { id: 'para_second_brain' as ViewModeTab, label: 'PARA 세컨드 브레인', icon: Brain },
+    { id: 'smart_finance' as ViewModeTab, label: '스마트 재정', icon: Coins },
+    { id: 'health_routine' as ViewModeTab, label: '건강 & 루틴', icon: Activity }
   ];
 
   return (
-    <div className="flex-1 flex flex-col h-full w-full overflow-y-auto bg-[#fafafa] dark:bg-[#09090b] text-zinc-900 dark:text-zinc-100 font-sans selection:bg-blue-100 dark:selection:bg-blue-950">
+    <div className="flex-1 flex flex-col h-full w-full overflow-y-auto bg-[var(--bg-base)] text-[var(--text-primary)] font-sans selection:bg-blue-100 dark:selection:bg-blue-950">
       {/* ─────────────────────────────────────────────────────────────────────────────
           1. [상단 서브 컨트롤 바] - Google AI Studio & Linear 모노톤 스타일
          ───────────────────────────────────────────────────────────────────────────── */}
-      <div className="sticky top-0 z-20 px-4 sm:px-8 py-3 border-b border-zinc-200/80 dark:border-white/10 bg-white/95 dark:bg-[#09090b]/95 backdrop-blur-md flex flex-wrap items-center justify-between gap-3 shadow-2xs">
+      <div className="sticky top-0 z-20 px-4 sm:px-8 py-3 border-b border-slate-200 dark:border-zinc-800 bg-white/80 dark:bg-zinc-950/80 backdrop-blur-md flex flex-wrap items-center justify-between gap-3 shadow-2xs">
         {/* 좌측 뷰 모드 탭들 */}
         <div className="flex items-center space-x-2 sm:space-x-3 overflow-x-auto scrollbar-none">
           <button
             onClick={() => setCurrentView('home')}
-            className="flex items-center space-x-1.5 px-2.5 py-1.5 rounded-xl bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 text-xs font-semibold transition cursor-pointer shrink-0"
+            className="flex items-center space-x-1.5 px-2.5 py-1.5 rounded-xl bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 text-slate-700 dark:text-zinc-300 text-xs font-semibold transition cursor-pointer shrink-0"
           >
-            <ArrowLeft className="w-3.5 h-3.5" />
+            <ArrowLeft className="w-3.5 h-3.5 text-slate-500 dark:text-zinc-400" />
             <span className="hidden sm:inline">홈으로</span>
           </button>
 
-          <div className="h-4 w-[1px] bg-zinc-200 dark:bg-zinc-800 hidden sm:block" />
+          <div className="h-4 w-[1px] bg-slate-200 dark:border-zinc-800 hidden sm:block" />
 
           {/* 4대 뷰 모드 토글 탭 */}
-          <div className="flex items-center space-x-1 p-0.5 rounded-xl bg-zinc-100 dark:bg-zinc-900 border border-zinc-200/80 dark:border-white/10">
+          <div className="flex items-center space-x-1 p-0.5 rounded-xl bg-slate-100 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800">
             {VIEW_TABS.map(tab => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.id;
@@ -591,13 +591,13 @@ export const LifePage: React.FC = () => {
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer whitespace-nowrap ${
+                  className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer whitespace-nowrap ${
                     isActive
-                      ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-2xs'
-                      : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'
+                      ? 'bg-white dark:bg-zinc-800 text-slate-900 dark:text-zinc-100 font-bold shadow-xs border border-slate-200 dark:border-zinc-700'
+                      : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-100'
                   }`}
                 >
-                  <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-amber-500' : ''}`} />
+                  <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-slate-800 dark:text-zinc-200' : 'text-slate-500 dark:text-zinc-400'}`} />
                   <span>{tab.label}</span>
                 </button>
               );
@@ -612,18 +612,18 @@ export const LifePage: React.FC = () => {
           <div className="relative">
             <button
               onClick={() => setIsSaveMenuOpen(!isSaveMenuOpen)}
-              className="flex items-center space-x-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs sm:text-sm font-medium bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-200 border border-zinc-300 dark:border-zinc-700 transition cursor-pointer shadow-2xs"
+              className="flex items-center space-x-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs sm:text-sm font-medium bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 text-slate-700 dark:text-zinc-200 border border-slate-200 dark:border-zinc-700 transition cursor-pointer shadow-2xs"
             >
-              <Save className="w-3.5 h-3.5" />
+              <Save className="w-3.5 h-3.5 text-slate-500 dark:text-zinc-400" />
               <span>관리</span>
-              <ChevronDown className="w-3 h-3 text-zinc-400" />
+              <ChevronDown className="w-3 h-3 text-slate-400" />
             </button>
 
             {isSaveMenuOpen && (
-              <div className="absolute right-0 mt-1.5 w-48 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xl p-1.5 z-40 space-y-1">
+              <div className="absolute right-0 mt-1.5 w-48 rounded-xl bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 shadow-xl p-1.5 z-40 space-y-1">
                 <button
                   onClick={handleExportJson}
-                  className="w-full flex items-center space-x-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition text-left cursor-pointer"
+                  className="w-full flex items-center space-x-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-700 dark:text-zinc-200 hover:bg-slate-100 dark:hover:bg-zinc-800 transition text-left cursor-pointer"
                 >
                   <Download className="w-3.5 h-3.5 text-blue-500" />
                   <span>JSON 데이터 백업</span>
@@ -646,7 +646,7 @@ export const LifePage: React.FC = () => {
             className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs sm:text-sm font-medium transition cursor-pointer shadow-2xs ${
               isExporting
                 ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700 cursor-wait'
-                : 'bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 border border-zinc-300 dark:border-zinc-700'
+                : 'bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 text-slate-800 dark:text-zinc-200 border border-slate-200 dark:border-zinc-700'
             }`}
             title="현재 라이프 Hub 4대 DB를 내 노션 워크스페이스에 일괄 배포"
           >
@@ -657,7 +657,7 @@ export const LifePage: React.FC = () => {
               </>
             ) : (
               <>
-                <Send className="w-3.5 h-3.5 text-zinc-600 dark:text-zinc-300" />
+                <Send className="w-3.5 h-3.5 text-slate-600 dark:text-zinc-300" />
                 <span className="hidden sm:inline">노션 내보내기</span>
                 <span className="sm:hidden">내보내기</span>
               </>
@@ -668,9 +668,9 @@ export const LifePage: React.FC = () => {
           <button
             onClick={() => setIsNotionSettingsModalOpen(true)}
             title={isNotionConnected ? '노션 연결됨' : '노션 연결 설정'}
-            className="inline-flex items-center space-x-1.5 px-2 py-1 rounded-lg text-xs font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 transition cursor-pointer"
+            className="inline-flex items-center space-x-1.5 px-2 py-1 rounded-lg text-xs font-medium text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-200 transition cursor-pointer"
           >
-            <span className={`w-2 h-2 rounded-full ${isNotionConnected ? 'bg-emerald-500 shadow-xs shadow-emerald-500/50' : 'bg-zinc-400'}`} />
+            <span className={`w-2 h-2 rounded-full ${isNotionConnected ? 'bg-emerald-500 shadow-xs shadow-emerald-500/50' : 'bg-slate-400'}`} />
             <span>{isNotionConnected ? '연결됨' : '미연결'}</span>
           </button>
         </div>

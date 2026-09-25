@@ -323,16 +323,16 @@ export const HomePage: React.FC = () => {
   ];
 
   return (
-    <div className="flex-1 flex flex-col h-full w-full overflow-hidden bg-neutral-50 dark:bg-notion-dark-bg text-neutral-900 dark:text-white select-none relative">
+    <div className="flex-1 flex flex-col h-full w-full overflow-hidden bg-[var(--bg-base)] text-[var(--text-primary)] select-none relative">
       
       {/* 1. 상단 절제된 타이포그래피 헤더 & 좌측 서랍 토글 바 */}
-      <header className="shrink-0 border-b border-neutral-200/80 dark:border-neutral-800 bg-white/80 dark:bg-notion-dark-card/80 backdrop-blur px-4 py-3 sm:px-6 flex items-center justify-between z-10">
+      <header className="shrink-0 border-b border-slate-200 dark:border-zinc-800 bg-white/80 dark:bg-zinc-950/80 backdrop-blur px-4 py-3 sm:px-6 flex items-center justify-between z-10">
         
         {/* 좌측 서랍 토글 버튼 & 메인 제목 */}
         <div className="flex items-center space-x-3">
           <button
             onClick={() => setIsDrawerOpen(true)}
-            className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-200 hover:bg-slate-200 dark:hover:bg-neutral-700 transition font-bold text-xs cursor-pointer shadow-2xs"
+            className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-200 hover:bg-slate-200 dark:hover:bg-zinc-700 transition font-bold text-xs cursor-pointer shadow-2xs border border-slate-200 dark:border-zinc-700"
             title="대화 기록 서랍 열기"
           >
             <Clock className="w-4 h-4 text-amber-500" />

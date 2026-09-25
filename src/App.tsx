@@ -22,6 +22,8 @@ import LifePage from './app/life/page';
 import DevLabPage from './app/devlab/page';
 import MediaLabPage from './app/medialab/page';
 
+import { UniversalThemeProvider } from './context/SparkThemeContext';
+
 export const MainApp: React.FC = () => {
   const { 
     currentView,
@@ -53,11 +55,11 @@ export const MainApp: React.FC = () => {
   // 3. 관리자 권한 인가 완료 -> 정상 빌더 & 대시보드 애플리케이션 진입
   return (
     <ErrorBoundary fallbackTitle="앱 화면 로드 중 예기치 않은 오류가 발생했습니다.">
-      <div className="flex flex-col h-screen w-screen overflow-hidden bg-white dark:bg-notion-dark-bg text-notion-light-text dark:text-notion-dark-text font-sans">
+      <div className="flex flex-col h-screen w-screen overflow-hidden bg-[var(--bg-base)] text-[var(--text-primary)] font-sans transition-colors duration-200">
         <Navbar />
         
         {/* 뷰 모드 분기: 홈 대시보드 vs 템플릿 빌더 vs 라이프 허브 vs 개발 랩 vs AI 미디어 랩 vs 내 보관함 vs 1초 퀵 캡처 */}
-        <main className="flex-1 flex flex-col overflow-hidden">
+        <main className="flex-1 flex flex-col overflow-hidden bg-[var(--bg-base)] text-[var(--text-primary)]">
           {currentView === 'home' ? (
             <HomePage />
           ) : currentView === 'builder' ? (
@@ -97,9 +99,11 @@ export const MainApp: React.FC = () => {
 export default function App() {
   return (
     <ErrorBoundary fallbackTitle="애플리케이션 초기화 중 오류가 발생했습니다.">
-      <AppProvider>
-        <MainApp />
-      </AppProvider>
+      <UniversalThemeProvider>
+        <AppProvider>
+          <MainApp />
+        </AppProvider>
+      </UniversalThemeProvider>
     </ErrorBoundary>
   );
 }

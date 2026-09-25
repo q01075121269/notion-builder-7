@@ -21,7 +21,7 @@ import { LifeHubTaskBridge } from './LifeHubTaskBridge';
 import { NotionWikiDeployModal } from './NotionWikiDeployModal';
 import { MultiSourceResearchModal } from './MultiSourceResearchModal';
 import { SparkStudioHeader } from './SparkStudioHeader';
-import { SparkThemeProvider, useSparkTheme } from '../../context/SparkThemeContext';
+import { useSparkTheme } from '../../context/SparkThemeContext';
 import { fetchSparkpageResearch } from '../../services/sparkResearchService';
 import type { SparkpagePayload } from '../../types/spark';
 import type { SparkVisualStyle } from '../../types/visualStyle';
@@ -40,11 +40,7 @@ import {
 const STORAGE_KEY = 'anti_office_studio_projects_v1';
 
 export const OfficeStudioContainer: React.FC = () => {
-  return (
-    <SparkThemeProvider>
-      <OfficeStudioInner />
-    </SparkThemeProvider>
-  );
+  return <OfficeStudioInner />;
 };
 
 const OfficeStudioInner: React.FC = () => {

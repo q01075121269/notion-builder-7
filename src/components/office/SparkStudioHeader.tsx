@@ -160,7 +160,7 @@ export const SparkStudioHeader: React.FC<SparkStudioHeaderProps> = ({
         <button
           type="button"
           onClick={toggleTheme}
-          className="flex items-center space-x-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer whitespace-nowrap border shrink-0 bg-white dark:bg-slate-800/60 text-slate-800 dark:text-slate-200 border-slate-300 dark:border-slate-700 hover:opacity-90 shadow-xs"
+          className="flex items-center space-x-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all duration-200 cursor-pointer whitespace-nowrap border shrink-0 bg-white/90 dark:bg-zinc-900/90 text-slate-800 dark:text-zinc-200 border-slate-200 dark:border-zinc-800 hover:opacity-90 shadow-xs"
           title={theme === 'dark' ? '라이트 모드로 전환' : '다크 모드로 전환'}
         >
           {theme === 'dark' ? (
@@ -170,7 +170,7 @@ export const SparkStudioHeader: React.FC<SparkStudioHeaderProps> = ({
             </>
           ) : (
             <>
-              <Moon className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
+              <Moon className="w-4 h-4 text-indigo-500 shrink-0" />
               <span>다크 모드</span>
             </>
           )}

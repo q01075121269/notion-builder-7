@@ -332,12 +332,12 @@ export const DashboardView: React.FC = () => {
 
   return (
     <ErrorBoundary>
-      <div className="h-full w-full overflow-y-auto bg-slate-50/60 dark:bg-notion-dark-bg p-4 sm:p-6 lg:p-8 space-y-8 select-none">
+      <div className="h-full w-full overflow-y-auto bg-[var(--bg-base)] text-[var(--text-primary)] p-4 sm:p-6 lg:p-8 space-y-8 select-none">
         
         {/* ==================================================== */}
         {/* 1. 상단: 내 노션 저장소 워크스페이스 연결 배너 */}
         {/* ==================================================== */}
-        <section className="p-4 sm:p-5 rounded-2xl border border-neutral-200 dark:border-notion-dark-border bg-gradient-to-r from-slate-50 via-indigo-50/40 to-amber-50/30 dark:from-neutral-900 dark:via-neutral-900/90 dark:to-neutral-800/80 shadow-xs space-y-3">
+        <section className="p-4 sm:p-5 rounded-2xl border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/90 shadow-xs space-y-3">
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
             <div className="flex items-center space-x-3.5">
               <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-amber-500 via-indigo-600 to-emerald-500 text-white flex items-center justify-center font-bold text-xl shrink-0 shadow-md">

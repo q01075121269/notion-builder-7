@@ -3,29 +3,57 @@
 @tailwind utilities;
 
 :root {
-  /* Google NotebookLM 순정 Light Mode */
-  --bg-app: #f8fafd;
-  --bg-surface: #ffffff;
-  --bg-card: #ffffff;
-  --border-color: #e3e3e3;
-  --text-primary: #1f1f1f;
-  --text-secondary: #444746;
-  --accent-color: #1a73e8;
+  /* ☀️ 라이트 모드 토큰 (Notion/Apple 감성) */
+  --bg-base: #f9fafb;
+  --surface-card: #ffffff;
+  --surface-elevated: #f1f5f9;
+  --border-subtle: #e2e8f0;
+  --border-strong: #cbd5e1;
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #64748b;
+  --accent-primary: #3b82f6;
+  --accent-hover: #2563eb;
+  --accent-subtle: #eff6ff;
+
+  /* 호환성 변수 매핑 */
+  --bg-app: var(--bg-base);
+  --bg-surface: var(--surface-card);
+  --bg-card: var(--surface-card);
+  --border-color: var(--border-subtle);
+  --accent-color: var(--accent-primary);
 }
 
-html.dark {
-  /* Google NotebookLM 순정 Dark Mode */
-  --bg-app: #131314;
-  --bg-surface: #1e1f20;
-  --bg-card: #1e1f20;
-  --border-color: #333537;
-  --text-primary: #e3e3e3;
-  --text-secondary: #c4c7c5;
-  --accent-color: #a8c7fa;
+.dark, html.dark {
+  /* 🌙 다크 모드 토큰 (Google AI Studio/Linear 감성) */
+  --bg-base: #111214;
+  --surface-card: #18191b;
+  --surface-elevated: #222326;
+  --border-subtle: #27272a;
+  --border-strong: #3f3f46;
+  --text-primary: #f4f4f5;
+  --text-secondary: #d4d4d8;
+  --text-muted: #a1a1aa;
+  --accent-primary: #4e82ee;
+  --accent-hover: #3b82f6;
+  --accent-subtle: rgba(78, 130, 238, 0.15);
+
+  /* 호환성 변수 매핑 */
+  --bg-app: var(--bg-base);
+  --bg-surface: var(--surface-card);
+  --bg-card: var(--surface-card);
+  --border-color: var(--border-subtle);
+  --accent-color: var(--accent-primary);
+}
+
+/* 한글 타이포그래피 전역 보호 */
+body, * {
+  word-break: keep-all;
+  overflow-wrap: break-word;
 }
 
 body {
-  background-color: var(--bg-app);
+  background-color: var(--bg-base);
   color: var(--text-primary);
 }
 

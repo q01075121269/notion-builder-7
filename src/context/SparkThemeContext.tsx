@@ -172,7 +172,7 @@ export const SparkThemeProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   return (
     <SparkThemeContext.Provider value={{ theme, setTheme, toggleTheme, themeConfig }}>
-      <div className={`w-full h-full bg-[var(--bg-app)] text-[var(--text-primary)] transition-colors duration-200 flex flex-col overflow-hidden`}>
+      <div className={`w-full h-full bg-[var(--bg-base)] text-[var(--text-primary)] transition-colors duration-200 flex flex-col overflow-hidden`}>
         {children}
       </div>
     </SparkThemeContext.Provider>
@@ -186,3 +186,8 @@ export const useSparkTheme = (): SparkThemeContextValue => {
   }
   return context;
 };
+
+// 범용 유니버설 테마 별칭 export
+export const UniversalThemeProvider = SparkThemeProvider;
+export const useTheme = useSparkTheme;
+
