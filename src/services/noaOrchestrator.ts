@@ -104,15 +104,40 @@ export const DOMAIN_INTERVIEW_STEPS: Record<MediaDomain, InterviewStep[]> = {
 // 도메인 감지 헬퍼
 export function detectDomainFromPrompt(prompt: string): MediaDomain {
   const p = prompt.toLowerCase();
-  if (p.includes('음악') || p.includes('bgm') || p.includes('사운드') || p.includes('노래') || p.includes('오디오') || p.includes('비트')) {
+
+  // 1. 오디오/음원
+  if (p.includes('음악') || p.includes('bgm') || p.includes('사운드') || p.includes('노래') || p.includes('오디오') || p.includes('비트') || p.includes('bgm만들')) {
     return 'audio';
   }
-  if (p.includes('영상') || p.includes('비디오') || p.includes('쇼츠') || p.includes('릴스') || p.includes('동영상') || p.includes('모션')) {
-    return 'video';
-  }
-  if (p.includes('이미지') || p.includes('썸네일') || p.includes('그림') || p.includes('사진') || p.includes('비주얼') || p.includes('포스터')) {
+
+  // 2. 비디오/영상/MV (명시적 영상 키워드가 있는 경우)
+  const isVideoExplicit = p.includes('영상') || p.includes('비디오') || p.includes('쇼츠') || p.includes('릴스') || p.includes('동영상') || p.includes('모션') || p.includes('mv') || p.includes('뮤직비디오');
+
+  // 3. 비주얼/실사/이미지 키워드 우선 검사
+  const isVisualExplicit = 
+    p.includes('캐릭터') ||
+    p.includes('실사') ||
+    p.includes('이미지') ||
+    p.includes('사진') ||
+    p.includes('썸네일') ||
+    p.includes('포트레이트') ||
+    p.includes('인물') ||
+    p.includes('디렉터') ||
+    p.includes('패션') ||
+    p.includes('그림') ||
+    p.includes('화보') ||
+    p.includes('비주얼') ||
+    p.includes('3d') ||
+    p.includes('포스터');
+
+  if (isVisualExplicit && !isVideoExplicit) {
     return 'visual';
   }
+
+  if (isVideoExplicit) {
+    return 'video';
+  }
+
   return 'visual';
 }
 

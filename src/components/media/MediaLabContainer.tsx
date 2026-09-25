@@ -117,32 +117,51 @@ export const MediaLabContainer: React.FC = () => {
     }
   };
 
-  // 아티팩트 생성 엔진 트리거 (VPO 및 MV 엔진 통합)
+  // 아티팩트 생성 엔진 트리거 (VPO 및 실사 렌더러/MV 분기)
   const triggerArtifactGeneration = (domain: MediaDomain, promptSummary: string) => {
     setFsmState('GENERATING');
     setUserPromptText(promptSummary);
 
-    const is3D = promptSummary.toLowerCase().includes('3d') || promptSummary.toLowerCase().includes('헬리콥터');
-    const isMV = promptSummary.toLowerCase().includes('뮤직비디오') || promptSummary.toLowerCase().includes('mv') || domain === 'video';
+    const isExplicitVideo = 
+      domain === 'video' ||
+      promptSummary.toLowerCase().includes('뮤직비디오') ||
+      promptSummary.toLowerCase().includes('mv') ||
+      promptSummary.toLowerCase().includes('영상') ||
+      promptSummary.toLowerCase().includes('비디오') ||
+      promptSummary.toLowerCase().includes('쇼츠') ||
+      promptSummary.toLowerCase().includes('릴스');
+
+    const is3D = promptSummary.toLowerCase().includes('3d') || promptSummary.toLowerCase().includes('헬리콥터') || promptSummary.toLowerCase().includes('렌더');
+
+    // 비주얼 인텐트(캐릭터, 실사, 이미지, 사진, 썸네일 등)는 절대 비디오/MV로 빠지지 않음!
+    const effectiveDomain: MediaDomain = isExplicitVideo ? 'video' : 'visual';
+    setCurrentDomain(effectiveDomain);
 
     // 1) VPO 프롬프트 최적화 실행
-    const vpo = optimizePrompt(promptSummary, domain, is3D ? '3d' : isMV ? 'cinematic' : undefined);
+    const vpo = optimizePrompt(promptSummary, effectiveDomain, is3D ? '3d' : 'photo');
     setVpoResult(vpo);
 
-    // 2) 옴니모달 MV 엔진 생성
-    const mv = generateBeatSyncMV(promptSummary, 120);
-    setMvPipelineResult(mv);
+    if (effectiveDomain === 'visual') {
+      // 실사 비주얼 렌더러 모드: MV 비트 싱크 완전 배제
+      setMvPipelineResult(null);
 
-    setNoaResponseText(
-      is3D 
-        ? 'VPO 렌더링 파라미터를 결합하여 3D 정밀 메커니즘 캔버스를 도출했습니다. (Unreal Engine 5.5 / Octane Render / PBR Titanium 8K)' 
-        : '비트 타임스탬프에 맞춘 3개 씬 궤적 MV를 렌더링했습니다. (Spatial FaceID 99.4% Lock & 0s/4s/12s 비트 싱크 완료)'
-    );
+      const targetTitle = promptSummary.length > 25 ? `${promptSummary.slice(0, 25)}...` : promptSummary;
+      if (is3D) {
+        setNoaResponseText('VPO 렌더링 파라미터를 결합하여 3D 정밀 메커니즘 캔버스를 도출했습니다. (Unreal Engine 5.5 / Octane Render / PBR Titanium 8K)');
+      } else {
+        setNoaResponseText(`요청하신 ${targetTitle}를 VPO 실사 엔진(Hasselblad 80mm f/1.8 심도 및 자연광)으로 렌더링하여 캔버스에 마운트했습니다.`);
+      }
+    } else {
+      // 비디오/MV 모드
+      const mv = generateBeatSyncMV(promptSummary, 120);
+      setMvPipelineResult(mv);
+      setNoaResponseText('비트 타임스탬프에 맞춘 3개 씬 궤적 MV를 렌더링했습니다. (Spatial FaceID 99.4% Lock & 0s/4s/12s 비트 싱크 완료)');
+    }
 
     showToast('노아 PD가 캔버스에 고해상도 아티팩트를 렌더링 중입니다...', 'info');
 
     setTimeout(() => {
-      const initialArt = createInitialArtifact(domain, promptSummary, visualRatio);
+      const initialArt = createInitialArtifact(effectiveDomain, promptSummary, visualRatio);
       initialArt.waveformData = generateWaveformData(48);
       initialArt.promptHistory = [
         {
@@ -156,7 +175,7 @@ export const MediaLabContainer: React.FC = () => {
       setFsmState('REFINING');
       showToast('초안 렌더링이 완료되었습니다. 조종석에서 피드백을 지시해 주세요.', 'success');
       loadCachedAssets();
-    }, 1100);
+    }, 1000);
   };
 
   // 듀얼 트랙 대화형 오케스트레이터 입력 핸들러
@@ -182,7 +201,36 @@ export const MediaLabContainer: React.FC = () => {
       }
     }
 
-    // 3. 인플레이스 변환 분기: 배경 교체 (Search-Grounded Relighting)
+    // 3. 비주얼 인텐트 감지 (캐릭터, 실사, 이미지, 사진, 썸네일, 패션, 디렉터, 3D 등) -> 즉각 실사 비주얼 렌더러로 직결!
+    const isVisualIntent = 
+      trimmed.includes('캐릭터') ||
+      trimmed.includes('실사') ||
+      trimmed.includes('이미지') ||
+      trimmed.includes('사진') ||
+      trimmed.includes('썸네일') ||
+      trimmed.includes('포트레이트') ||
+      trimmed.includes('패션') ||
+      trimmed.includes('디렉터') ||
+      trimmed.includes('인물') ||
+      trimmed.includes('3d') ||
+      trimmed.includes('3D') ||
+      trimmed.includes('만들어줘');
+
+    const isExplicitVideo = 
+      trimmed.includes('영상') || 
+      trimmed.includes('비디오') || 
+      trimmed.includes('쇼츠') || 
+      trimmed.includes('릴스') || 
+      trimmed.includes('뮤직비디오') || 
+      trimmed.includes('mv') || 
+      trimmed.includes('MV');
+
+    if (isVisualIntent && !isExplicitVideo && fsmState === 'IDLE') {
+      triggerArtifactGeneration('visual', trimmed);
+      return;
+    }
+
+    // 4. 인플레이스 변환 분기: 배경 교체 (Search-Grounded Relighting)
     if (trimmed.includes('배경') && (trimmed.includes('바꿔') || trimmed.includes('변경') || trimmed.includes('알프스'))) {
       setUserPromptText(trimmed);
       const bgQuery = trimmed.includes('알프스') ? '알프스 설산 빙하 파노라마' : '선셋 해변 골든아워';
@@ -194,10 +242,10 @@ export const MediaLabContainer: React.FC = () => {
       return;
     }
 
-    // 4. 인플레이스 변환 분기: 인물 피사체 정밀 치환 (Subject Swap with Composition Lock)
+    // 5. 인플레이스 변환 분기: 인물 피사체 정밀 치환 (Subject Swap with Composition Lock)
     if ((trimmed.includes('인물') || trimmed.includes('피사체') || trimmed.includes('ceo') || trimmed.includes('사람')) && (trimmed.includes('바꿔') || trimmed.includes('치환') || trimmed.includes('변경'))) {
       setUserPromptText(trimmed);
-      const targetSubject = trimmed.includes('ceo') || trimmed.includes('CEO') ? '40대 서양 CEO' : '20대 테크 창업가';
+      const targetSubject = trimmed.includes('ceo') || trimmed.includes('CEO') ? '40대 서양 CEO' : '30대 여성 패션 디렉터';
       const baseMv = mvPipelineResult || generateBeatSyncMV(artifact?.title || '미디어 아티팩트');
       const updatedMv = applySubjectSwapWithCompositionLock(baseMv, targetSubject);
       setMvPipelineResult(updatedMv);
@@ -206,15 +254,9 @@ export const MediaLabContainer: React.FC = () => {
       return;
     }
 
-    // 5. 파일 첨부 후 "뮤직비디오 만들어줘" 요청 분기
+    // 6. 파일 첨부 후 "뮤직비디오 만들어줘" 요청 분기
     if (attachedFile || trimmed.includes('뮤직비디오') || trimmed.includes('mv') || trimmed.includes('MV')) {
       triggerArtifactGeneration('video', trimmed || '비트 싱크 뮤직비디오');
-      return;
-    }
-
-    // 6. "3D 헬리콥터 만들어줘" 등 3D 모드 분기
-    if (trimmed.includes('3d') || trimmed.includes('3D') || trimmed.includes('헬리콥터')) {
-      triggerArtifactGeneration('visual', trimmed);
       return;
     }
 

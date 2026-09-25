@@ -1,22 +1,22 @@
 // src/components/media/MediaArtifactStage.tsx
-// 중앙 라이브 미디어 캔버스 뷰어 (비율 원클릭 스위처, 9:16 쇼츠 세이프존, 키네틱 가라오케 자막, 비트 싱크 MV 플레이어)
+// 중앙 라이브 미디어 캔버스 뷰어 (실체 고화질 비주얼 렌더러, 비율 스위처 물리 바인딩, 세이프존, 유틸리티 알약)
 
 import React, { useState, useEffect } from 'react';
 import { 
   Play, 
   Pause, 
   Download, 
-  Share2, 
+  Link as LinkIcon, 
   Cloud, 
   Smartphone, 
   ShieldCheck, 
-  Film, 
-  Music, 
-  Image as ImageIcon 
+  Camera,
+  Check
 } from 'lucide-react';
 import type { MediaArtifact } from '../../types/media';
 import type { MVPipelineResult } from '../../lib/media/videoPipeline';
 import type { VPOOptimizationResult } from '../../lib/media/vpo';
+import { resolveVisualAssetByPrompt, downloadImageDirectly } from '../../lib/media/visualAssets';
 
 interface MediaArtifactStageProps {
   artifact: MediaArtifact;
@@ -27,8 +27,6 @@ interface MediaArtifactStageProps {
   onSave4K: () => void;
   onNotionSync: () => void;
   onCopyLink: () => void;
-  onSendEmail?: () => void;
-  onLifeSync?: () => void;
 }
 
 export const MediaArtifactStage: React.FC<MediaArtifactStageProps> = ({
@@ -42,51 +40,54 @@ export const MediaArtifactStage: React.FC<MediaArtifactStageProps> = ({
   onCopyLink
 }) => {
   const [isPlaying, setIsPlaying] = useState<boolean>(true);
-  const [currentTime, setCurrentTime] = useState<number>(5.2);
+  const [currentTime, setCurrentTime] = useState<number>(0);
   const [showSafeZone, setShowSafeZone] = useState<boolean>(true);
   const [isHovered, setIsHovered] = useState<boolean>(false);
+  const [isCopied, setIsCopied] = useState<boolean>(false);
 
+  // 비주얼 프롬프트 매칭 실제 고화질 이미지 리소스 도출
+  const visualInfo = resolveVisualAssetByPrompt(artifact.title || artifact.promptHistory[0]?.userRaw || '');
+  const displayImageUrl = artifact.previewUrl || visualInfo.imageUrl;
+
+  const isVideoMode = artifact.domain === 'video';
   const totalDuration = mvData?.totalDuration || 16;
 
-  // 비디오/MV 재생 프로그레스 시뮬레이션
+  // 비디오/MV 모드일 때만 타이머 시뮬레이션 가동
   useEffect(() => {
     let timer: NodeJS.Timeout;
-    if (isPlaying) {
+    if (isVideoMode && isPlaying) {
       timer = setInterval(() => {
         setCurrentTime((prev) => (prev >= totalDuration ? 0 : Number((prev + 0.1).toFixed(1))));
       }, 100);
     }
     return () => clearInterval(timer);
-  }, [isPlaying, totalDuration]);
+  }, [isVideoMode, isPlaying, totalDuration]);
 
-  // 현재 활성화된 씬 컷 계산 (EDL 매칭)
-  const currentScene = mvData?.edlList.find(
-    (cut) => currentTime >= cut.startTime && currentTime <= cut.endTime
-  ) || mvData?.edlList[0];
-
-  // 키네틱 가라오케 자막 단어 하이라이트 인덱스 계산
-  const getKaraokeWords = () => {
-    if (!currentScene) return [];
-    const lyrics = currentScene.karaokeLyrics;
-    const sceneElapsed = currentTime - currentScene.startTime;
-    const sceneDuration = currentScene.endTime - currentScene.startTime;
-    const activeIndex = Math.min(
-      lyrics.length - 1,
-      Math.floor((sceneElapsed / sceneDuration) * lyrics.length)
-    );
-
-    return lyrics.map((word, idx) => ({
-      text: word,
-      isHighlighted: idx <= activeIndex,
-      isCurrent: idx === activeIndex
-    }));
+  // 비율에 따른 물리 캔버스 컨테이너 스타일 계산
+  const getAspectContainerClass = () => {
+    if (aspectRatio === '16:9') {
+      return 'aspect-video max-w-4xl w-full';
+    }
+    if (aspectRatio === '9:16') {
+      return 'aspect-[9/16] max-w-sm w-full';
+    }
+    return 'aspect-square max-w-md w-full';
   };
 
-  const karaokeWords = getKaraokeWords();
+  const handleDownload = async () => {
+    onSave4K();
+    await downloadImageDirectly(displayImageUrl, `${artifact.title || 'noa-visual-master'}.png`);
+  };
+
+  const handleCopyLinkWithFeedback = () => {
+    onCopyLink();
+    setIsCopied(true);
+    setTimeout(() => setIsCopied(false), 2000);
+  };
 
   return (
     <div 
-      className="w-full max-w-5xl mx-auto flex flex-col items-center justify-center relative group select-none animate-fadeIn"
+      className="w-full max-w-5xl mx-auto flex flex-col items-center justify-center relative group select-none animate-fadeIn pb-4"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
@@ -94,13 +95,14 @@ export const MediaArtifactStage: React.FC<MediaArtifactStageProps> = ({
       {/* 1. 상단 미니멀 컨트롤 바: 비율 원클릭 스위처 & 쇼츠 세이프존 토글 */}
       {/* ======================================================================= */}
       <div className="w-full flex items-center justify-between pb-3 px-1 text-xs">
-        {/* 비율 원클릭 스위처 */}
+        
+        {/* 비율 원클릭 스위처 (16:9 / 9:16 / 1:1 물리 전환) */}
         <div className="flex items-center gap-1 p-1 rounded-2xl bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 shadow-2xs">
           <button
             onClick={() => onAspectRatioChange('16:9')}
-            className={`px-3 py-1 rounded-xl font-semibold transition cursor-pointer ${
+            className={`px-3 py-1.5 rounded-xl font-semibold transition-all cursor-pointer ${
               aspectRatio === '16:9'
-                ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 shadow-xs'
+                ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 shadow-xs scale-102'
                 : 'text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200'
             }`}
           >
@@ -109,9 +111,9 @@ export const MediaArtifactStage: React.FC<MediaArtifactStageProps> = ({
 
           <button
             onClick={() => onAspectRatioChange('9:16')}
-            className={`px-3 py-1 rounded-xl font-semibold transition cursor-pointer ${
+            className={`px-3 py-1.5 rounded-xl font-semibold transition-all cursor-pointer ${
               aspectRatio === '9:16'
-                ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 shadow-xs'
+                ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 shadow-xs scale-102'
                 : 'text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200'
             }`}
           >
@@ -120,9 +122,9 @@ export const MediaArtifactStage: React.FC<MediaArtifactStageProps> = ({
 
           <button
             onClick={() => onAspectRatioChange('1:1')}
-            className={`px-3 py-1 rounded-xl font-semibold transition cursor-pointer ${
+            className={`px-3 py-1.5 rounded-xl font-semibold transition-all cursor-pointer ${
               aspectRatio === '1:1'
-                ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 shadow-xs'
+                ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 shadow-xs scale-102'
                 : 'text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200'
             }`}
           >
@@ -130,7 +132,7 @@ export const MediaArtifactStage: React.FC<MediaArtifactStageProps> = ({
           </button>
         </div>
 
-        {/* 9:16 모드일 때 세이프존 가이드 토글 스위치 */}
+        {/* 9:16 모드 진입 시 세이프존 가이드 토글 스위치 및 서명 배지 */}
         <div className="flex items-center gap-2">
           {aspectRatio === '9:16' && (
             <button
@@ -146,25 +148,18 @@ export const MediaArtifactStage: React.FC<MediaArtifactStageProps> = ({
             </button>
           )}
 
-          {/* VPO 또는 FaceID 서명 뱃지 */}
           <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-zinc-100 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700/80 text-[11px] font-mono text-zinc-600 dark:text-zinc-300">
             <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" strokeWidth={1.5} />
-            <span>FaceID Lock 99.4%</span>
+            <span>C2PA SynthID 서명 완료</span>
           </div>
         </div>
       </div>
 
       {/* ======================================================================= */}
-      {/* 2. 대형 캔버스 뷰어 컨테이너 (호버 시 플로팅 알약 노출) */}
+      {/* 2. 대형 캔버스 뷰어 컨테이너 (비율 물리 바인딩 & 호버 시 플로팅 알약) */}
       {/* ======================================================================= */}
       <div 
-        className={`w-full bg-zinc-950 rounded-3xl border border-slate-200 dark:border-zinc-800 shadow-2xl relative overflow-hidden flex flex-col justify-between transition-all duration-300 ${
-          aspectRatio === '16:9' 
-            ? 'aspect-video max-w-5xl' 
-            : aspectRatio === '9:16' 
-              ? 'w-[320px] sm:w-[360px] h-[580px] sm:h-[640px]' 
-              : 'aspect-square max-w-xl'
-        }`}
+        className={`${getAspectContainerClass()} bg-zinc-950 rounded-3xl border border-slate-200 dark:border-zinc-800 shadow-2xl relative overflow-hidden flex flex-col justify-between transition-all duration-300 ease-out`}
       >
         {/* ------------------------------------------------------------------- */}
         {/* 마우스 호버(Hover) 시에만 나타나는 상단 플로팅 알약 UI */}
@@ -175,21 +170,25 @@ export const MediaArtifactStage: React.FC<MediaArtifactStageProps> = ({
           }`}
         >
           <button
-            onClick={onSave4K}
+            onClick={handleDownload}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold text-zinc-800 dark:text-zinc-200 hover:bg-slate-100 dark:hover:bg-zinc-800 transition cursor-pointer"
-            title="4K 무손실 내보내기"
+            title="고화질 저장"
           >
             <Download className="w-3.5 h-3.5 text-zinc-500" strokeWidth={1.5} />
-            <span>4K 무손실 내보내기</span>
+            <span>고화질 저장</span>
           </button>
 
           <button
-            onClick={onCopyLink}
+            onClick={handleCopyLinkWithFeedback}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold text-zinc-800 dark:text-zinc-200 hover:bg-slate-100 dark:hover:bg-zinc-800 transition cursor-pointer"
-            title="공유"
+            title="링크 복사"
           >
-            <Share2 className="w-3.5 h-3.5 text-zinc-500" strokeWidth={1.5} />
-            <span>공유</span>
+            {isCopied ? (
+              <Check className="w-3.5 h-3.5 text-emerald-500" strokeWidth={1.5} />
+            ) : (
+              <LinkIcon className="w-3.5 h-3.5 text-zinc-500" strokeWidth={1.5} />
+            )}
+            <span>{isCopied ? '복사됨' : '링크 복사'}</span>
           </button>
 
           <button
@@ -203,154 +202,98 @@ export const MediaArtifactStage: React.FC<MediaArtifactStageProps> = ({
         </div>
 
         {/* ------------------------------------------------------------------- */}
-        {/* 메인 캔버스 렌더링 화면 (비디오/3D/MV 실시간 연출 시각화) */}
+        {/* 실제 고화질 캔버스 미디어 렌더러 (실사 이미지 안착) */}
         {/* ------------------------------------------------------------------- */}
-        <div className="absolute inset-0 bg-gradient-to-tr from-zinc-950 via-zinc-900 to-zinc-800 flex items-center justify-center p-6">
-          <div className="text-center space-y-3 max-w-md">
-            <div className="w-16 h-16 rounded-full bg-white/10 mx-auto flex items-center justify-center backdrop-blur-md border border-white/20">
-              {artifact.domain === 'audio' ? (
-                <Music className="w-8 h-8 text-white/90" strokeWidth={1.5} />
-              ) : artifact.domain === 'visual' ? (
-                <ImageIcon className="w-8 h-8 text-white/90" strokeWidth={1.5} />
-              ) : (
-                <Film className="w-8 h-8 text-white/90" strokeWidth={1.5} />
-              )}
-            </div>
-
-            <div className="space-y-1">
-              <h3 className="text-base sm:text-lg font-bold text-white tracking-tight">
-                {artifact.title}
-              </h3>
-              <p className="text-xs text-zinc-400 font-mono">
-                {vpoData?.technicalSpecs.engineOrCamera || 'Unreal Engine 5.5 Octane Render • 8K UHD'}
-              </p>
-              {mvData?.groundingRelighting && (
-                <span className="inline-block mt-1 px-2.5 py-0.5 rounded-full text-[10px] font-medium bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                  {mvData.groundingRelighting.sourceAttribution}
-                </span>
-              )}
-            </div>
-          </div>
+        <div className="absolute inset-0 bg-zinc-950 flex items-center justify-center overflow-hidden">
+          <img 
+            src={displayImageUrl} 
+            alt={artifact.title}
+            className="w-full h-full object-cover transition-transform duration-700 ease-out hover:scale-103"
+            loading="eager"
+          />
+          {/* 부드러운 하단 그라디언트 비네팅 */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent pointer-events-none" />
         </div>
 
         {/* ------------------------------------------------------------------- */}
         {/* 9:16 모바일 쇼츠 세이프존(Safe Zone) 마스크 가이드 */}
-        {/* 우측 버튼 영역(72px)과 하단 제목 영역(180px)을 반투명 점선으로 표시 */}
         {/* ------------------------------------------------------------------- */}
         {aspectRatio === '9:16' && showSafeZone && (
-          <div className="absolute inset-0 pointer-events-none z-20 flex flex-col justify-between p-3">
-            {/* 상단 헤더 세이프존 */}
-            <div className="border border-dashed border-amber-400/40 rounded-lg p-1.5 flex justify-between items-center bg-amber-400/5">
-              <span className="text-[9px] font-mono text-amber-300">쇼츠 상단 헤더 영역</span>
-              <span className="text-[9px] font-mono text-amber-300">검색 / 카메라</span>
+          <div className="absolute inset-0 pointer-events-none z-20 flex flex-col justify-between p-3.5">
+            {/* 상단 헤더 영역 마스크 */}
+            <div className="border border-dashed border-amber-400/50 rounded-xl p-1.5 flex justify-between items-center bg-black/30 backdrop-blur-2xs">
+              <span className="text-[9px] font-mono text-amber-300 font-semibold">쇼츠 상단 헤더 영역</span>
+              <span className="text-[9px] font-mono text-amber-300">검색 / 메뉴</span>
             </div>
 
-            {/* 중간 우측 버튼 영역 (72px 너비 마스크) */}
-            <div className="self-end w-[72px] h-[220px] border border-dashed border-amber-400/40 rounded-lg p-1 flex flex-col justify-around items-center bg-amber-400/5 my-auto">
+            {/* 우측 72px 버튼 세이프존 마스크 */}
+            <div className="self-end w-[72px] h-[200px] border border-dashed border-amber-400/50 rounded-xl p-1 flex flex-col justify-around items-center bg-black/30 backdrop-blur-2xs my-auto">
               <span className="text-[8px] font-mono text-amber-300">좋아요</span>
               <span className="text-[8px] font-mono text-amber-300">댓글</span>
               <span className="text-[8px] font-mono text-amber-300">공유</span>
               <span className="text-[8px] font-mono text-amber-300">리믹스</span>
-              <span className="text-[8px] font-mono text-amber-300">사운드</span>
             </div>
 
-            {/* 하단 제목/캡션 영역 (180px 높이 마스크) */}
-            <div className="w-full h-[140px] border border-dashed border-amber-400/40 rounded-lg p-2 flex flex-col justify-between bg-amber-400/5">
-              <span className="text-[9px] font-mono text-amber-300">
-                하단 세이프존 마스크 (제목/채널/사운드명 180px)
+            {/* 하단 180px 제목/사운드 세이프존 마스크 */}
+            <div className="w-full h-[120px] border border-dashed border-amber-400/50 rounded-xl p-2 flex flex-col justify-between bg-black/30 backdrop-blur-2xs">
+              <span className="text-[9px] font-mono text-amber-300 font-semibold">
+                하단 세이프존 마스크 (제목/사운드 180px)
               </span>
-              <span className="text-[8px] font-mono text-zinc-400 text-right">
-                ※ 자막 및 피사체는 이 상단에 배치 권장
+              <span className="text-[8px] font-mono text-zinc-300 text-right">
+                ※ 중요 자막 및 피사체는 이 상단 배치 권장
               </span>
             </div>
           </div>
         )}
 
         {/* ------------------------------------------------------------------- */}
-        {/* 키네틱 가라오케 자막 (Karaoke Subtitle) 오버레이 */}
+        {/* 캔버스 하단 단정하고 우아한 프롬프트 메타데이터 뱃지 바 */}
         {/* ------------------------------------------------------------------- */}
-        <div className="relative z-30 px-6 pb-2 text-center">
-          <div className="inline-flex flex-wrap justify-center gap-1.5 bg-black/60 backdrop-blur-md px-4 py-2 rounded-2xl border border-white/10 shadow-lg">
-            {karaokeWords.map((item, idx) => (
-              <span
-                key={idx}
-                className={`text-sm sm:text-base font-bold transition-all duration-150 ${
-                  item.isCurrent
-                    ? 'text-amber-300 scale-110 drop-shadow-[0_0_12px_rgba(252,211,77,0.8)]'
-                    : item.isHighlighted
-                      ? 'text-white'
-                      : 'text-zinc-400 opacity-60'
-                }`}
-              >
-                {item.text}
-              </span>
-            ))}
-          </div>
-        </div>
+        <div className="relative z-30 p-4 sm:p-5 flex flex-col gap-2 mt-auto">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm sm:text-base font-bold text-white drop-shadow-md tracking-tight flex items-center gap-2">
+              <Camera className="w-4 h-4 text-zinc-300" strokeWidth={1.5} />
+              <span>{artifact.title || visualInfo.title}</span>
+            </h3>
 
-        {/* ------------------------------------------------------------------- */}
-        {/* 3. 하단 비트 싱크 MV 타임라인 컨트롤러 & 비트 드롭 마커 */}
-        {/* ------------------------------------------------------------------- */}
-        <div className="relative z-30 p-5 bg-gradient-to-t from-black/95 via-black/60 to-transparent space-y-2.5">
-          {/* 현재 씬 및 카메라 모션 안내 */}
-          <div className="flex items-center justify-between text-xs text-zinc-300">
-            <span className="font-semibold text-white">
-              {currentScene?.shotType || 'Scene 1: Intro Close-up'}
-            </span>
-            <span className="font-mono text-[11px] text-zinc-400">
-              {currentTime.toFixed(1)}s / {totalDuration}s
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-black/50 text-zinc-300 backdrop-blur-md border border-white/10">
+              {aspectRatio} • 8K Master
             </span>
           </div>
 
-          {/* 재생 시크바 & 비트 드롭 마커 (Beat Marker: 0s, 4s, 12s, 16s) */}
-          <div className="relative w-full h-3 flex items-center group/timeline cursor-pointer">
-            {/* 기본 트랙 */}
-            <div className="w-full h-1.5 bg-white/20 rounded-full overflow-hidden relative">
-              <div 
-                className="h-full bg-white rounded-full transition-all duration-100"
-                style={{ width: `${(currentTime / totalDuration) * 100}%` }}
-              />
-            </div>
-
-            {/* 비트 드롭 마커 핀 포인트 시각화 */}
-            {(mvData?.beatMarkers || [0, 4, 12, 16]).map((marker, mIdx) => {
-              const posPercent = (marker / totalDuration) * 100;
-              return (
-                <div
-                  key={mIdx}
-                  className="absolute top-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.9)] z-10"
-                  style={{ left: `${posPercent}%` }}
-                  title={`Beat Drop: ${marker}s`}
-                />
-              );
-            })}
+          {/* VPO 메타데이터 뱃지 */}
+          <div className="flex flex-wrap items-center gap-1.5 text-[10px] font-mono text-zinc-300">
+            <span className="px-2 py-0.5 rounded bg-black/60 backdrop-blur-md border border-white/10">
+              {vpoData?.technicalSpecs.engineOrCamera || visualInfo.cameraSpec}
+            </span>
+            <span className="px-2 py-0.5 rounded bg-black/60 backdrop-blur-md border border-white/10">
+              {vpoData?.technicalSpecs.lighting || visualInfo.lightingSpec}
+            </span>
+            <span className="px-2 py-0.5 rounded bg-black/60 backdrop-blur-md border border-white/10 text-amber-300">
+              {vpoData?.technicalSpecs.colorGrade || visualInfo.colorGrade}
+            </span>
           </div>
 
-          {/* 재생 컨트롤 버튼 및 씬 세부 정보 */}
-          <div className="flex items-center justify-between pt-1">
-            <div className="flex items-center gap-2">
+          {/* 비디오 모드일 때만 재생 바 시각화 */}
+          {isVideoMode && mvData && (
+            <div className="pt-2 border-t border-white/10 flex items-center gap-3">
               <button
                 onClick={() => setIsPlaying(!isPlaying)}
                 className="p-1.5 rounded-full bg-white/20 hover:bg-white/30 text-white transition cursor-pointer"
               >
-                {isPlaying ? (
-                  <Pause className="w-4 h-4" strokeWidth={1.5} />
-                ) : (
-                  <Play className="w-4 h-4 ml-0.5" strokeWidth={1.5} />
-                )}
+                {isPlaying ? <Pause className="w-3.5 h-3.5" strokeWidth={1.5} /> : <Play className="w-3.5 h-3.5" strokeWidth={1.5} />}
               </button>
-
-              <span className="text-[11px] text-zinc-300 truncate max-w-xs">
-                {currentScene?.cameraMotion || 'Cinematic Dolly Camera Rig'}
+              <div className="flex-1 h-1 bg-white/20 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-white rounded-full transition-all duration-100"
+                  style={{ width: `${(currentTime / totalDuration) * 100}%` }}
+                />
+              </div>
+              <span className="text-[10px] font-mono text-zinc-300">
+                {currentTime.toFixed(1)}s / {totalDuration}s
               </span>
             </div>
-
-            <div className="flex items-center gap-2 font-mono text-[10px] text-zinc-400">
-              <span>BPM {mvData?.bpm || 120}</span>
-              <span>•</span>
-              <span>4K 60FPS</span>
-            </div>
-          </div>
+          )}
         </div>
 
       </div>
