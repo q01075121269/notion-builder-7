@@ -255,6 +255,17 @@ export const OfficeStudioContainer: React.FC = () => {
     showToast(`'${source.title}' 지식 창고에 적재 완료`, 'success');
   };
 
+  const handleAddSources = (newSources: OfficeSource[]) => {
+    setProjects(prev => prev.map(p => {
+      if (p.id === activeProjectId) {
+        return { ...p, sources: [...newSources, ...p.sources] };
+      }
+      return p;
+    }));
+    const totalTokens = newSources.reduce((acc, s) => acc + s.tokenCount, 0);
+    showToast(`${newSources.length}개 소스가 지식 창고에 일괄 적재되었습니다. (${totalTokens.toLocaleString()} tokens)`, 'success');
+  };
+
   const handleDeleteSource = (srcId: string) => {
     setProjects(prev => prev.map(p => {
       if (p.id === activeProjectId) {
@@ -484,6 +495,7 @@ export const OfficeStudioContainer: React.FC = () => {
               sources={activeProject.sources}
               onToggleSelectSource={handleToggleSelectSource}
               onAddSource={handleAddSource}
+              onAddSources={handleAddSources}
               onDeleteSource={handleDeleteSource}
               onOpenTemplateInjector={handleOpenTemplateInjector}
               onCollapse={() => setIsCollapsed(true)}

@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import type { OfficeSource, OfficeSourceType } from '../../types/office';
+import { MultiSourceResearchModal } from './MultiSourceResearchModal';
 import { 
   FileUp, 
   Globe, 
@@ -9,18 +10,19 @@ import {
   Square, 
   Trash2, 
   FileText, 
-  Loader2,
   Database,
   Eye,
   X,
   Building2,
-  PanelLeftClose
+  PanelLeftClose,
+  Search
 } from 'lucide-react';
 
 interface KnowledgeDockProps {
   sources: OfficeSource[];
   onToggleSelectSource: (sourceId: string) => void;
   onAddSource: (source: OfficeSource) => void;
+  onAddSources?: (sources: OfficeSource[]) => void;
   onDeleteSource: (sourceId: string) => void;
   onSelectSourcePreview?: (source: OfficeSource) => void;
   onOpenTemplateInjector?: (source?: OfficeSource) => void;
@@ -31,6 +33,7 @@ export const KnowledgeDock: React.FC<KnowledgeDockProps> = ({
   sources,
   onToggleSelectSource,
   onAddSource,
+  onAddSources,
   onDeleteSource,
   onSelectSourcePreview: _onSelectSourcePreview,
   onOpenTemplateInjector,
@@ -41,13 +44,14 @@ export const KnowledgeDock: React.FC<KnowledgeDockProps> = ({
   const [highlightedSourceId, setHighlightedSourceId] = useState<string | null>(null);
   const [urlInput, setUrlInput] = useState('');
   const [researchKeyword, setResearchKeyword] = useState('');
-  const [isResearching, setIsResearching] = useState(false);
-  const [researchStep, setResearchStep] = useState('');
   const [isRecording, setIsRecording] = useState(false);
   const [voiceText, setVoiceText] = useState('');
   const [previewSource, setPreviewSource] = useState<OfficeSource | null>(null);
+  const [isMultiModalOpen, setIsMultiModalOpen] = useState(false);
+  const [isResearchMicActive, setIsResearchMicActive] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const researchRecognitionRef = useRef<any>(null);
 
   // 팩트 출처 클릭 시 해당 소스 카드로 스크롤 포커스 & 하이라이트 애니메이션
   useEffect(() => {
@@ -172,35 +176,82 @@ export const KnowledgeDock: React.FC<KnowledgeDockProps> = ({
     }
   };
 
-  // 젠스파크형 자율 심층 리서치 (Multi-step Web Investigation Simulation)
-  const handleRunDeepResearch = async () => {
-    if (!researchKeyword.trim()) return;
-    setIsResearching(true);
+  // 리서치 입력창 음성(STT) 마이크 토글
+  const handleToggleResearchVoice = () => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert('브라우저에서 Web Speech API(음성 인식)를 지원하지 않습니다.');
+      return;
+    }
 
-    setResearchStep('1. 구글 및 글로벌 학술/산업 DB 다각도 검색 쿼리 발산 중...');
-    await new Promise(r => setTimeout(r, 600));
+    if (!isResearchMicActive) {
+      try {
+        const recognition = new SpeechRecognition();
+        recognition.lang = 'ko-KR';
+        recognition.continuous = true;
+        recognition.interimResults = false;
 
-    setResearchStep('2. 상위 12개 전문 보고서 및 보도자료 크롤링 및 팩트 교차 검증 중...');
-    await new Promise(r => setTimeout(r, 600));
+        recognition.onstart = () => {
+          setIsResearchMicActive(true);
+        };
 
-    setResearchStep('3. 핵심 수치 및 출처 메타데이터 추출 완료!');
-    await new Promise(r => setTimeout(r, 400));
+        recognition.onresult = (event: any) => {
+          let finalChunk = '';
+          for (let i = event.resultIndex; i < event.results.length; i++) {
+            if (event.results[i].isFinal) {
+              finalChunk += event.results[i][0].transcript.trim() + ' ';
+            }
+          }
+          if (finalChunk.trim()) {
+            setResearchKeyword(prev => {
+              const p = prev.trim();
+              const n = finalChunk.trim();
+              if (!p) return n;
+              if (p.endsWith(n)) return p;
+              return `${p} ${n}`;
+            });
+          }
+        };
 
-    const newSource: OfficeSource = {
-      id: `src-deep-${Date.now()}`,
-      title: `[자율 심층 리서치] ${researchKeyword}`,
-      type: 'deep_research',
-      tokenCount: 16500,
-      createdAt: new Date().toISOString().slice(0, 16).replace('T', ' '),
-      isSelected: true,
-      summary: `젠스파크형 자율 에이전트 교차 검증 리서치 리포트 (${researchKeyword})`,
-      content: `[젠스파크형 심층 리서치 분석 결과 - 키워드: ${researchKeyword}]\n1. 시장 전망: 2026년 글로벌 오피스 시장의 생성형 AI 도입률은 연평균 48.2% 성장 중.\n2. 핵심 지표: 기안 결재 소요 시간 78% 단축, 예산 집행 오차율 0.2% 미만 유지.\n3. 규제 준수: 공공/금융 가이드라인에 따른 데이터 무결성 보증 필수.`
-    };
+        recognition.onerror = () => {
+          setIsResearchMicActive(false);
+        };
 
-    onAddSource(newSource);
-    setIsResearching(false);
-    setResearchKeyword('');
-    setActiveInputTab('none');
+        recognition.onend = () => {
+          setIsResearchMicActive(false);
+        };
+
+        researchRecognitionRef.current = recognition;
+        recognition.start();
+      } catch {
+        setIsResearchMicActive(false);
+      }
+    } else {
+      if (researchRecognitionRef.current) {
+        try { researchRecognitionRef.current.stop(); } catch {}
+        researchRecognitionRef.current = null;
+      }
+      setIsResearchMicActive(false);
+    }
+  };
+
+  // 다중 웹/문서 소스 일괄 탐색 모달 오픈
+  const handleOpenMultiSourceModal = () => {
+    if (researchRecognitionRef.current) {
+      try { researchRecognitionRef.current.stop(); } catch {}
+      researchRecognitionRef.current = null;
+    }
+    setIsResearchMicActive(false);
+    setIsMultiModalOpen(true);
+  };
+
+  // 일괄 소스 적재 핸들러
+  const handleBatchImportSources = (newSources: OfficeSource[]) => {
+    if (onAddSources) {
+      onAddSources(newSources);
+    } else {
+      newSources.forEach(s => onAddSource(s));
+    }
   };
 
   const getSourceIcon = (type: OfficeSourceType) => {
@@ -225,8 +276,8 @@ export const KnowledgeDock: React.FC<KnowledgeDockProps> = ({
             </h2>
           </div>
           <div className="flex items-center space-x-1 shrink-0">
-            <span className="shrink-0 whitespace-nowrap px-2 py-0.5 text-xs font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200/60 rounded-full dark:bg-indigo-950 dark:text-indigo-300 dark:border-indigo-800">
-              {selectedSources.length}/{sources.length}건 활성
+            <span className="shrink-0 whitespace-nowrap px-2.5 py-0.5 text-xs font-bold text-indigo-700 bg-indigo-50 border border-indigo-200/80 rounded-full dark:bg-indigo-950 dark:text-indigo-300 dark:border-indigo-800 shadow-2xs">
+              {selectedSources.length}/{sources.length}건 활성 {totalTokens > 0 ? `(${totalTokens.toLocaleString()} tokens)` : ''}
             </span>
             {onCollapse && (
               <button
@@ -298,39 +349,45 @@ export const KnowledgeDock: React.FC<KnowledgeDockProps> = ({
           </button>
         </div>
 
-        {/* 젠스파크형 자율 심층 리서치 인풋 바 */}
+        {/* 지식 창고 리서치 입력창 & 마이크 & 다중 웹/문서 소스 일괄 탐색 버튼 */}
         <div className="relative">
           <div className="flex items-center rounded-xl bg-white dark:bg-zinc-800 border border-purple-300 dark:border-purple-800 shadow-xs overflow-hidden focus-within:ring-2 focus-within:ring-purple-400">
-            <Sparkles className="w-4 h-4 text-purple-600 dark:text-purple-400 ml-2.5 shrink-0 animate-pulse" />
+            <Search className="w-4 h-4 text-purple-600 dark:text-purple-400 ml-2.5 shrink-0" />
             <input
               type="text"
               value={researchKeyword}
               onChange={(e) => setResearchKeyword(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter') handleRunDeepResearch();
+                if (e.key === 'Enter') handleOpenMultiSourceModal();
               }}
-              placeholder="젠스파크형 자율 심층 리서치..."
+              placeholder='"스마트 시설물 유지관리 및 AI 에이전트 행정 자동화"...'
               className="w-full py-2 px-2 text-xs bg-transparent outline-none text-slate-800 dark:text-zinc-100 placeholder-slate-400 dark:placeholder-zinc-500 font-medium"
             />
+            {/* 음성(STT) 마이크 토글 버튼 */}
             <button
-              onClick={handleRunDeepResearch}
-              disabled={isResearching || !researchKeyword.trim()}
-              className="px-2.5 py-1.5 mr-1 rounded-lg bg-purple-600 hover:bg-purple-500 disabled:opacity-40 text-white text-[11px] font-bold transition cursor-pointer shrink-0"
+              type="button"
+              onClick={handleToggleResearchVoice}
+              className={`p-1.5 mr-1 rounded-lg transition cursor-pointer shrink-0 ${
+                isResearchMicActive
+                  ? 'bg-rose-500 text-white animate-pulse shadow-xs'
+                  : 'text-slate-400 hover:text-purple-600 dark:hover:text-purple-300 hover:bg-slate-100 dark:hover:bg-zinc-700'
+              }`}
+              title={isResearchMicActive ? '음성 듣는 중... 클릭하여 중지' : '음성(STT)으로 리서치 주제 말하기'}
             >
-              {isResearching ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : '조사'}
+              <Mic className="w-3.5 h-3.5" />
+            </button>
+            {/* [조사] 버튼 */}
+            <button
+              type="button"
+              onClick={handleOpenMultiSourceModal}
+              className="px-2.5 py-1.5 mr-1 rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-[11px] font-bold transition cursor-pointer shrink-0 shadow-xs flex items-center space-x-1"
+              title="다중 웹/문서 소스 일괄 탐색 모달 열기"
+            >
+              <Sparkles className="w-3 h-3" />
+              <span>조사</span>
             </button>
           </div>
-
-          {/* 심층 리서치 진행 알림 */}
-          {isResearching && (
-            <div className="mt-2 p-2 rounded-xl bg-purple-50 dark:bg-purple-950/80 border border-purple-200 dark:border-purple-800 text-[11px] text-purple-800 dark:text-purple-200 font-medium space-y-1 animate-fadeIn">
-              <div className="flex items-center space-x-1.5 font-bold">
-                <Loader2 className="w-3.5 h-3.5 animate-spin text-purple-600 dark:text-purple-400" />
-                <span>자율 에이전트 리서치 수행 중</span>
-              </div>
-              <p className="text-[10px] text-purple-600 dark:text-purple-300 pl-5">{researchStep}</p>
-            </div>
-          )}
+        </div>
 
           {/* 사내 서식 스캔 & 캔버스 복제 주입 퀵 버튼 */}
           <button
@@ -342,7 +399,6 @@ export const KnowledgeDock: React.FC<KnowledgeDockProps> = ({
             <Building2 className="w-3.5 h-3.5 text-slate-500" />
             <span>사내 고유 서식 스캔 & 캔버스 복제 주입</span>
           </button>
-        </div>
 
         {/* URL 인라인 입력창 */}
         {activeInputTab === 'url' && (
@@ -534,6 +590,14 @@ export const KnowledgeDock: React.FC<KnowledgeDockProps> = ({
           </div>
         </div>
       )}
+
+      {/* 🌐 다중 웹/문서 소스 일괄 탐색 모달 (NotebookLM & Genspark 스타일) */}
+      <MultiSourceResearchModal
+        isOpen={isMultiModalOpen}
+        onClose={() => setIsMultiModalOpen(false)}
+        query={researchKeyword || '스마트 시설물 유지관리 및 AI 에이전트 행정 자동화'}
+        onImportSources={handleBatchImportSources}
+      />
 
     </div>
   );
