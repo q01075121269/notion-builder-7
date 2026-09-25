@@ -1,5 +1,5 @@
 // src/components/media/MediaLabContainer.tsx
-// 제4챕터 AI 미디어 랩(AI Media Lab 2026) 1단계 백지 신축 - 제로 메뉴 캔버스 & 노아 총괄 PD 인터랙션 조종석
+// 제4챕터 AI 미디어 랩(AI Media Lab 2026) 2단계 - 초격차 비주얼 & 옴니모달 영상 엔진 (VPO·MV 합성·세이프존)
 
 import React, { useState, useEffect } from 'react';
 import { 
@@ -9,14 +9,6 @@ import {
   User,
   Music, 
   Image as ImageIcon, 
-  Download, 
-  Link as LinkIcon, 
-  Mail, 
-  Cloud, 
-  Zap, 
-  Play, 
-  Pause, 
-  Volume2, 
   ShieldCheck, 
   Sparkles,
   History,
@@ -29,6 +21,7 @@ import {
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { NoaMediaDock } from './NoaMediaDock';
+import { MediaArtifactStage } from './MediaArtifactStage';
 import type { 
   MediaDomain, 
   FSMState, 
@@ -46,6 +39,14 @@ import {
   createCheckpoint,
   generateWaveformData
 } from '../../services/noaOrchestrator';
+import { optimizePrompt } from '../../lib/media/vpo';
+import type { VPOOptimizationResult } from '../../lib/media/vpo';
+import { 
+  generateBeatSyncMV, 
+  applySearchGroundedRelighting, 
+  applySubjectSwapWithCompositionLock 
+} from '../../lib/media/videoPipeline';
+import type { MVPipelineResult } from '../../lib/media/videoPipeline';
 import { saveMediaItem, getRecentMediaItems, deleteMediaItem } from '../../lib/mediaStorage';
 import type { MediaItem } from '../../lib/mediaStorage';
 
@@ -65,26 +66,16 @@ export const MediaLabContainer: React.FC = () => {
   const [artifact, setArtifact] = useState<MediaArtifact | null>(null);
   const [history, setHistory] = useState<MediaCheckpoint[]>([]);
 
+  // VPO 및 MV 파이프라인 엔진 데이터 상태
+  const [vpoResult, setVpoResult] = useState<VPOOptimizationResult | null>(null);
+  const [mvPipelineResult, setMvPipelineResult] = useState<MVPipelineResult | null>(null);
+
   // 대화 스트림: 사용자 원문 & 노아 피드백 메시지 (박스 없이 시원한 텍스트 형태)
   const [userPromptText, setUserPromptText] = useState<string>('');
   const [noaResponseText, setNoaResponseText] = useState<string>('');
 
-  // 숏폼 비디오 전용 상태
-  const [showSafeZone, setShowSafeZone] = useState<boolean>(true);
-  const [isPlayingVideo, setIsPlayingVideo] = useState<boolean>(true);
-  const [videoProgress, setVideoProgress] = useState<number>(45);
-
-  // 오디오 전용 상태
-  const [isPlayingAudio, setIsPlayingAudio] = useState<boolean>(false);
-  const [audioVolume, setAudioVolume] = useState<number>(80);
-  const [audioTime, setAudioTime] = useState<number>(14);
-  const [waveformBars, setWaveformBars] = useState<number[]>([]);
-
   // 비주얼 전용 상태 (비율 전환 16:9 / 9:16 / 1:1)
   const [visualRatio, setVisualRatio] = useState<'16:9' | '9:16' | '1:1'>('16:9');
-
-  // 호버 알약 액션 바 표시 상태
-  const [isHoveredArtifact, setIsHoveredArtifact] = useState<boolean>(false);
 
   // 최근 IndexedDB 캐시 에셋 로드
   const loadCachedAssets = async () => {
@@ -107,37 +98,13 @@ export const MediaLabContainer: React.FC = () => {
     setCurrentDomain('video');
     setCurrentStepIndex(0);
     setArtifact(null);
+    setVpoResult(null);
+    setMvPipelineResult(null);
     setHistory([]);
     setUserPromptText('');
     setNoaResponseText('');
-    setIsPlayingAudio(false);
-    setIsPlayingVideo(true);
     showToast('새로운 미디어 세션을 백지 캔버스에서 시작합니다.', 'info');
   };
-
-  // 오디오 파형 재생 애니메이션 시뮬레이션
-  useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (isPlayingAudio) {
-      interval = setInterval(() => {
-        setAudioTime((prev) => (prev >= 30 ? 0 : prev + 1));
-        setWaveformBars(generateWaveformData(48));
-      }, 500);
-    }
-    return () => clearInterval(interval);
-  }, [isPlayingAudio]);
-
-  // 비디오 재생 프로그레스 시뮬레이션
-  useEffect(() => {
-    let videoInterval: NodeJS.Timeout;
-    if (isPlayingVideo && artifact?.domain === 'video') {
-      videoInterval = setInterval(() => {
-        setVideoProgress((prev) => (prev >= 100 ? 0 : prev + 2));
-      }, 200);
-    }
-    return () => clearInterval(videoInterval);
-  }, [isPlayingVideo, artifact?.domain]);
-
 
   // 인터뷰 단계 스킵 처리
   const handleSkipStep = () => {
@@ -150,23 +117,46 @@ export const MediaLabContainer: React.FC = () => {
     }
   };
 
-  // 아티팩트 생성 엔진 트리거
+  // 아티팩트 생성 엔진 트리거 (VPO 및 MV 엔진 통합)
   const triggerArtifactGeneration = (domain: MediaDomain, promptSummary: string) => {
     setFsmState('GENERATING');
     setUserPromptText(promptSummary);
-    setNoaResponseText('인물 락 및 시네마틱 카메라 리그를 연산하며 고해상도 초안을 렌더링 중입니다...');
+
+    const is3D = promptSummary.toLowerCase().includes('3d') || promptSummary.toLowerCase().includes('헬리콥터');
+    const isMV = promptSummary.toLowerCase().includes('뮤직비디오') || promptSummary.toLowerCase().includes('mv') || domain === 'video';
+
+    // 1) VPO 프롬프트 최적화 실행
+    const vpo = optimizePrompt(promptSummary, domain, is3D ? '3d' : isMV ? 'cinematic' : undefined);
+    setVpoResult(vpo);
+
+    // 2) 옴니모달 MV 엔진 생성
+    const mv = generateBeatSyncMV(promptSummary, 120);
+    setMvPipelineResult(mv);
+
+    setNoaResponseText(
+      is3D 
+        ? 'VPO 렌더링 파라미터를 결합하여 3D 정밀 메커니즘 캔버스를 도출했습니다. (Unreal Engine 5.5 / Octane Render / PBR Titanium 8K)' 
+        : '비트 타임스탬프에 맞춘 3개 씬 궤적 MV를 렌더링했습니다. (Spatial FaceID 99.4% Lock & 0s/4s/12s 비트 싱크 완료)'
+    );
+
     showToast('노아 PD가 캔버스에 고해상도 아티팩트를 렌더링 중입니다...', 'info');
 
     setTimeout(() => {
       const initialArt = createInitialArtifact(domain, promptSummary, visualRatio);
+      initialArt.waveformData = generateWaveformData(48);
+      initialArt.promptHistory = [
+        {
+          userRaw: promptSummary,
+          optimizedVPO: vpo.optimizedPrompt
+        }
+      ];
+
       setArtifact(initialArt);
-      setWaveformBars(initialArt.waveformData || generateWaveformData(48));
       setHistory([createCheckpoint(initialArt)]);
       setFsmState('REFINING');
-      setNoaResponseText('요청하신 인물 락 및 시네마틱 카메라 리그를 적용한 초안입니다.');
       showToast('초안 렌더링이 완료되었습니다. 조종석에서 피드백을 지시해 주세요.', 'success');
       loadCachedAssets();
-    }, 1200);
+    }, 1100);
   };
 
   // 듀얼 트랙 대화형 오케스트레이터 입력 핸들러
@@ -192,7 +182,43 @@ export const MediaLabContainer: React.FC = () => {
       }
     }
 
-    // 3. REFINING 또는 COMPLETED 상태에서의 피드백 적용
+    // 3. 인플레이스 변환 분기: 배경 교체 (Search-Grounded Relighting)
+    if (trimmed.includes('배경') && (trimmed.includes('바꿔') || trimmed.includes('변경') || trimmed.includes('알프스'))) {
+      setUserPromptText(trimmed);
+      const bgQuery = trimmed.includes('알프스') ? '알프스 설산 빙하 파노라마' : '선셋 해변 골든아워';
+      const baseMv = mvPipelineResult || generateBeatSyncMV(artifact?.title || '미디어 아티팩트');
+      const updatedMv = applySearchGroundedRelighting(baseMv, bgQuery);
+      setMvPipelineResult(updatedMv);
+      setNoaResponseText(`Google Search Grounding 메타 소스를 바인딩하고, 피사체 누끼 분리 및 ${bgQuery} 45도 림라이트 재조명을 적용했습니다.`);
+      showToast(`배경을 "${bgQuery}"(으)로 실시간 재조명 치환했습니다.`, 'success');
+      return;
+    }
+
+    // 4. 인플레이스 변환 분기: 인물 피사체 정밀 치환 (Subject Swap with Composition Lock)
+    if ((trimmed.includes('인물') || trimmed.includes('피사체') || trimmed.includes('ceo') || trimmed.includes('사람')) && (trimmed.includes('바꿔') || trimmed.includes('치환') || trimmed.includes('변경'))) {
+      setUserPromptText(trimmed);
+      const targetSubject = trimmed.includes('ceo') || trimmed.includes('CEO') ? '40대 서양 CEO' : '20대 테크 창업가';
+      const baseMv = mvPipelineResult || generateBeatSyncMV(artifact?.title || '미디어 아티팩트');
+      const updatedMv = applySubjectSwapWithCompositionLock(baseMv, targetSubject);
+      setMvPipelineResult(updatedMv);
+      setNoaResponseText(`구도와 포즈 앵커를 99% 묶은 채, 피사체를 ${targetSubject} 속성으로 정밀 치환했습니다.`);
+      showToast(`피사체를 "${targetSubject}"(으)로 구도 락 치환했습니다.`, 'success');
+      return;
+    }
+
+    // 5. 파일 첨부 후 "뮤직비디오 만들어줘" 요청 분기
+    if (attachedFile || trimmed.includes('뮤직비디오') || trimmed.includes('mv') || trimmed.includes('MV')) {
+      triggerArtifactGeneration('video', trimmed || '비트 싱크 뮤직비디오');
+      return;
+    }
+
+    // 6. "3D 헬리콥터 만들어줘" 등 3D 모드 분기
+    if (trimmed.includes('3d') || trimmed.includes('3D') || trimmed.includes('헬리콥터')) {
+      triggerArtifactGeneration('visual', trimmed);
+      return;
+    }
+
+    // 7. REFINING 또는 COMPLETED 상태에서의 피드백 적용
     if (fsmState === 'REFINING' || fsmState === 'COMPLETED') {
       setUserPromptText(trimmed);
       if (trimmed === '최종 완성 확정' || trimmed.includes('완성')) {
@@ -210,11 +236,14 @@ export const MediaLabContainer: React.FC = () => {
       }
 
       if (artifact) {
+        const vpo = optimizePrompt(trimmed, artifact.domain);
+        setVpoResult(vpo);
+
         const updatedPromptHistory = [
           ...artifact.promptHistory,
           {
             userRaw: trimmed,
-            optimizedVPO: `[Refined Directive]: ${trimmed} with cinematic camera rig update`
+            optimizedVPO: vpo.optimizedPrompt
           }
         ];
 
@@ -234,7 +263,7 @@ export const MediaLabContainer: React.FC = () => {
       return;
     }
 
-    // 4. IDLE 상태에서의 분기 (초보자 vs 숙련자 패턴)
+    // 8. IDLE 상태에서의 분기 (초보자 vs 숙련자 패턴)
     if (fsmState === 'IDLE') {
       const detectedDomain = detectDomainFromPrompt(trimmed);
       setCurrentDomain(detectedDomain);
@@ -255,7 +284,7 @@ export const MediaLabContainer: React.FC = () => {
       return;
     }
 
-    // 5. INTERVIEWING 상태에서 질문 응답
+    // 9. INTERVIEWING 상태에서 질문 응답
     if (fsmState === 'INTERVIEWING') {
       setUserPromptText(trimmed);
       const steps = DOMAIN_INTERVIEW_STEPS[currentDomain] || DOMAIN_INTERVIEW_STEPS.video;
@@ -269,7 +298,6 @@ export const MediaLabContainer: React.FC = () => {
     }
   };
 
-
   // 도구 선택 핸들러 ([➕ 도구])
   const handleToolSelect = (toolId: string) => {
     if (toolId === 'ratio') {
@@ -277,8 +305,7 @@ export const MediaLabContainer: React.FC = () => {
       setVisualRatio(nextRatio);
       showToast(`화면 비율을 [${nextRatio}]로 전환했습니다.`, 'info');
     } else if (toolId === 'safezone') {
-      setShowSafeZone(!showSafeZone);
-      showToast(`쇼츠 UI 세이프존을 [${!showSafeZone ? 'ON' : 'OFF'}] 했습니다.`, 'info');
+      showToast('쇼츠 UI 세이프존 토글은 캔버스 상단 버튼에서 제어할 수 있습니다.', 'info');
     } else if (toolId === 'c2pa') {
       setIsDrawerOpen(true);
       setDrawerTab('c2pa');
@@ -317,19 +344,6 @@ export const MediaLabContainer: React.FC = () => {
   const handleActionCopyLink = () => {
     navigator.clipboard.writeText(window.location.href);
     showToast('미디어 아티팩트 딥링크가 클립보드에 복사되었습니다.', 'success');
-  };
-
-  // 컨텍스트 액션: 이메일 전송
-  const handleActionSendEmail = () => {
-    const subject = encodeURIComponent(`[AI Media Lab] ${artifact?.title || '미디어 아티팩트'}`);
-    const body = encodeURIComponent(`AI 미디어 랩에서 생성된 아티팩트 안내:\n\n제목: ${artifact?.title}\n도메인: ${artifact?.domain}\nC2PA 서명 인증 완료.`);
-    window.open(`mailto:?subject=${subject}&body=${body}`, '_blank');
-    showToast('이메일 클라이언트가 열립니다.', 'info');
-  };
-
-  // 컨텍스트 액션: 라이프 Hub 연동
-  const handleActionLifeSync = () => {
-    showToast('라이프 Hub 데일리 모닝 루틴 & 브리핑 카드 에셋으로 등록되었습니다.', 'success');
   };
 
   // 캐시 에셋 삭제 핸들러
@@ -441,7 +455,6 @@ export const MediaLabContainer: React.FC = () => {
         {/* 열렸을 때의 서랍 내용 */}
         {isDrawerOpen && (
           <div className="flex-1 flex flex-col overflow-y-auto p-3 space-y-4 animate-fadeIn">
-            {/* 서랍 내부 서브 탭 */}
             <div className="flex items-center gap-1 p-1 bg-slate-100 dark:bg-zinc-800 rounded-xl">
               <button
                 onClick={() => setDrawerTab('vault')}
@@ -475,7 +488,6 @@ export const MediaLabContainer: React.FC = () => {
               </button>
             </div>
 
-            {/* 탭 1: 에셋 보관함 (IndexedDB 캐시) */}
             {drawerTab === 'vault' && (
               <div className="space-y-2">
                 <div className="flex items-center justify-between text-[11px] text-zinc-500 font-medium">
@@ -533,7 +545,6 @@ export const MediaLabContainer: React.FC = () => {
               </div>
             )}
 
-            {/* 탭 2: C2PA 및 SynthID 서명 정보 */}
             {drawerTab === 'c2pa' && (
               <div className="space-y-3 text-xs text-zinc-600 dark:text-zinc-400">
                 <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 space-y-1">
@@ -552,22 +563,21 @@ export const MediaLabContainer: React.FC = () => {
                     <span className="font-semibold text-zinc-800 dark:text-zinc-200">Google SynthID</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-zinc-500">라이선스</span>
-                    <span className="font-semibold text-zinc-800 dark:text-zinc-200">CC-BY-4.0 AI Master</span>
+                    <span className="text-zinc-500">Spatial FaceID</span>
+                    <span className="font-semibold text-emerald-500">Lock 99.4%</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-zinc-500">위변조 방지 락</span>
-                    <span className="font-semibold text-emerald-500">활성화됨</span>
+                    <span className="text-zinc-500">라이선스</span>
+                    <span className="font-semibold text-zinc-800 dark:text-zinc-200">CC-BY-4.0 AI Master</span>
                   </div>
                 </div>
               </div>
             )}
 
-            {/* 탭 3: 세션 파라미터 */}
             {drawerTab === 'settings' && (
               <div className="space-y-3 text-xs">
                 <div className="space-y-1">
-                  <label className="text-zinc-500 text-[11px] font-semibold">화면 비율 프리셋</label>
+                  <label className="text-zinc-500 text-[11px] font-semibold">기본 화면 비율</label>
                   <div className="grid grid-cols-3 gap-1">
                     {(['16:9', '9:16', '1:1'] as const).map((r) => (
                       <button
@@ -584,18 +594,6 @@ export const MediaLabContainer: React.FC = () => {
                     ))}
                   </div>
                 </div>
-
-                <div className="pt-2 border-t border-slate-200 dark:border-zinc-700 space-y-1">
-                  <div className="flex items-center justify-between text-zinc-600 dark:text-zinc-400">
-                    <span>쇼츠 UI 세이프존</span>
-                    <button
-                      onClick={() => setShowSafeZone(!showSafeZone)}
-                      className="text-zinc-900 dark:text-zinc-100 font-bold hover:underline"
-                    >
-                      {showSafeZone ? '켜짐' : '꺼짐'}
-                    </button>
-                  </div>
-                </div>
               </div>
             )}
           </div>
@@ -607,11 +605,8 @@ export const MediaLabContainer: React.FC = () => {
       {/* ========================================================================= */}
       <div className="flex-1 flex flex-col h-full overflow-hidden">
         
-        {/* ======================================================================= */}
-        {/* [상단 초슬림 인디케이터]: 🎨 AI 미디어 랩 | 세션 #1        [ 🔄 새 세션 ] */}
-        {/* ======================================================================= */}
+        {/* [상단 초슬림 인디케이터] */}
         <header className="h-11 px-4 sm:px-6 border-b border-slate-200 dark:border-zinc-800 flex items-center justify-between bg-white/80 dark:bg-zinc-950/80 backdrop-blur-md shrink-0 z-20">
-          {/* 좌측: 타이틀 | 세션 번호 */}
           <div className="flex items-center space-x-2">
             <Film className="w-4 h-4 text-zinc-900 dark:text-zinc-100" strokeWidth={1.5} />
             <span className="font-bold text-xs sm:text-sm text-zinc-900 dark:text-zinc-100 tracking-tight">
@@ -629,7 +624,6 @@ export const MediaLabContainer: React.FC = () => {
             )}
           </div>
 
-          {/* 우측: 되돌리기 & [ 🔄 새 세션 ] */}
           <div className="flex items-center space-x-2">
             {history.length > 1 && (
               <button
@@ -653,13 +647,11 @@ export const MediaLabContainer: React.FC = () => {
           </div>
         </header>
 
-        {/* ======================================================================= */}
         {/* [광활한 전폭 캔버스 : 최대 1400px 이상 시원하게 확장] */}
-        {/* ======================================================================= */}
         <main className="flex-1 overflow-y-auto px-4 sm:px-8 py-6 flex flex-col items-center">
           <div className="w-full max-w-[1400px] flex-1 flex flex-col space-y-6">
             
-            {/* [대화 스트림: 사용자 원문 텍스트 - 박스 없이 시원한 텍스트] */}
+            {/* 대화 스트림: 사용자 원문 텍스트 (박스 없이 시원한 텍스트) */}
             {userPromptText && (
               <div className="space-y-1 animate-fadeIn">
                 <div className="flex items-center space-x-2 text-xs font-semibold text-zinc-500 dark:text-zinc-400">
@@ -672,7 +664,7 @@ export const MediaLabContainer: React.FC = () => {
               </div>
             )}
 
-            {/* [대화 스트림: 노아(NOA) 총괄 PD 피드백 - 박스 없이 시원한 텍스트] */}
+            {/* 대화 스트림: 노아(NOA) 총괄 PD 피드백 (박스 없이 시원한 텍스트) */}
             {noaResponseText && (
               <div className="space-y-1 animate-fadeIn">
                 <div className="flex items-center space-x-2 text-xs font-semibold text-zinc-900 dark:text-zinc-200">
@@ -719,257 +711,38 @@ export const MediaLabContainer: React.FC = () => {
               </div>
             )}
 
-            {/* GENERATING 상태 로딩 */}
+            {/* GENERATING 상태 로딩 인디케이터 */}
             {fsmState === 'GENERATING' && (
               <div className="w-full flex flex-col items-center justify-center py-16 space-y-4 animate-fadeIn">
                 <div className="w-14 h-14 rounded-2xl bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 flex items-center justify-center shadow-md animate-pulse">
                   <Film className="w-7 h-7 text-zinc-700 dark:text-zinc-300" strokeWidth={1.5} />
                 </div>
                 <p className="text-sm font-bold text-zinc-800 dark:text-zinc-200">
-                  인물 락 및 시네마틱 카메라 리그 연산 중...
+                  VPO 렌더링 파라미터 및 비트 싱크 씬 트래킹 연산 중...
                 </p>
               </div>
             )}
 
             {/* =================================================================== */}
-            {/* 🎬 [대형 라이브 비디오/이미지 캔버스 (화면을 꽉 채우는 쾌적한 뷰어)] */}
-            {/*    (마우스 호버 시에만 [💾 무손실 저장] [☁️ 노션 적재] 플로팅 알약 노출) */}
+            {/* 🎬 [고도화된 중앙 라이브 미디어 캔버스 뷰어 (MediaArtifactStage)] */}
             {/* =================================================================== */}
             {(fsmState === 'REFINING' || fsmState === 'COMPLETED') && artifact && (
-              <div 
-                className="w-full flex-1 flex flex-col items-center justify-center relative group min-h-[460px] pb-4 animate-fadeIn"
-                onMouseEnter={() => setIsHoveredArtifact(true)}
-                onMouseLeave={() => setIsHoveredArtifact(false)}
-              >
-                {/* --------------------------------------------------------------- */}
-                {/* 마우스 호버 시에만 [💾 무손실 저장] [☁️ 노션 적재] 플로팅 알약 노출 */}
-                {/* --------------------------------------------------------------- */}
-                <div 
-                  className={`absolute top-4 z-40 flex items-center gap-1.5 p-1.5 rounded-full bg-white/95 dark:bg-zinc-900/95 border border-slate-200/90 dark:border-zinc-700/90 shadow-2xl backdrop-blur-xl transition-all duration-300 ${
-                    isHoveredArtifact ? 'opacity-100 translate-y-0 pointer-events-auto' : 'opacity-0 -translate-y-2 pointer-events-none'
-                  }`}
-                >
-                  <button
-                    onClick={handleActionSave4K}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold text-zinc-800 dark:text-zinc-200 hover:bg-slate-100 dark:hover:bg-zinc-800 transition cursor-pointer"
-                    title="4K 무손실 저장"
-                  >
-                    <Download className="w-3.5 h-3.5 text-zinc-500" strokeWidth={1.5} />
-                    <span>무손실 저장</span>
-                  </button>
-
-                  <button
-                    onClick={handleActionNotionSync}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold text-zinc-800 dark:text-zinc-200 hover:bg-slate-100 dark:hover:bg-zinc-800 transition cursor-pointer"
-                    title="노션 DB 적재"
-                  >
-                    <Cloud className="w-3.5 h-3.5 text-zinc-500" strokeWidth={1.5} />
-                    <span>노션 적재</span>
-                  </button>
-
-                  <div className="w-px h-3.5 bg-zinc-200 dark:bg-zinc-700 mx-0.5" />
-
-                  <button
-                    onClick={handleActionCopyLink}
-                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-800 transition cursor-pointer"
-                    title="링크 복사"
-                  >
-                    <LinkIcon className="w-3.5 h-3.5 text-zinc-500" strokeWidth={1.5} />
-                    <span className="hidden sm:inline">링크 복사</span>
-                  </button>
-
-                  <button
-                    onClick={handleActionSendEmail}
-                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-800 transition cursor-pointer"
-                    title="이메일 전송"
-                  >
-                    <Mail className="w-3.5 h-3.5 text-zinc-500" strokeWidth={1.5} />
-                    <span className="hidden sm:inline">이메일</span>
-                  </button>
-
-                  <button
-                    onClick={handleActionLifeSync}
-                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-800 transition cursor-pointer"
-                    title="라이프 Hub 연동"
-                  >
-                    <Zap className="w-3.5 h-3.5 text-zinc-500" strokeWidth={1.5} />
-                    <span className="hidden sm:inline">라이프 Hub</span>
-                  </button>
-                </div>
-
-                {/* 1. 비디오/숏폼 대형 라이브 캔버스 (화면을 꽉 채우는 쾌적한 와이드 뷰어) */}
-                {artifact.domain === 'video' && (
-                  <div className="w-full flex flex-col items-center space-y-3">
-                    {/* 와이드 대형 시네마틱 뷰어 프레임 (최대 1400px 대응) */}
-                    <div className="w-full max-w-5xl aspect-video bg-zinc-950 rounded-3xl border border-slate-200 dark:border-zinc-800 shadow-2xl relative overflow-hidden flex flex-col justify-between">
-                      {/* 배경 시네마틱 시뮬레이션 렌더링 뷰 */}
-                      <div className="absolute inset-0 bg-gradient-to-tr from-zinc-950 via-zinc-900 to-zinc-800 flex items-center justify-center">
-                        <div className="text-center p-8 space-y-4">
-                          <div className="w-16 h-16 rounded-full bg-white/10 mx-auto flex items-center justify-center backdrop-blur-md border border-white/20">
-                            <Film className="w-8 h-8 text-white/90" strokeWidth={1.5} />
-                          </div>
-                          <div className="space-y-1">
-                            <h3 className="text-lg sm:text-xl font-bold text-white tracking-tight">
-                              {artifact.title}
-                            </h3>
-                            <p className="text-xs text-zinc-400 font-mono">
-                              ALPS GLACIER CINEMATIC 4K 60FPS • NOA CAMERA RIG v2.6
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* 쇼츠 UI 세이프존 마스크 오버레이 (가이드선) */}
-                      {showSafeZone && (
-                        <div className="absolute inset-0 pointer-events-none border-2 border-dashed border-amber-400/30 m-6 rounded-2xl flex flex-col justify-between p-4">
-                          <div className="flex justify-between items-start">
-                            <span className="text-[10px] font-mono bg-amber-400/20 text-amber-300 px-2 py-0.5 rounded">
-                              상단 UI 세이프존
-                            </span>
-                            <span className="text-[10px] font-mono bg-amber-400/20 text-amber-300 px-2 py-0.5 rounded">
-                              검색/공유
-                            </span>
-                          </div>
-                          <div className="flex justify-between items-end">
-                            <span className="text-[10px] font-mono bg-amber-400/20 text-amber-300 px-2 py-0.5 rounded">
-                              하단 자막 세이프존
-                            </span>
-                            <span className="text-[10px] font-mono bg-amber-400/20 text-amber-300 px-2 py-0.5 rounded">
-                              오디오 트랙
-                            </span>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* 하단 재생 컨트롤 & 자막 */}
-                      <div className="relative z-20 p-6 bg-gradient-to-t from-black/95 via-black/50 to-transparent space-y-3">
-                        <p className="text-sm sm:text-base font-bold text-white drop-shadow-md">
-                          "{artifact.captions?.[0]?.text || '도전하지 않으면 아무것도 변하지 않습니다.'}"
-                        </p>
-
-                        <div className="flex items-center gap-3">
-                          <button
-                            onClick={() => setIsPlayingVideo(!isPlayingVideo)}
-                            className="p-2 rounded-full bg-white/20 hover:bg-white/30 text-white transition cursor-pointer"
-                          >
-                            {isPlayingVideo ? (
-                              <Pause className="w-4 h-4" strokeWidth={1.5} />
-                            ) : (
-                              <Play className="w-4 h-4 ml-0.5" strokeWidth={1.5} />
-                            )}
-                          </button>
-
-                          <div className="flex-1 h-1.5 bg-white/20 rounded-full overflow-hidden">
-                            <div 
-                              className="h-full bg-white rounded-full transition-all duration-200" 
-                              style={{ width: `${videoProgress}%` }} 
-                            />
-                          </div>
-
-                          <span className="text-xs font-mono text-zinc-300">
-                            00:{Math.floor((videoProgress / 100) * 15).toString().padStart(2, '0')} / 00:15
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* 2. 비주얼/이미지 대형 캔버스 */}
-                {artifact.domain === 'visual' && (
-                  <div className="w-full max-w-5xl aspect-video bg-zinc-950 rounded-3xl border border-slate-200 dark:border-zinc-800 shadow-2xl relative overflow-hidden flex items-center justify-center p-8">
-                    <div className="text-center space-y-3">
-                      <div className="w-16 h-16 rounded-2xl bg-white/10 mx-auto flex items-center justify-center backdrop-blur-md">
-                        <ImageIcon className="w-8 h-8 text-white/90" strokeWidth={1.5} />
-                      </div>
-                      <h3 className="text-lg sm:text-xl font-bold text-white">
-                        {artifact.title}
-                      </h3>
-                      <p className="text-xs text-zinc-400 max-w-md mx-auto line-clamp-2">
-                        {artifact.promptHistory[0]?.optimizedVPO}
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-                {/* 3. 오디오/음악 대형 캔버스 */}
-                {artifact.domain === 'audio' && (
-                  <div className="w-full max-w-4xl bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-10 h-10 rounded-xl bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center">
-                          <Music className="w-5 h-5 text-zinc-600 dark:text-zinc-300" strokeWidth={1.5} />
-                        </div>
-                        <div>
-                          <h4 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
-                            {artifact.title}
-                          </h4>
-                          <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                            Mastered WAV 24-bit 48kHz • SynthID 워터마크 서명
-                          </p>
-                        </div>
-                      </div>
-
-                      <span className="text-xs font-mono text-zinc-500">
-                        00:{audioTime.toString().padStart(2, '0')} / 00:30
-                      </span>
-                    </div>
-
-                    {/* 오디오 파형 비주얼라이저 */}
-                    <div className="h-28 bg-slate-50 dark:bg-zinc-950 rounded-2xl p-4 flex items-center justify-center gap-1 border border-slate-200/80 dark:border-zinc-800/80 overflow-hidden">
-                      {(waveformBars.length > 0 ? waveformBars : generateWaveformData(48)).map((val, idx) => {
-                        const isPassed = (idx / 48) * 30 <= audioTime;
-                        return (
-                          <div
-                            key={idx}
-                            className={`w-1.5 rounded-full transition-all duration-300 ${
-                              isPassed ? 'bg-zinc-900 dark:bg-zinc-100' : 'bg-zinc-300 dark:bg-zinc-700'
-                            }`}
-                            style={{ height: `${Math.max(14, val * 84)}px` }}
-                          />
-                        );
-                      })}
-                    </div>
-
-                    {/* 재생 컨트롤 */}
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <button
-                          onClick={() => setIsPlayingAudio(!isPlayingAudio)}
-                          className="w-11 h-11 rounded-2xl bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 flex items-center justify-center shadow-md hover:scale-105 active:scale-95 transition cursor-pointer"
-                        >
-                          {isPlayingAudio ? (
-                            <Pause className="w-4 h-4" strokeWidth={1.5} />
-                          ) : (
-                            <Play className="w-4 h-4 ml-0.5" strokeWidth={1.5} />
-                          )}
-                        </button>
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        <Volume2 className="w-4 h-4 text-zinc-400" strokeWidth={1.5} />
-                        <input
-                          type="range"
-                          min="0"
-                          max="100"
-                          value={audioVolume}
-                          onChange={(e) => setAudioVolume(Number(e.target.value))}
-                          className="w-24 accent-zinc-900 dark:accent-zinc-100"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-              </div>
+              <MediaArtifactStage
+                artifact={artifact}
+                mvData={mvPipelineResult}
+                vpoData={vpoResult}
+                aspectRatio={visualRatio}
+                onAspectRatioChange={setVisualRatio}
+                onSave4K={handleActionSave4K}
+                onNotionSync={handleActionNotionSync}
+                onCopyLink={handleActionCopyLink}
+              />
             )}
 
           </div>
         </main>
 
-        {/* ======================================================================= */}
         {/* [하단 중앙 와이드 플로팅 Noa 독 (Gemini 순정 알약형 바)] */}
-        {/* ======================================================================= */}
         <footer className="shrink-0 z-30">
           <NoaMediaDock
             onSubmit={handleDockSubmit}
