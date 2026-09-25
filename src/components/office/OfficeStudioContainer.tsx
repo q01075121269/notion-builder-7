@@ -563,6 +563,7 @@ export const OfficeStudioContainer: React.FC = () => {
           canUndo={historyStack.length > 0}
           lastActionName={historyStack[historyStack.length - 1]?.action}
           onShowToast={showToast}
+          sources={activeProject.sources}
         />
 
       </div>

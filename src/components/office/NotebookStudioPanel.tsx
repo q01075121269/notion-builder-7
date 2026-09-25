@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import type { OfficeDocument, OfficeDocumentFormat, SheetRow, DocSection } from '../../types/office';
+import type { OfficeDocument, OfficeDocumentFormat, OfficeSource } from '../../types/office';
+import { classifyOfficeIntent, executeOfficeIntent } from '../../lib/office/intentRouter';
 import { 
   Sparkles, 
   ChevronRight, 
@@ -40,6 +41,7 @@ interface NotebookStudioPanelProps {
   canUndo: boolean;
   lastActionName?: string;
   onShowToast?: (message: string, type: 'info' | 'success' | 'error') => void;
+  sources?: OfficeSource[];
 }
 
 export const NotebookStudioPanel: React.FC<NotebookStudioPanelProps> = ({
@@ -53,7 +55,8 @@ export const NotebookStudioPanel: React.FC<NotebookStudioPanelProps> = ({
   onUndo,
   canUndo,
   lastActionName,
-  onShowToast
+  onShowToast,
+  sources = []
 }) => {
   const [inputText, setInputText] = useState('');
   const [isListening, setIsListening] = useState(false);
@@ -127,34 +130,12 @@ export const NotebookStudioPanel: React.FC<NotebookStudioPanelProps> = ({
     }
   };
 
-  // 금액 파서 헬퍼: "120만 원", "50만원", "1500000원", "150만" 등 숫자로 변환
-  const parseKoreanCurrency = (text: string): { amount: number; matchedStr: string } => {
-    const manMatch = text.match(/(\d+[\d,]*)\s*만\s*원?/);
-    if (manMatch) {
-      const val = parseInt(manMatch[1].replace(/,/g, ''), 10);
-      return { amount: val * 10000, matchedStr: manMatch[0] };
-    }
-
-    const wonMatch = text.match(/(\d+[\d,]*)\s*원/);
-    if (wonMatch) {
-      const val = parseInt(wonMatch[1].replace(/,/g, ''), 10);
-      return { amount: val, matchedStr: wonMatch[0] };
-    }
-
-    const numMatch = text.match(/(\d{5,})/);
-    if (numMatch) {
-      return { amount: parseInt(numMatch[1], 10), matchedStr: numMatch[0] };
-    }
-
-    return { amount: 3500000, matchedStr: '' };
-  };
-
-  // 자연어 명령 인텐트 파싱 및 캔버스 실시간 실행기
+  // Jev형 지능형 의도 분류기(Intent Classifier) 및 Gemini 실무 작문 엔진 연동
   const handleSendMessage = (textToSend?: string) => {
     const text = (textToSend || inputText).trim();
     if (!text || isThinking) return;
 
-    // 1. 입력창 즉시 초기화 (누락 버그 해결)
+    // 1. 입력창 즉시 초기화 (누락 버그 완전 해결)
     setInputText('');
 
     const userMsg: CopilotMessage = {
@@ -167,287 +148,34 @@ export const NotebookStudioPanel: React.FC<NotebookStudioPanelProps> = ({
     setMessages(prev => [...prev, userMsg]);
     setIsThinking(true);
 
-    let replyText = '';
-    let actionName = '';
-    let updatedDoc: OfficeDocument = { ...document };
-    let highlightTarget: string | null = null;
+    // 2. Jev형 인텐트 판단기 호출 (단순 키워드 매칭이 아닌 명확한 의도 구조체 분류)
+    const classifiedIntent = classifyOfficeIntent(text, document);
 
-    const lower = text.toLowerCase();
-    const isMultiLineReq = /두\s*줄|2줄|줄바꿈|행바꿈|줄\s*나눠|멀티라인/.test(text);
+    // 3. Gemini 심층 작문 및 지식 창고 기반 캔버스 변이 실행
+    const result = executeOfficeIntent(classifiedIntent, text, document, sources);
 
-    // 1. [제목 및 줄바꿈 변경 명령 처리]
-    // 예: "2026년 하반기 차세대 ai 오피스 스튜디오에서 두 줄로 만들어 줘", "제목 두 줄로", "제목을 ~로 변경"
-    if (isMultiLineReq || text.includes('제목') || text.includes('문서명')) {
-      if (isMultiLineReq) {
-        let multiTitle = '';
-        if (text.includes('2026년') || lower.includes('ai') || lower.includes('오피스') || lower.includes('스튜디오')) {
-          multiTitle = '2026년\n하반기 차세대 AI 오피스 스튜디오 도입 기안서';
-        } else {
-          const explicitMatch = text.match(/(?:제목(?:을)?|문서명(?:을)?)\s*(?:['"「](.+?)['"」]|(.+?))\s*(?:으로|로)?\s*(?:두\s*줄|2줄|줄바꿈)/);
-          const raw = explicitMatch ? (explicitMatch[1] || explicitMatch[2]).trim() : document.title;
-          const words = raw.split(/\s+/);
-          if (words.length >= 2) {
-            const mid = Math.ceil(words.length / 2);
-            multiTitle = `${words.slice(0, mid).join(' ')}\n${words.slice(mid).join(' ')}`;
-          } else {
-            multiTitle = `${raw}\n(차세대 추진 기안서)`;
-          }
-        }
+    // 4. 캔버스 상태 즉각 갱신 및 Undo 히스토리 바인딩
+    onChangeDocument(result.updatedDoc, result.actionName);
+    toast(result.actionName, 'success');
 
-        updatedDoc = {
-          ...updatedDoc,
-          title: multiTitle
-        };
-        actionName = '제목 2줄 줄바꿈 분할 및 갱신';
-        replyText = `요청하신 대로 문서 제목을 2줄로 줄바꿈하여 '${multiTitle}'로 캔버스에 즉시 반영했습니다.`;
-        highlightTarget = 'title';
-        if (currentFormat !== 'docs') onChangeFormat('docs');
-      } else {
-        const titleMatch = text.match(/(?:제목을?|문서명(?:을)?)\s*(?:['"「](.+?)['"」]|(.+?))\s*(?:으로|로)?\s*(?:변경|바꿔|수정|설정|적용)/)
-          || text.match(/^제목\s*[:：]\s*(.+)$/);
-        const newTitle = titleMatch ? (titleMatch[1] || titleMatch[2]).trim() : '2026년 하반기 차세대 AI 오피스 스튜디오 도입 기안서';
-        
-        updatedDoc = {
-          ...updatedDoc,
-          title: newTitle
-        };
-        actionName = `제목을 [${newTitle}]로 변경`;
-        replyText = `문서 제목을 "${newTitle}"(으)로 캔버스에 즉시 반영했습니다.`;
-        highlightTarget = 'title';
-        if (currentFormat !== 'docs') onChangeFormat('docs');
-      }
-    }
-    // 2. [결재란 변경 명령 처리]
-    // 예: "결재란에서 팀장 대신 본부장으로 바꿔줘", "결재선 수정해줘"
-    else if (text.includes('결재') || text.includes('서명선') || text.includes('승인선')) {
-      let newApprovers = [...(updatedDoc.metadata.approvers || ['기획(기안)', '박팀장(검토)', '이본부장(결재)'])];
-      
-      if (text.includes('팀장') && (text.includes('본부장') || text.includes('대신') || text.includes('바꿔'))) {
-        newApprovers = ['기획(기안)', '박본부장(검토)', '이대표이사(결재)'];
-      } else if (text.includes('대표') || text.includes('사장')) {
-        newApprovers = ['기획(기안)', '김팀장(검토)', '최대표이사(결재)'];
-      } else if (text.includes('2단계') || text.includes('두단계')) {
-        newApprovers = ['담당(기안)', '팀장(결재)'];
-      } else {
-        newApprovers = ['기획(기안)', '박본부장(검토)', '이대표이사(최종결재)'];
-      }
-
-      updatedDoc = {
-        ...updatedDoc,
-        metadata: {
-          ...updatedDoc.metadata,
-          approvers: newApprovers
-        }
-      };
-      actionName = '결재란 직급 및 승인선 실시간 수정';
-      replyText = `결재란의 담당자/직급 정보를 [${newApprovers.join(' ➔ ')}]로 실시간 수정했습니다.`;
-      highlightTarget = 'approvers';
-      if (currentFormat !== 'docs') onChangeFormat('docs');
-    }
-    // 3. [기안자 변경 명령]: "기안자를 ... 로 변경/바꿔"
-    else if (text.match(/기안자(?:를)?\s*(?:['"「](.+?)['"」]|(\S+))\s*(?:으로|로)?\s*(?:변경|바꿔|수정|설정)/)) {
-      const authorMatch = text.match(/기안자(?:를)?\s*(?:['"「](.+?)['"」]|(\S+))\s*(?:으로|로)?\s*(?:변경|바꿔|수정|설정)/);
-      const newAuthor = authorMatch ? (authorMatch[1] || authorMatch[2]).trim() : '홍길동 수석';
-      updatedDoc = {
-        ...updatedDoc,
-        metadata: {
-          ...updatedDoc.metadata,
-          author: newAuthor
-        }
-      };
-      actionName = `기안자를 [${newAuthor}]로 변경`;
-      replyText = `기안자를 "${newAuthor}"(으)로 즉각 변경했습니다.`;
-      highlightTarget = 'metadata-author';
-      if (currentFormat !== 'docs') onChangeFormat('docs');
-    }
-    // 4. [기안 부서 변경 명령]: "부서를 ... 로 변경/바꿔"
-    else if (text.match(/(?:기안\s*)?부서(?:를)?\s*(?:['"「](.+?)['"」]|(\S+))\s*(?:으로|로)?\s*(?:변경|바꿔|수정|설정)/)) {
-      const deptMatch = text.match(/(?:기안\s*)?부서(?:를)?\s*(?:['"「](.+?)['"」]|(\S+))\s*(?:으로|로)?\s*(?:변경|바꿔|수정|설정)/);
-      const newDept = deptMatch ? (deptMatch[1] || deptMatch[2]).trim() : 'AI 전략기획팀';
-      updatedDoc = {
-        ...updatedDoc,
-        metadata: {
-          ...updatedDoc.metadata,
-          department: newDept
-        }
-      };
-      actionName = `기안 부서를 [${newDept}]로 변경`;
-      replyText = `기안 부서를 "${newDept}"(으)로 업데이트했습니다.`;
-      highlightTarget = 'metadata-department';
-      if (currentFormat !== 'docs') onChangeFormat('docs');
-    }
-    // 5. [추진 배경 및 본문 섹션 수정/추가 명령]
-    else if (text.includes('추진 배경') || text.includes('추진배경') || (text.includes('내용') && (text.includes('수정') || text.includes('변경') || text.includes('추가')))) {
-      const sections = [...(updatedDoc.content.docsContent?.sections || [])];
-      
-      if (text.includes('추진 배경') || text.includes('추진배경')) {
-        const bgContentMatch = text.match(/(?:추진\s*배경|추진배경)(?:을|를)?\s*(?:['"「](.+?)['"」]|(.+?))\s*(?:으로|로)?\s*(?:수정|변경|업데이트)/);
-        const newBg = bgContentMatch ? (bgContentMatch[1] || bgContentMatch[2]).trim() : '2026년 차세대 AI 오피스 워크스페이스 도입에 따른 업무 생산성 300% 극대화';
-        
-        let found = false;
-        const newSections = sections.map(s => {
-          if (s.text.includes('추진 배경') || (s.level === 2 && !found)) {
-            found = true;
-            return { ...s, text: `□ ${newBg}` };
-          }
-          return s;
-        });
-        
-        if (!found) {
-          newSections.push({
-            id: `sec-bg-${Date.now()}`,
-            level: 2,
-            marker: '□',
-            text: newBg
-          });
-        }
-        
-        updatedDoc = {
-          ...updatedDoc,
-          content: {
-            ...updatedDoc.content,
-            docsContent: { sections: newSections }
-          }
-        };
-        actionName = '추진 배경 섹션 내용 실시간 수정';
-        replyText = `공문서 추진 배경 항목을 "${newBg}"(으)로 실시간 업데이트했습니다.`;
-      } else {
-        const addContentMatch = text.match(/(?:['"「](.+?)['"」]|(.+?))\s*(?:내용|문단|항목|섹션)?\s*(?:추가해줘|넣어줘|반영해줘)/);
-        const itemToAdd = addContentMatch ? (addContentMatch[1] || addContentMatch[2]).trim() : '전사 AI 거버넌스 및 보안 정책 준수 방안 수립';
-        
-        const newSec: DocSection = {
-          id: `sec-add-${Date.now()}`,
-          level: 3,
-          marker: '○',
-          text: itemToAdd
-        };
-        
-        updatedDoc = {
-          ...updatedDoc,
-          content: {
-            ...updatedDoc.content,
-            docsContent: { sections: [...sections, newSec] }
-          }
-        };
-        actionName = `본문 항목 [${itemToAdd.slice(0, 15)}] 추가`;
-        replyText = `공문서 본문에 새 항목 [${itemToAdd}]을 즉각 추가 반영했습니다.`;
-      }
-      
-      highlightTarget = 'sections';
-      if (currentFormat !== 'docs') onChangeFormat('docs');
-    }
-    // 6. [스프레드시트 표 행 추가 / 예산 수정]
-    else if (text.includes('표') || text.includes('시트') || text.includes('항목') || text.includes('예산')) {
-      const { amount, matchedStr } = parseKoreanCurrency(text);
-      let itemName = text
-        .replace(/표에|시트에|추가해줘|넣어줘|등록해줘|항목|금액|예산/g, '')
-        .replace(matchedStr, '')
-        .trim();
-
-      if (!itemName) itemName = 'AI 자동화 인프라 확장비';
-
-      const currentRows = updatedDoc.content.sheetsContent?.rows || [];
-      const newRowNumber = currentRows.length + 1;
-      const newRow: SheetRow = {
-        id: `row-ai-${Date.now()}`,
-        cells: [newRowNumber, itemName, '실시간 AI 코파일럿 산출', amount, '정규 반영']
-      };
-
-      const newRows = [...currentRows, newRow];
-      const endRowIndex = newRows.length + 1;
-      const newFormula = `=SUM(D2:D${endRowIndex})`;
-
-      updatedDoc = {
-        ...updatedDoc,
-        content: {
-          ...updatedDoc.content,
-          sheetsContent: {
-            ...updatedDoc.content.sheetsContent,
-            rows: newRows,
-            totalFormula: newFormula
-          }
-        }
-      };
-
-      actionName = `표에 [${itemName} - ₩${amount.toLocaleString()}] 추가 및 =SUM 갱신`;
-      replyText = `데이터 표에 [${itemName} : ₩${amount.toLocaleString()}] 행을 추가하고, 합계 수식을 ${newFormula}로 정산했습니다.`;
-      highlightTarget = 'sheets';
-      if (currentFormat !== 'sheets') {
-        onChangeFormat('sheets');
-      }
-    }
-    // 7. [마인드맵 관련 명령]
-    else if (text.includes('마인드맵') && (text.includes('가지') || text.includes('추가') || text.includes('노드'))) {
-      const branchTopicMatch = text.match(/(?:가지에|노드에)?\s*(.*?)(?:를|을)?\s*(?:추가|반영)/);
-      const branchTopic = branchTopicMatch && branchTopicMatch[1].trim() ? branchTopicMatch[1].trim() : '보안 정책 및 거버넌스 가이드라인';
-      
-      const newSec: DocSection = {
-        id: `sec-mm-${Date.now()}`,
-        level: 2,
-        marker: '□',
-        text: branchTopic
-      };
-
-      updatedDoc = {
-        ...updatedDoc,
-        content: {
-          ...updatedDoc.content,
-          docsContent: {
-            sections: [...updatedDoc.content.docsContent.sections, newSec]
-          }
-        }
-      };
-
-      actionName = `마인드맵 가지 [${branchTopic.slice(0, 15)}] 추가`;
-      replyText = `마인드맵 트리에 새로운 가지 [${branchTopic}]를 성공적으로 추가했습니다.`;
-      if (currentFormat !== 'mindmap') {
-        onChangeFormat('mindmap');
-      }
-    }
-    // 8. [공문서 개조식 종결어미 정돈]
-    else if (text.includes('개조식') || text.includes('어조') || text.includes('다듬')) {
-      const sections = updatedDoc.content.docsContent?.sections || [];
-      const updatedSections = sections.map(s => {
-        let t = s.text;
-        t = t.replace(/합니다\.|입니다\.|됩니다\./g, '함.').replace(/있습니다\./g, '있음.');
-        return { ...s, text: t };
-      });
-
-      updatedDoc = {
-        ...updatedDoc,
-        content: {
-          ...updatedDoc.content,
-          docsContent: { sections: updatedSections }
-        }
-      };
-
-      actionName = '공문서 행안부 표준 개조식 종결어미(-함) 일괄 정돈';
-      replyText = '공문서 본문의 모든 문장을 행정안전부 표준 개조식 종결어미(-함, -임)로 깔끔하게 정돈했습니다.';
-      highlightTarget = 'sections';
-      if (currentFormat !== 'docs') {
-        onChangeFormat('docs');
-      }
-    }
-    // 9. [기타 자연어 질문 처리 (고정 매크로 전면 삭제 -> 실제 문서 상태 기반 응답)]
-    else {
-      actionName = `AI 맞춤 분석: ${text.slice(0, 15)}`;
-      replyText = `현재 작성 중이신 [${updatedDoc.title.replace('\n', ' ')}] 문서의 맥락을 분석했습니다. 요청하신 내용("${text}")을 문서 전략에 즉각 반영할 수 있도록 인플레이스 편집을 대기 중입니다. 특정 섹션이나 결재선, 예산 변경이 필요하시면 바로 말씀해 주세요.`;
+    // 5. 캔버스 하이라이트 애니메이션 발송
+    if (result.highlightTarget) {
+      window.dispatchEvent(new CustomEvent('anti-office-highlight', { detail: { target: result.highlightTarget } }));
     }
 
-    if (highlightTarget) {
-      window.dispatchEvent(new CustomEvent('anti-office-highlight', { detail: { target: highlightTarget } }));
+    // 6. 필요한 경우 포맷 자동 동기화
+    if (result.targetFormat && result.targetFormat !== currentFormat) {
+      onChangeFormat(result.targetFormat);
     }
 
-    onChangeDocument(updatedDoc, actionName);
-    toast(actionName, 'success');
-
+    // 7. 실무 브리핑 응답 메시지 반환
     setTimeout(() => {
       const aiMsg: CopilotMessage = {
         id: `msg-ai-${Date.now()}`,
         sender: 'ai',
-        text: replyText,
+        text: result.replyText,
         timestamp: '방금 전',
-        appliedAction: actionName
+        appliedAction: result.actionName
       };
 
       setMessages(prev => [...prev, aiMsg]);
@@ -720,9 +448,10 @@ export const NotebookStudioPanel: React.FC<NotebookStudioPanelProps> = ({
         {/* 빠른 추천 프롬프트 칩들 */}
         <div className="px-3 py-1.5 border-t border-slate-100 dark:border-zinc-800/80 flex items-center space-x-1.5 overflow-x-auto scrollbar-none shrink-0 bg-slate-50/30 dark:bg-zinc-950/20">
           {[
+            '지금 내용을 AI 에이전트 도입으로 바꿔봐',
+            '제목을 아래 내용에 맞게 적당하게 해줘',
             '제목 두 줄로 나눠줘',
             '결재란 팀장 대신 본부장으로 바꿔줘',
-            '추진 배경 수정해줘',
             '표에 비목 추가 및 =SUM 계산'
           ].map((prompt, idx) => (
             <button
