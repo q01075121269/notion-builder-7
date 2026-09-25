@@ -386,7 +386,12 @@ const OfficeStudioInner: React.FC = () => {
 
   // 사내 서식 적용 완료 핸들러
   const handleApplyCompanyTemplate = (updatedDoc: OfficeDocument, templateName: string) => {
-    updateDocument(updatedDoc, `'${templateName}' 사내 서식 캔버스 복제 적용`);
+    const docWithFormat: OfficeDocument = {
+      ...updatedDoc,
+      format: 'docs'
+    };
+    updateDocument(docWithFormat, `'${templateName}' 사내 서식 캔버스 복제 적용`);
+    setViewMode('canvas');
     showToast(`'${templateName}' 서식이 캔버스에 1:1 복제 적용되었습니다.`, 'success');
   };
 
@@ -548,10 +553,10 @@ const OfficeStudioInner: React.FC = () => {
           <button
             onClick={handleUndo}
             disabled={historyStack.length === 0}
-            className="flex items-center space-x-1 px-2.5 py-1.5 rounded-lg disabled:opacity-30 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800/80 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition cursor-pointer shadow-xs"
+            className="flex items-center space-x-1 px-2.5 py-1.5 rounded-lg disabled:opacity-30 border border-slate-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-xs font-semibold text-slate-700 dark:text-zinc-300 hover:text-slate-900 dark:hover:text-white transition cursor-pointer shadow-xs"
             title={historyStack.length > 0 ? `되돌리기: ${historyStack[historyStack.length - 1].action}` : '되돌릴 작업 없음'}
           >
-            <Undo2 className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400 shrink-0" />
+            <Undo2 className="w-3.5 h-3.5 text-slate-600 dark:text-zinc-300 shrink-0" />
             <span className="hidden sm:inline">되돌리기</span>
           </button>
 

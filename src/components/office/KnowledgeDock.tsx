@@ -383,7 +383,7 @@ export const KnowledgeDock: React.FC<KnowledgeDockProps> = ({
             <button
               type="button"
               onClick={handleOpenMultiSourceModal}
-              className="px-2.5 py-1.5 mr-1 rounded-lg bg-[var(--accent-color)] hover:opacity-90 text-white text-[11px] font-bold transition cursor-pointer shrink-0 shadow-xs flex items-center space-x-1"
+              className="px-2.5 py-1.5 mr-1 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-500 text-[11px] transition cursor-pointer shrink-0 shadow-xs flex items-center space-x-1"
               title="다중 웹/문서 소스 일괄 탐색 모달 열기"
             >
               <Sparkles className="w-3 h-3" />
@@ -538,10 +538,10 @@ export const KnowledgeDock: React.FC<KnowledgeDockProps> = ({
                   <button
                     type="button"
                     onClick={() => onOpenTemplateInjector && onOpenTemplateInjector(src)}
-                    className="w-full py-1 px-2 rounded-lg bg-[var(--bg-app)] hover:opacity-80 text-[var(--text-primary)] border border-[var(--border-color)] text-[10px] font-bold flex items-center justify-center space-x-1 transition cursor-pointer"
+                    className="w-full py-1 px-2.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 text-xs font-semibold flex items-center justify-center space-x-1.5 transition cursor-pointer shadow-xs"
                     title="이 소스의 서식/표 구조를 사내 표준 양식으로 캔버스에 복제 적용"
                   >
-                    <Building2 className="w-3 h-3 text-[var(--accent-color)]" />
+                    <Building2 className="w-3.5 h-3.5 text-zinc-300" />
                     <span>사내 양식으로 적용</span>
                   </button>
                 </div>

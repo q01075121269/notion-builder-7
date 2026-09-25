@@ -22,19 +22,19 @@ export const StyleGalleryToolbar: React.FC<StyleGalleryToolbarProps> = ({
       
       {/* 갤러리 타이틀 라벨 */}
       <div className="flex items-center space-x-2 shrink-0">
-        <div className="p-1.5 rounded-lg bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">
+        <div className="p-1.5 rounded-lg bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300">
           <Palette className="w-4 h-4" />
         </div>
         <div className="hidden md:block">
           <div className="flex items-center space-x-1.5">
-            <span className="text-xs font-extrabold text-slate-800 dark:text-slate-200">
+            <span className="text-xs font-bold text-zinc-900 dark:text-zinc-100">
               비주얼 스타일 갤러리
             </span>
-            <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">
+            <span className="text-[10px] font-semibold px-1.5 py-0.2 rounded-full bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300">
               5대 규격
             </span>
           </div>
-          <p className="text-[10px] text-slate-500 dark:text-slate-400">클릭 즉시 모든 산출물에 일괄 적용</p>
+          <p className="text-[10px] text-zinc-500 dark:text-zinc-400">클릭 즉시 모든 산출물에 일괄 적용</p>
         </div>
       </div>
 
@@ -50,8 +50,8 @@ export const StyleGalleryToolbar: React.FC<StyleGalleryToolbarProps> = ({
               className={`
                 group relative px-2.5 sm:px-3 py-1.5 rounded-xl border text-left transition-all duration-200 cursor-pointer flex items-center space-x-2
                 ${isActive
-                  ? 'bg-white dark:bg-slate-800 border-indigo-500 shadow-md ring-2 ring-indigo-500/30 font-bold scale-[1.02]'
-                  : 'bg-white/60 dark:bg-slate-800/50 border-slate-200/80 dark:border-slate-700/80 hover:bg-white dark:hover:bg-slate-800 hover:border-slate-300 dark:hover:border-slate-600 shadow-2xs'
+                  ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 border-zinc-900 dark:border-white shadow-md font-bold scale-[1.02]'
+                  : 'bg-white/80 dark:bg-zinc-800/60 border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300'
                 }
               `}
               title={`${st.name}: ${st.tagline}`}
@@ -63,17 +63,17 @@ export const StyleGalleryToolbar: React.FC<StyleGalleryToolbarProps> = ({
 
               {/* 텍스트 메타 */}
               <div className="flex flex-col">
-                <span className={`text-xs whitespace-nowrap leading-tight ${isActive ? 'text-indigo-600 dark:text-indigo-400 font-extrabold' : 'text-slate-800 dark:text-slate-200 font-medium'}`}>
+                <span className={`text-xs whitespace-nowrap leading-tight ${isActive ? 'text-white dark:text-zinc-900 font-bold' : 'text-zinc-800 dark:text-zinc-200 font-medium'}`}>
                   {st.shortName}
                 </span>
-                <span className="hidden xl:inline text-[9px] text-slate-400 dark:text-slate-500 truncate max-w-[120px]">
+                <span className={`hidden xl:inline text-[9px] truncate max-w-[120px] ${isActive ? 'text-zinc-300 dark:text-zinc-600' : 'text-zinc-400 dark:text-zinc-500'}`}>
                   {st.tagline.slice(0, 16)}...
                 </span>
               </div>
 
               {/* 활성 체크 표시 */}
               {isActive && (
-                <div className="w-3.5 h-3.5 rounded-full bg-indigo-600 text-white flex items-center justify-center shrink-0 ml-1">
+                <div className="w-3.5 h-3.5 rounded-full bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white flex items-center justify-center shrink-0 ml-1">
                   <Check className="w-2.5 h-2.5 stroke-[3]" />
                 </div>
               )}

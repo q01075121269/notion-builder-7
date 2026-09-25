@@ -38,10 +38,10 @@ export const PRESET_COMPANY_TEMPLATES: CompanyTemplateSpec[] = [
     name: '2026 엔터프라이즈 표준 사내 기안서 서식',
     companyName: '(주)노션아키텍트 홀딩스',
     department: '신사업전략본부 AI솔루션팀',
-    docNumberFormat: 'AI-2026-0842',
+    docNumberFormat: '[사내보안]-2026-089호',
     retentionPeriod: '영구 (사내 감사 기준)',
     approvers: ['기안 (김책임)', '팀장 (박팀장)', '본부장 (최본부장)', '대표이사 (정대표)'],
-    tableHeaders: ['번호', '예산 비목', '산출 내역', '소요 금액 (원)', '비고'],
+    tableHeaders: ['번호', '항목', '산출근거', '소요예산(원)', '비고'],
     sampleBudgetRows: [
       { no: 1, category: 'SW 라이선스', description: 'AI 엔진 API 토큰 및 전사 엔터프라이즈 시트 라이선스', amount: 48000000, note: '연간 선지급' },
       { no: 2, category: '인프라 구축비', description: '사내 온프레미스 연동 게이트웨이 및 보안 프록시', amount: 25000000, note: '초기 1회' },
@@ -132,6 +132,7 @@ export const CompanyTemplateInjector: React.FC<CompanyTemplateInjectorProps> = (
       // 2. 통합 덮어쓰기 문서 생성
       const updatedDoc: OfficeDocument = {
         ...currentDocument,
+        format: 'docs',
         title: `${currentTemplate.companyName} 표준 기안서`,
         metadata: {
           ...currentDocument.metadata,

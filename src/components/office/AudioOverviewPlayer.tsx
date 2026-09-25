@@ -80,8 +80,66 @@ export const AudioOverviewPlayer: React.FC<AudioOverviewPlayerProps> = ({
   const [waveHeights, setWaveHeights] = useState<number[]>([12, 24, 18, 30, 20, 14, 28, 22, 16, 26, 19, 15]);
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
 
-  // 재생 타이머 루프
+  // 음성 텍스트 합성 헬퍼
+  const getFullScriptText = () => {
+    return [
+      `${documentTitle}. 2분 핵심 오디오 브리핑을 시작합니다.`,
+      ...BRIEFING_SCRIPT.map(s => `${s.speakerName}. ${s.text}`)
+    ].join(' ');
+  };
+
+  // 실제 TTS 음성 재생 시작
+  const startSpeech = (rate = playbackRate) => {
+    if (typeof window === 'undefined' || !window.speechSynthesis) return;
+
+    window.speechSynthesis.cancel();
+
+    const textToSpeak = getFullScriptText();
+    const utterance = new SpeechSynthesisUtterance(textToSpeak);
+    utterance.lang = 'ko-KR';
+    utterance.rate = rate;
+
+    // 한국어 보이스 선택
+    const voices = window.speechSynthesis.getVoices();
+    const koVoice = voices.find(v => v.lang === 'ko-KR' || v.lang.startsWith('ko'));
+    if (koVoice) {
+      utterance.voice = koVoice;
+    }
+
+    utterance.onend = () => {
+      setIsPlaying(false);
+      setCurrentTime(TOTAL_DURATION);
+    };
+
+    utterance.onerror = (e) => {
+      console.warn('[AudioOverview TTS] Error or cancelled:', e);
+      setIsPlaying(false);
+    };
+
+    utteranceRef.current = utterance;
+    window.speechSynthesis.speak(utterance);
+  };
+
+  // 모달 닫기나 언마운트 시 TTS 안전 취소
+  useEffect(() => {
+    return () => {
+      if (typeof window !== 'undefined' && window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, []);
+
+  // isOpen이 false가 될 때 음성 중지
+  useEffect(() => {
+    if (!isOpen && typeof window !== 'undefined' && window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+      setIsPlaying(false);
+    }
+  }, [isOpen]);
+
+  // 재생 타이머 루프 및 파형 동기화
   useEffect(() => {
     if (isPlaying) {
       timerRef.current = setInterval(() => {
@@ -113,19 +171,47 @@ export const AudioOverviewPlayer: React.FC<AudioOverviewPlayerProps> = ({
     return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
+  // 재생 / 일시정지 토글
   const handleTogglePlay = () => {
-    setIsPlaying(!isPlaying);
+    if (typeof window === 'undefined' || !window.speechSynthesis) {
+      setIsPlaying(!isPlaying);
+      return;
+    }
+
+    if (isPlaying) {
+      window.speechSynthesis.cancel();
+      setIsPlaying(false);
+    } else {
+      setIsPlaying(true);
+      startSpeech(playbackRate);
+    }
   };
 
+  // 처음부터 다시 재생
   const handleRestart = () => {
     setCurrentTime(0);
     setIsPlaying(true);
+    startSpeech(playbackRate);
   };
 
+  // 배속 순환 (1.0x -> 1.2x -> 1.5x)
   const handleRateCycle = () => {
     const rates = [1.0, 1.2, 1.5];
     const nextIdx = (rates.indexOf(playbackRate) + 1) % rates.length;
-    setPlaybackRate(rates[nextIdx]);
+    const nextRate = rates[nextIdx];
+    setPlaybackRate(nextRate);
+
+    if (isPlaying) {
+      startSpeech(nextRate);
+    }
+  };
+
+  const handleClose = () => {
+    if (typeof window !== 'undefined' && window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
+    setIsPlaying(false);
+    onClose();
   };
 
   const handleProgressSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -213,7 +299,14 @@ export const AudioOverviewPlayer: React.FC<AudioOverviewPlayerProps> = ({
               {/* 음소거 토글 */}
               <button
                 type="button"
-                onClick={() => setIsMuted(!isMuted)}
+                onClick={() => {
+                  const nextMuted = !isMuted;
+                  setIsMuted(nextMuted);
+                  if (nextMuted && typeof window !== 'undefined' && window.speechSynthesis) {
+                    window.speechSynthesis.cancel();
+                    setIsPlaying(false);
+                  }
+                }}
                 className="p-1.5 rounded-lg text-slate-500 hover:text-slate-800 dark:text-zinc-400 dark:hover:text-white transition cursor-pointer"
                 title={isMuted ? '음소거 해제' : '음소거'}
               >
@@ -256,7 +349,7 @@ export const AudioOverviewPlayer: React.FC<AudioOverviewPlayerProps> = ({
 
             <button
               type="button"
-              onClick={onClose}
+              onClick={handleClose}
               className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 hover:bg-slate-100 dark:hover:bg-zinc-800 transition cursor-pointer"
               title="오디오 플레이어 닫기"
             >

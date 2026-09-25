@@ -116,11 +116,7 @@ export const TriOptionIdeator: React.FC<TriOptionIdeatorProps> = ({
     opt: PlanOption,
     theme: {
       tag: string;
-      tagClass: string;
       icon: React.ReactNode;
-      borderClass: string;
-      hoverClass: string;
-      buttonBg: string;
     }
   ) => {
     const isSelected = planTriad.selectedOption === key;
@@ -131,84 +127,84 @@ export const TriOptionIdeator: React.FC<TriOptionIdeatorProps> = ({
         className={`
           flex flex-col justify-between rounded-3xl p-6 transition-all duration-200 border relative
           ${isSelected 
-            ? `${theme.borderClass} ring-2 ring-indigo-500/30 bg-white dark:bg-zinc-850 shadow-xl scale-[1.01]` 
-            : `${theme.hoverClass} bg-white/90 dark:bg-zinc-900 border-slate-200 dark:border-zinc-800 shadow-sm`
+            ? 'border-zinc-500 bg-zinc-900/95 ring-2 ring-zinc-500/30 shadow-xl' 
+            : 'border-zinc-800 bg-zinc-900/80 hover:border-zinc-700 shadow-sm'
           }
         `}
       >
         <div>
           {/* 상단 뱃지 & 선택 인디케이터 */}
           <div className="flex items-center justify-between mb-4">
-            <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black ${theme.tagClass}`}>
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-zinc-800 text-zinc-300 border border-zinc-700">
               {theme.icon}
               <span>{theme.tag}</span>
             </span>
 
             {isSelected && (
-              <span className="flex items-center space-x-1 text-xs font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950 px-2.5 py-0.5 rounded-full border border-indigo-200 dark:border-indigo-800">
-                <Check className="w-3.5 h-3.5" />
+              <span className="flex items-center space-x-1 text-xs font-bold text-zinc-100 bg-zinc-800 px-2.5 py-0.5 rounded-full border border-zinc-600">
+                <Check className="w-3.5 h-3.5 text-zinc-200" />
                 <span>선택됨</span>
               </span>
             )}
           </div>
 
           {/* 타이틀 및 컨셉 */}
-          <h3 className="text-base sm:text-lg font-black text-slate-900 dark:text-white mb-2 leading-snug">
+          <h3 className="text-base sm:text-lg font-semibold text-zinc-100 mb-2 leading-snug">
             {opt.title}
           </h3>
-          <p className="text-xs sm:text-sm text-slate-600 dark:text-zinc-300 leading-relaxed mb-5 font-medium">
+          <p className="text-sm text-zinc-300 leading-relaxed mb-5 font-normal">
             {opt.concept}
           </p>
 
           {/* 타깃 & 가격 모델 */}
           <div className="space-y-2.5 text-xs mb-5">
-            <div className="p-3 rounded-2xl bg-slate-50 dark:bg-zinc-800/60 border border-slate-200/60 dark:border-zinc-750">
-              <div className="flex items-center space-x-1.5 text-slate-500 dark:text-zinc-400 font-bold mb-1">
-                <Target className="w-3.5 h-3.5 text-indigo-500" />
+            <div className="p-3 rounded-2xl bg-zinc-800/60 border border-zinc-750">
+              <div className="flex items-center space-x-1.5 text-zinc-300 font-bold mb-1">
+                <Target className="w-3.5 h-3.5 text-zinc-300" />
                 <span>핵심 타깃</span>
               </div>
-              <p className="text-slate-800 dark:text-zinc-200 font-semibold">{opt.target}</p>
+              <p className="text-zinc-200 font-medium">{opt.target}</p>
             </div>
 
-            <div className="p-3 rounded-2xl bg-slate-50 dark:bg-zinc-800/60 border border-slate-200/60 dark:border-zinc-750">
-              <div className="flex items-center space-x-1.5 text-slate-500 dark:text-zinc-400 font-bold mb-1">
-                <Coins className="w-3.5 h-3.5 text-amber-500" />
+            <div className="p-3 rounded-2xl bg-zinc-800/60 border border-zinc-750">
+              <div className="flex items-center space-x-1.5 text-zinc-300 font-bold mb-1">
+                <Coins className="w-3.5 h-3.5 text-zinc-300" />
                 <span>예산 및 가격 체계</span>
               </div>
-              <p className="text-slate-800 dark:text-zinc-200 font-semibold">{opt.pricing}</p>
+              <p className="text-zinc-200 font-medium">{opt.pricing}</p>
             </div>
 
             {/* 장점 & 단점 */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              <div className="p-2.5 rounded-xl bg-emerald-50/60 dark:bg-emerald-950/30 border border-emerald-200/60 dark:border-emerald-800/40">
-                <div className="flex items-center space-x-1 text-emerald-700 dark:text-emerald-300 font-extrabold text-[11px] mb-1">
+              <div className="p-2.5 rounded-xl bg-zinc-800/80 border border-zinc-700">
+                <div className="flex items-center space-x-1 text-emerald-400 font-bold text-[11px] mb-1">
                   <ThumbsUp className="w-3 h-3" />
                   <span>장점 (Pros)</span>
                 </div>
-                <p className="text-[11px] text-emerald-900 dark:text-emerald-200 leading-snug">{opt.pros}</p>
+                <p className="text-[11px] text-zinc-300 leading-snug">{opt.pros}</p>
               </div>
 
-              <div className="p-2.5 rounded-xl bg-rose-50/60 dark:bg-rose-950/30 border border-rose-200/60 dark:border-rose-800/40">
-                <div className="flex items-center space-x-1 text-rose-700 dark:text-rose-300 font-extrabold text-[11px] mb-1">
+              <div className="p-2.5 rounded-xl bg-zinc-800/80 border border-zinc-700">
+                <div className="flex items-center space-x-1 text-amber-400 font-bold text-[11px] mb-1">
                   <AlertCircle className="w-3 h-3" />
                   <span>단점 (Cons)</span>
                 </div>
-                <p className="text-[11px] text-rose-900 dark:text-rose-200 leading-snug">{opt.cons}</p>
+                <p className="text-[11px] text-zinc-300 leading-snug">{opt.cons}</p>
               </div>
             </div>
           </div>
 
           {/* 로드맵 */}
           <div className="space-y-1.5 mb-6">
-            <span className="text-xs font-bold text-slate-500 dark:text-zinc-400 flex items-center gap-1.5">
-              <Milestone className="w-3.5 h-3.5 text-indigo-500" />
+            <span className="text-xs font-bold text-zinc-300 flex items-center gap-1.5">
+              <Milestone className="w-3.5 h-3.5 text-zinc-300" />
               <span>실행 로드맵</span>
             </span>
-            <ul className="space-y-1.5 text-xs text-slate-700 dark:text-zinc-300">
+            <ul className="space-y-1.5 text-xs text-zinc-300">
               {opt.roadmap.map((step, sIdx) => (
-                <li key={sIdx} className="flex items-start gap-2 bg-slate-50/80 dark:bg-zinc-800/40 p-2 rounded-lg">
-                  <span className="font-mono text-indigo-500 font-bold text-[11px] shrink-0">0{sIdx + 1}</span>
-                  <span className="leading-tight">{step}</span>
+                <li key={sIdx} className="flex items-start gap-2 bg-zinc-800/50 p-2 rounded-lg border border-zinc-800/80">
+                  <span className="font-mono text-zinc-400 font-bold text-[11px] shrink-0">0{sIdx + 1}</span>
+                  <span className="leading-tight text-zinc-200">{step}</span>
                 </li>
               ))}
             </ul>
@@ -218,10 +214,7 @@ export const TriOptionIdeator: React.FC<TriOptionIdeatorProps> = ({
         {/* 확정 버튼 */}
         <button
           onClick={() => handleOpenConfirmModal(key)}
-          className={`
-            w-full py-3 px-4 rounded-2xl text-xs font-black flex items-center justify-center space-x-2 transition cursor-pointer shadow-md active:scale-98
-            ${theme.buttonBg}
-          `}
+          className="w-full py-3 px-4 rounded-2xl text-xs font-bold flex items-center justify-center space-x-2 transition cursor-pointer shadow-md bg-zinc-100 text-zinc-900 hover:bg-white active:scale-98"
         >
           <span>이 안으로 기획 확정</span>
           <ArrowRight className="w-4 h-4" />
@@ -234,17 +227,17 @@ export const TriOptionIdeator: React.FC<TriOptionIdeatorProps> = ({
     <div className="w-full flex flex-col py-6 px-4 sm:px-8 space-y-6 max-w-[1400px] mx-auto select-none">
       
       {/* 상단 기획 키워드 인풋바 & 발산 배너 */}
-      <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-zinc-900 text-white rounded-3xl p-6 sm:p-8 shadow-xl border border-indigo-800/40 relative overflow-hidden">
+      <div className="bg-zinc-900 text-white rounded-3xl p-6 sm:p-8 shadow-md border border-zinc-800 relative overflow-hidden">
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="space-y-2 max-w-2xl">
-            <div className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full text-xs font-extrabold bg-indigo-500/20 text-indigo-300 border border-indigo-400/30">
-              <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+            <div className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-zinc-800 text-zinc-300 border border-zinc-700">
+              <Sparkles className="w-3.5 h-3.5 text-zinc-300" />
               <span>3-Way AI 기획 발산 엔진 (Tri-Option Ideator)</span>
             </div>
-            <h2 className="text-xl sm:text-2xl font-black tracking-tight text-white">
+            <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-zinc-100">
               상반된 세 가지 기획 관점을 1초 만에 인큐베이팅
             </h2>
-            <p className="text-xs sm:text-sm text-zinc-300 leading-relaxed">
+            <p className="text-xs sm:text-sm text-zinc-300 leading-relaxed font-normal">
               아이디어 키워드를 입력하면 검증된 정석형, 도파민 폭발 혁신형, 초고속 0원 린 MVP형 3가지 대안을 즉시 비교 발산하고 공문서로 직결합니다.
             </p>
           </div>
@@ -258,21 +251,21 @@ export const TriOptionIdeator: React.FC<TriOptionIdeatorProps> = ({
                 if (e.key === 'Enter') handleGenerateTriad();
               }}
               placeholder="기획 아이디어 또는 키워드를 툭 던져보세요..."
-              className="px-4 py-3 rounded-2xl bg-zinc-800/90 border border-zinc-700 text-xs sm:text-sm text-white placeholder-zinc-400 focus:border-indigo-400 outline-none w-full sm:w-80 shadow-inner"
+              className="px-4 py-3 rounded-2xl bg-zinc-800 border border-zinc-700 text-xs sm:text-sm text-white placeholder-zinc-400 focus:border-zinc-500 outline-none w-full sm:w-80 shadow-inner"
             />
             <button
               onClick={handleGenerateTriad}
               disabled={isGenerating}
-              className="flex items-center justify-center space-x-1.5 px-5 py-3 rounded-2xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 disabled:opacity-50 text-white text-xs font-black transition shadow-lg whitespace-nowrap cursor-pointer active:scale-95"
+              className="flex items-center justify-center space-x-1.5 px-5 py-3 rounded-2xl bg-zinc-100 hover:bg-white text-zinc-900 disabled:opacity-50 text-xs font-bold transition shadow-sm whitespace-nowrap cursor-pointer active:scale-95"
             >
               {isGenerating ? (
                 <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <Loader2 className="w-4 h-4 animate-spin text-zinc-800" />
                   <span>3-Way 발산 중...</span>
                 </>
               ) : (
                 <>
-                  <Zap className="w-4 h-4 text-amber-300" />
+                  <Zap className="w-4 h-4 text-zinc-800" />
                   <span>3-Way 기획 발산</span>
                 </>
               )}
@@ -285,29 +278,17 @@ export const TriOptionIdeator: React.FC<TriOptionIdeatorProps> = ({
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {renderCard('A', planTriad.optionA, {
           tag: 'A안 [정석·안정형]',
-          tagClass: 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300 border border-blue-200 dark:border-blue-800',
-          icon: <ShieldCheck className="w-3.5 h-3.5 mr-1 text-blue-600 shrink-0" />,
-          borderClass: 'border-blue-500 dark:border-blue-500',
-          hoverClass: 'hover:border-blue-300 dark:hover:border-blue-800',
-          buttonBg: 'bg-blue-600 hover:bg-blue-500 text-white'
+          icon: <ShieldCheck className="w-3.5 h-3.5 text-zinc-300 shrink-0" />
         })}
 
         {renderCard('B', planTriad.optionB, {
           tag: 'B안 [파격·혁신형]',
-          tagClass: 'bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300 border border-purple-200 dark:border-purple-800',
-          icon: <Flame className="w-3.5 h-3.5 mr-1 text-purple-600 shrink-0" />,
-          borderClass: 'border-purple-500 dark:border-purple-500',
-          hoverClass: 'hover:border-purple-300 dark:hover:border-purple-800',
-          buttonBg: 'bg-purple-600 hover:bg-purple-500 text-white'
+          icon: <Flame className="w-3.5 h-3.5 text-zinc-300 shrink-0" />
         })}
 
         {renderCard('C', planTriad.optionC, {
           tag: 'C안 [실속·초고속 MVP]',
-          tagClass: 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 border border-amber-200 dark:border-amber-800',
-          icon: <Zap className="w-3.5 h-3.5 mr-1 text-amber-600 shrink-0" />,
-          borderClass: 'border-amber-500 dark:border-amber-500',
-          hoverClass: 'hover:border-amber-300 dark:hover:border-amber-800',
-          buttonBg: 'bg-amber-600 hover:bg-amber-500 text-white'
+          icon: <Zap className="w-3.5 h-3.5 text-zinc-300 shrink-0" />
         })}
       </div>
 

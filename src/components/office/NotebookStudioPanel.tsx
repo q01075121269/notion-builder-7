@@ -459,10 +459,10 @@ export const NotebookStudioPanel: React.FC<NotebookStudioPanelProps> = ({
           {canUndo && (
             <button
               onClick={onUndo}
-              className="flex items-center space-x-1 px-2 py-0.5 rounded-md text-[11px] font-semibold text-[var(--text-secondary)] hover:bg-[var(--bg-card)] hover:text-[var(--text-primary)] transition cursor-pointer"
+              className="flex items-center space-x-1 px-2 py-0.5 rounded-md text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 hover:text-black dark:hover:text-white bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/20 transition cursor-pointer"
               title={`되돌리기: ${lastActionName || ''}`}
             >
-              <Undo2 className="w-3 h-3" />
+              <Undo2 className="w-3 h-3 text-zinc-600 dark:text-zinc-300" />
               <span>되돌리기</span>
             </button>
           )}
