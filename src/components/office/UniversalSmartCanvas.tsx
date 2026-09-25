@@ -4,21 +4,24 @@ import type {
   CanvasViewMode, 
   PlanTriad, 
   PlanOption,
-  OfficeCitation 
+  OfficeCitation,
+  OfficeSource
 } from '../../types/office';
 import { TriOptionIdeator } from './TriOptionIdeator';
-import { GovDocsCanvas } from './canvas/GovDocsCanvas';
+import { SparkpageCanvas } from './canvas/SparkpageCanvas';
 import { SlidesCanvas } from './canvas/SlidesCanvas';
 import { SheetsCanvas } from './canvas/SheetsCanvas';
 import { MinutesCanvas } from './canvas/MinutesCanvas';
 import { MindMapCanvas } from './canvas/MindMapCanvas';
 import { InfographicCanvas } from './canvas/InfographicCanvas';
 import { BriefingReportCanvas } from './canvas/BriefingReportCanvas';
-import { Sparkles, Edit3 } from 'lucide-react';
+import { Sparkles, LayoutDashboard } from 'lucide-react';
+import { useSparkTheme } from '../../context/SparkThemeContext';
 
 interface UniversalSmartCanvasProps {
   document: OfficeDocument;
   planTriad?: PlanTriad;
+  sources?: OfficeSource[];
   viewMode: CanvasViewMode;
   onChangeViewMode: (mode: CanvasViewMode) => void;
   onChangeDocument: (updated: OfficeDocument, actionName: string) => void;
@@ -32,6 +35,7 @@ interface UniversalSmartCanvasProps {
 export const UniversalSmartCanvas: React.FC<UniversalSmartCanvasProps> = ({
   document,
   planTriad,
+  sources = [],
   viewMode,
   onChangeViewMode,
   onChangeDocument,
@@ -41,48 +45,50 @@ export const UniversalSmartCanvas: React.FC<UniversalSmartCanvasProps> = ({
   onSyncToLifeHub,
   onShowToast
 }) => {
-  return (
-    <div className="w-full h-full flex flex-col bg-slate-100/70 dark:bg-zinc-950 overflow-hidden select-none relative">
-      
-      {/* 1. 상단 모드 전환 탭 바 (3-Way 기획 vs 실시간 캔버스) */}
-      <div className="px-4 sm:px-6 py-2 bg-white dark:bg-zinc-900 border-b border-slate-200 dark:border-zinc-800 flex items-center justify-between shrink-0 shadow-2xs">
-        <div className="flex items-center space-x-1 sm:space-x-2 bg-slate-100 dark:bg-zinc-800 p-1 rounded-xl border border-slate-200 dark:border-zinc-700">
-          <button
-            onClick={() => onChangeViewMode('triad')}
-            className={`
-              flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer whitespace-nowrap
-              ${viewMode === 'triad'
-                ? 'bg-white dark:bg-zinc-900 text-indigo-600 dark:text-indigo-400 shadow-xs border border-indigo-200 dark:border-indigo-900 font-bold'
-                : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white'
-              }
-            `}
-          >
-            <Sparkles className="w-4 h-4 mr-1.5 text-indigo-500 shrink-0" />
-            <span>3-Way 기획 인큐베이터</span>
-          </button>
+  const { themeConfig } = useSparkTheme();
 
+  return (
+    <div className={`w-full h-full flex flex-col ${themeConfig.appBg} overflow-hidden select-none relative transition-colors duration-200`}>
+      
+      {/* 1. 상단 모드 전환 탭 바 (3-Way 기획 vs Bento Grid 스파크 캔버스) */}
+      <div className={`px-4 sm:px-6 py-2 border-b ${themeConfig.headerBorder} ${themeConfig.headerBg} flex items-center justify-between shrink-0 shadow-2xs transition-colors duration-200`}>
+        <div className="flex items-center space-x-1 sm:space-x-2 bg-black/20 p-1 rounded-xl border border-white/5">
           <button
             onClick={() => onChangeViewMode('canvas')}
             className={`
               flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer whitespace-nowrap
               ${viewMode === 'canvas'
-                ? 'bg-white dark:bg-zinc-900 text-slate-900 dark:text-white shadow-xs border border-slate-300 dark:border-zinc-700 font-bold'
-                : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white'
+                ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 font-bold shadow-xs'
+                : 'text-slate-400 hover:text-white'
               }
             `}
           >
-            <Edit3 className="w-4 h-4 mr-1.5 text-slate-500 shrink-0" />
-            <span>실시간 인플레이스 캔버스</span>
+            <LayoutDashboard className="w-4 h-4 mr-1 text-cyan-400 shrink-0" />
+            <span>스파크 캔버스 (Bento Grid)</span>
+          </button>
+
+          <button
+            onClick={() => onChangeViewMode('triad')}
+            className={`
+              flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer whitespace-nowrap
+              ${viewMode === 'triad'
+                ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 font-bold shadow-xs'
+                : 'text-slate-400 hover:text-white'
+              }
+            `}
+          >
+            <Sparkles className="w-4 h-4 mr-1 text-indigo-400 shrink-0" />
+            <span>3-Way 전략 비교</span>
           </button>
         </div>
 
         {/* 현재 활성 포맷 상태 뱃지 */}
         <div className="flex items-center space-x-2">
-          <span className="hidden sm:inline text-[11px] text-slate-400 dark:text-zinc-500 font-medium">
-            현재 문서 양식:
+          <span className="hidden sm:inline text-[11px] text-slate-400 font-medium">
+            뷰 포맷:
           </span>
-          <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-100 dark:bg-zinc-800 text-slate-800 dark:text-zinc-200 border border-slate-200 dark:border-zinc-700 uppercase font-mono">
-            {document.format.toUpperCase()}
+          <span className={`px-2.5 py-1 rounded-lg text-xs font-bold border uppercase font-mono ${themeConfig.pillBg} ${themeConfig.pillBorder} ${themeConfig.pillText}`}>
+            {document.format === 'docs' ? 'SPARKPAGE' : document.format.toUpperCase()}
           </span>
         </div>
       </div>
@@ -98,9 +104,12 @@ export const UniversalSmartCanvas: React.FC<UniversalSmartCanvasProps> = ({
         ) : (
           <div className="w-full h-full min-h-full">
             {document.format === 'docs' && (
-              <GovDocsCanvas
+              <SparkpageCanvas
                 document={document}
+                planTriad={planTriad}
+                sources={sources}
                 onChangeDocument={onChangeDocument}
+                onApplyPlanToDoc={(key, qa) => onApplyPlanToDoc(key, qa)}
                 onSelectCitation={onSelectCitation}
               />
             )}

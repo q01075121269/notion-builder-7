@@ -19,6 +19,9 @@ import { AudioOverviewPlayer } from './AudioOverviewPlayer';
 import { VersionExportModal } from './VersionExportModal';
 import { LifeHubTaskBridge } from './LifeHubTaskBridge';
 import { NotionWikiDeployModal } from './NotionWikiDeployModal';
+import { MultiSourceResearchModal } from './MultiSourceResearchModal';
+import { SparkStudioHeader } from './SparkStudioHeader';
+import { SparkThemeProvider, useSparkTheme } from '../../context/SparkThemeContext';
 import { useApp } from '../../context/AppContext';
 import { 
   Folder, 
@@ -34,6 +37,15 @@ import {
 const STORAGE_KEY = 'anti_office_studio_projects_v1';
 
 export const OfficeStudioContainer: React.FC = () => {
+  return (
+    <SparkThemeProvider>
+      <OfficeStudioInner />
+    </SparkThemeProvider>
+  );
+};
+
+const OfficeStudioInner: React.FC = () => {
+  const { themeConfig } = useSparkTheme();
   const { showToast, setCurrentView } = useApp();
 
   // 1. 프로젝트 상태 (localStorage 연동 영구 보존)
@@ -103,6 +115,15 @@ export const OfficeStudioContainer: React.FC = () => {
 
   // 11. 우측 옴니 출하 서랍 상태
   const [isExportDrawerOpen, setIsExportDrawerOpen] = useState<boolean>(false);
+
+  // 12. 상단 옴니 리서치 모달 상태
+  const [isOmniResearchModalOpen, setIsOmniResearchModalOpen] = useState<boolean>(false);
+  const [omniResearchQuery, setOmniResearchQuery] = useState<string>('스마트 시설물 유지관리 및 AI 에이전트 행정 자동화');
+
+  const handleStartResearch = (query: string) => {
+    setOmniResearchQuery(query);
+    setIsOmniResearchModalOpen(true);
+  };
 
   // =========================================================================
   // 4. 반응형 사이드바 리사이저 & 접기/펼치기 상태
@@ -390,13 +411,20 @@ export const OfficeStudioContainer: React.FC = () => {
   return (
     <div 
       ref={containerRef}
-      className="flex-1 flex flex-col h-full w-full overflow-hidden bg-slate-100 dark:bg-zinc-950 text-slate-900 dark:text-zinc-100 font-sans select-none relative"
+      className={`flex-1 flex flex-col h-full w-full overflow-hidden ${themeConfig.appBg} font-sans select-none relative transition-colors duration-200`}
     >
-      
+      {/* ========================================================================= */}
+      {/* 0. 최상단 옴니 리서치 바 & 감마형 3대 비주얼 테마 스위처 헤더 */}
+      {/* ========================================================================= */}
+      <SparkStudioHeader
+        onStartResearch={handleStartResearch}
+        defaultQuery={currentDoc.title || '스마트 시설물 유지관리 및 AI 에이전트 행정 자동화'}
+      />
+
       {/* ========================================================================= */}
       {/* 상단 1단 미니멀 바: 프로젝트 네비게이션 & [ 🚀 최종 저장 및 출하 ] */}
       {/* ========================================================================= */}
-      <div className="h-12 border-b border-slate-200 dark:border-zinc-800 bg-white/95 dark:bg-zinc-900/95 backdrop-blur px-3 sm:px-5 flex items-center justify-between shrink-0 z-20 gap-3 no-print shadow-2xs">
+      <div className={`h-12 border-b ${themeConfig.headerBorder} ${themeConfig.headerBg} backdrop-blur px-3 sm:px-5 flex items-center justify-between shrink-0 z-20 gap-3 no-print shadow-2xs transition-colors duration-200`}>
         
         {/* 좌측: 사이드바 접기/펼치기 화살표 + 프로젝트 탭 목록 + 새 프로젝트 버튼 */}
         <div className="flex items-center space-x-1.5 overflow-x-auto whitespace-nowrap scrollbar-none flex-1 min-w-0 py-0.5">
@@ -536,6 +564,7 @@ export const OfficeStudioContainer: React.FC = () => {
           <UniversalSmartCanvas
             document={currentDoc}
             planTriad={activeProject.planTriad}
+            sources={activeProject.sources}
             viewMode={viewMode}
             onChangeViewMode={setViewMode}
             onChangeDocument={updateDocument}
@@ -651,6 +680,21 @@ export const OfficeStudioContainer: React.FC = () => {
         planTriad={activeProject.planTriad}
         onShowToast={showToast}
       />
+
+      {/* ========================================================================= */}
+      {/* 11. 상단 옴니 자율 리서치 모달 (MultiSourceResearchModal) */}
+      {/* ========================================================================= */}
+      {isOmniResearchModalOpen && (
+        <MultiSourceResearchModal
+          isOpen={isOmniResearchModalOpen}
+          onClose={() => setIsOmniResearchModalOpen(false)}
+          query={omniResearchQuery}
+          onImportSources={(newSources: OfficeSource[]) => {
+            handleAddSources(newSources);
+            showToast(`${newSources.length}개의 기술 출처가 지식 창고에 일괄 반영되었습니다.`, 'success');
+          }}
+        />
+      )}
 
     </div>
   );
