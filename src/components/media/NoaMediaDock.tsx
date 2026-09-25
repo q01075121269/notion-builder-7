@@ -8,8 +8,6 @@ import {
   Mic, 
   MicOff, 
   ArrowUp, 
-  FastForward, 
-  Sparkles, 
   X,
   FileText,
   SlidersHorizontal,
@@ -24,23 +22,20 @@ interface AttachedFile {
 }
 
 interface NoaMediaDockProps {
-  chips: string[];
-  onSelectChip: (chipText: string) => void;
   onSubmit: (prompt: string, attachedFile?: AttachedFile) => void;
   isProcessing: boolean;
   canSkip?: boolean;
   onSkip?: () => void;
   placeholder?: string;
   onToolSelect?: (toolId: string) => void;
+  // 호환용 옵셔널 props
+  chips?: string[];
+  onSelectChip?: (chipText: string) => void;
 }
 
 export const NoaMediaDock: React.FC<NoaMediaDockProps> = ({
-  chips,
-  onSelectChip,
   onSubmit,
   isProcessing,
-  canSkip = false,
-  onSkip,
   placeholder = '편하게 말씀하시거나 사진/음악을 올려주세요...',
   onToolSelect
 }) => {
@@ -156,35 +151,9 @@ export const NoaMediaDock: React.FC<NoaMediaDockProps> = ({
 
   return (
     <div className="w-full max-w-4xl mx-auto px-4 pb-4 sm:pb-6 relative z-30">
-      <div className="flex flex-col space-y-2.5">
+      <div className="flex flex-col space-y-2">
         
-        {/* 상단 라인: 노아의 동적 추천 칩 */}
-        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5 px-2">
-          {canSkip && onSkip && (
-            <button
-              type="button"
-              onClick={onSkip}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-zinc-200/90 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-300 dark:hover:bg-zinc-700 transition cursor-pointer shrink-0 border border-zinc-300/80 dark:border-zinc-700/80 shadow-2xs"
-            >
-              <FastForward className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400" strokeWidth={1.5} />
-              <span>이 단계 건너뛰기</span>
-            </button>
-          )}
-
-          {chips.map((chip, idx) => (
-            <button
-              key={`${chip}-${idx}`}
-              type="button"
-              onClick={() => onSelectChip(chip)}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-medium bg-white/90 dark:bg-zinc-900/90 text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition cursor-pointer shrink-0 border border-slate-200 dark:border-zinc-800 shadow-2xs backdrop-blur-xs active:scale-98"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400" strokeWidth={1.5} />
-              <span>{chip}</span>
-            </button>
-          ))}
-        </div>
-
-        {/* 첨부 파일 인디케이터 */}
+        {/* 첨부 파일 인디케이터 (첨부 시에만 노출) */}
         {attachedFile && (
           <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 w-fit text-xs text-zinc-700 dark:text-zinc-300 animate-fadeIn ml-2">
             <FileText className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400" strokeWidth={1.5} />

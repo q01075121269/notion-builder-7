@@ -138,35 +138,6 @@ export const MediaLabContainer: React.FC = () => {
     return () => clearInterval(videoInterval);
   }, [isPlayingVideo, artifact?.domain]);
 
-  // 현재 노아 추천 칩 목록 계산
-  const getDockChips = (): string[] => {
-    if (fsmState === 'IDLE') {
-      return [
-        '알프스 설산 배경의 40대 서양 CEO 15초 쇼츠',
-        '쇼츠 BGM 만들기',
-        '세로 숏폼 영상',
-        '3D/실사 썸네일'
-      ];
-    }
-
-    if (fsmState === 'INTERVIEWING') {
-      const steps = DOMAIN_INTERVIEW_STEPS[currentDomain] || DOMAIN_INTERVIEW_STEPS.video;
-      const currentStep = steps[currentStepIndex];
-      return currentStep ? currentStep.chips : ['생성 진행', '이대로 렌더링'];
-    }
-
-    if (fsmState === 'REFINING' || fsmState === 'COMPLETED') {
-      if (currentDomain === 'video') {
-        return ['배경 채도 높이기', '카메라 줌인 효과 추가', '자막 폰트 볼드화', '4K 업스케일링', '최종 완성 확정'];
-      }
-      if (currentDomain === 'audio') {
-        return ['드럼 비트 강조', '템포 5BPM 가속', '베이스 부스트', '마스터링 리미터 적용', '최종 완성 확정'];
-      }
-      return ['스튜디오 조명 강조', '배경 심도(아웃포커스) 강화', '텍스트 헤드라인 삽입', '4K 무손실 업스케일', '최종 완성 확정'];
-    }
-
-    return ['다음 단계', '세부 피드백'];
-  };
 
   // 인터뷰 단계 스킵 처리
   const handleSkipStep = () => {
@@ -298,43 +269,6 @@ export const MediaLabContainer: React.FC = () => {
     }
   };
 
-  // 퀵 칩 선택 핸들러
-  const handleSelectChip = (chipText: string) => {
-    if (chipText === '알프스 설산 배경의 40대 서양 CEO 15초 쇼츠') {
-      handleDockSubmit(chipText);
-      return;
-    }
-
-    if (fsmState === 'IDLE') {
-      if (chipText.includes('BGM')) {
-        setCurrentDomain('audio');
-        setFsmState('INTERVIEWING');
-        setCurrentStepIndex(0);
-        setUserPromptText('쇼츠 BGM 제작');
-        setNoaResponseText('사운드 무드와 템포 설정을 위한 노아 인터뷰를 시작합니다.');
-        showToast('쇼츠 BGM 제작 디렉팅을 시작합니다.', 'info');
-      } else if (chipText.includes('영상') || chipText.includes('숏폼')) {
-        setCurrentDomain('video');
-        setVisualRatio('9:16');
-        setFsmState('INTERVIEWING');
-        setCurrentStepIndex(0);
-        setUserPromptText('세로 숏폼 영상 제작');
-        setNoaResponseText('모바일 세로 숏폼을 위한 노아 인터뷰를 시작합니다.');
-        showToast('세로 숏폼 영상 제작 디렉팅을 시작합니다.', 'info');
-      } else {
-        setCurrentDomain('visual');
-        setVisualRatio('16:9');
-        setFsmState('INTERVIEWING');
-        setCurrentStepIndex(0);
-        setUserPromptText('3D/실사 썸네일 제작');
-        setNoaResponseText('고해상도 비주얼 썸네일을 위한 노아 인터뷰를 시작합니다.');
-        showToast('썸네일/비주얼 제작 디렉팅을 시작합니다.', 'info');
-      }
-      return;
-    }
-
-    handleDockSubmit(chipText);
-  };
 
   // 도구 선택 핸들러 ([➕ 도구])
   const handleToolSelect = (toolId: string) => {
@@ -753,7 +687,7 @@ export const MediaLabContainer: React.FC = () => {
 
             {/* IDLE 상태일 때의 미니멀 초기 안내 */}
             {fsmState === 'IDLE' && !artifact && (
-              <div className="flex-1 flex flex-col items-center justify-center py-12 text-center space-y-6 animate-fadeIn">
+              <div className="flex-1 flex flex-col items-center justify-center py-16 sm:py-24 text-center space-y-4 animate-fadeIn">
                 <div className="w-14 h-14 rounded-2xl bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 flex items-center justify-center shadow-xs">
                   <Sparkles className="w-7 h-7 text-zinc-600 dark:text-zinc-300" strokeWidth={1.5} />
                 </div>
@@ -761,33 +695,9 @@ export const MediaLabContainer: React.FC = () => {
                   <h2 className="text-xl sm:text-2xl font-bold text-zinc-900 dark:text-zinc-100 tracking-tight">
                     무엇을 만들고 싶으신가요?
                   </h2>
-                  <p className="text-xs sm:text-sm text-zinc-500 dark:text-zinc-400 max-w-md mx-auto">
+                  <p className="text-xs sm:text-sm text-zinc-500 dark:text-zinc-400 max-w-md mx-auto leading-relaxed">
                     원하시는 숏폼 영상, BGM, 썸네일 아이디어를 편하게 말씀해 주세요.
                   </p>
-                </div>
-
-                <div className="flex flex-wrap items-center justify-center gap-2 pt-2 max-w-xl">
-                  <button
-                    onClick={() => handleSelectChip('알프스 설산 배경의 40대 서양 CEO 15초 쇼츠')}
-                    className="flex items-center space-x-2 px-3.5 py-2 rounded-full bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 hover:border-zinc-400 dark:hover:border-zinc-600 text-xs font-medium text-zinc-700 dark:text-zinc-200 transition cursor-pointer"
-                  >
-                    <Film className="w-3.5 h-3.5 text-zinc-500" strokeWidth={1.5} />
-                    <span>알프스 설산 배경의 40대 서양 CEO 15초 쇼츠</span>
-                  </button>
-                  <button
-                    onClick={() => handleSelectChip('쇼츠 BGM 만들기')}
-                    className="flex items-center space-x-2 px-3.5 py-2 rounded-full bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 hover:border-zinc-400 dark:hover:border-zinc-600 text-xs font-medium text-zinc-700 dark:text-zinc-200 transition cursor-pointer"
-                  >
-                    <Music className="w-3.5 h-3.5 text-zinc-500" strokeWidth={1.5} />
-                    <span>쇼츠 BGM 만들기</span>
-                  </button>
-                  <button
-                    onClick={() => handleSelectChip('3D/실사 썸네일')}
-                    className="flex items-center space-x-2 px-3.5 py-2 rounded-full bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 hover:border-zinc-400 dark:hover:border-zinc-600 text-xs font-medium text-zinc-700 dark:text-zinc-200 transition cursor-pointer"
-                  >
-                    <ImageIcon className="w-3.5 h-3.5 text-zinc-500" strokeWidth={1.5} />
-                    <span>3D/실사 썸네일</span>
-                  </button>
                 </div>
               </div>
             )}
@@ -1062,12 +972,8 @@ export const MediaLabContainer: React.FC = () => {
         {/* ======================================================================= */}
         <footer className="shrink-0 z-30">
           <NoaMediaDock
-            chips={getDockChips()}
-            onSelectChip={handleSelectChip}
             onSubmit={handleDockSubmit}
             isProcessing={fsmState === 'GENERATING'}
-            canSkip={fsmState === 'INTERVIEWING'}
-            onSkip={handleSkipStep}
             onToolSelect={handleToolSelect}
             placeholder="편하게 말씀하시거나 사진/음악을 올려주세요..."
           />
