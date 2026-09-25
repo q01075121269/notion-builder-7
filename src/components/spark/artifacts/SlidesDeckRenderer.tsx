@@ -1,8 +1,8 @@
 // src/components/spark/artifacts/SlidesDeckRenderer.tsx
-// 16:9 와이드 비율의 프레젠테이션 카드 덱 렌더러
+// 16:9 와이드 비율의 프레젠테이션 카드 덱 렌더러 (10대 슬라이드 아키타입 & SVG 차트 내장)
 
 import React, { useState } from 'react';
-import type { OfficeDocument, SlideItem } from '../../../types/office';
+import type { OfficeDocument, SlideItem, SlideLayoutType } from '../../../types/office';
 import type { SparkVisualStyle } from '../../../types/visualStyle';
 import { VISUAL_STYLES } from '../../../types/visualStyle';
 import { 
@@ -16,8 +16,18 @@ import {
   Check, 
   TrendingUp,
   Clock,
-  Target
+  Target,
+  Zap,
+  AlertTriangle,
+  CheckCircle2,
+  Layers,
+  Workflow,
+  Quote,
+  Table
 } from 'lucide-react';
+import { InteractiveBarChart } from '../../office/charts/InteractiveBarChart';
+import { DonutProgressGauge } from '../../office/charts/DonutProgressGauge';
+import { TimelineConnector } from '../../office/charts/TimelineConnector';
 
 interface SlideStylePreset {
   containerBg: string;
@@ -141,6 +151,26 @@ const SLIDE_THEMES: Record<SparkVisualStyle, SlideStylePreset> = {
   }
 };
 
+export interface SlideLayoutMeta {
+  id: SlideLayoutType;
+  label: string;
+  emoji: string;
+  desc: string;
+}
+
+export const SLIDE_LAYOUTS: SlideLayoutMeta[] = [
+  { id: 'barchart', label: '막대 분석형', emoji: '📊', desc: '상단 핵심 메시지 + 대형 SVG 막대 차트 + 통계 브리프' },
+  { id: 'donut', label: '도넛 차트형', emoji: '🍩', desc: '예산/점유율 원형 게이지 + 우측 범례 및 주요 항목 명세' },
+  { id: 'kpi-impact', label: 'KPI 임팩트형', emoji: '🚀', desc: '초대형 볼드 타이포 + 증감률 태그 + 서브 게이지 바' },
+  { id: 'problem-solution', label: '문제 vs 해결', emoji: '⚖️', desc: '현재의 병목(적색) vs 도입 후 혁신(청색) 2단 분할' },
+  { id: 'triad-matrix', label: '3-Way 비교', emoji: '🏛️', desc: 'A안(정석), B안(파격), C안(실속) 3단 입체 비교 카드' },
+  { id: 'timeline-roadmap', label: '타임라인 로드맵', emoji: '⏱️', desc: '4단계 추진 일정 파이프라인 및 주차별 마일스톤' },
+  { id: 'bento-dashboard', label: 'Bento 대시보드', emoji: '🍱', desc: '4열 비대칭 벤토 카드로 요약/수치/로드맵 집약' },
+  { id: 'system-pipeline', label: '시스템 파이프라인', emoji: '⚡', desc: '입력 ➔ AI 코어 ➔ 출력 자동화 3단 블록 연결' },
+  { id: 'executive-quote', label: '결론/인용형', emoji: '💬', desc: 'C레벨 직보고용 대형 인용구 및 핵심 의사결정 콜아웃' },
+  { id: 'budget-grid', label: '예산 상세 그리드', emoji: '💰', desc: '항목별 금액 표 + 누적 예산 프로그레스 바' }
+];
+
 interface SlidesDeckRendererProps {
   document: OfficeDocument;
   visualStyle?: SparkVisualStyle;
@@ -165,13 +195,29 @@ export const SlidesDeckRenderer: React.FC<SlidesDeckRendererProps> = ({
   const styleMeta = VISUAL_STYLES[visualStyle] || VISUAL_STYLES['3d-isometric'];
   const slideTheme = SLIDE_THEMES[visualStyle] || SLIDE_THEMES['3d-isometric'];
 
+  const defaultLayouts: SlideLayoutType[] = [
+    'barchart',
+    'donut',
+    'kpi-impact',
+    'problem-solution',
+    'triad-matrix',
+    'timeline-roadmap',
+    'bento-dashboard',
+    'system-pipeline',
+    'executive-quote',
+    'budget-grid'
+  ];
+
   const activeSlide: SlideItem = slides[currentSlideIndex] || {
     id: 'default-1',
     title: document.title || '발표 자료 슬라이드',
     subtitle: '스마트 행정 및 자동화 추진 전략',
     bullets: ['핵심 추진 과제 1', '핵심 실행 방안 2', '기대 효과 및 로드맵 3'],
-    badge: 'STRATEGY'
+    badge: 'STRATEGY',
+    layout: defaultLayouts[currentSlideIndex % defaultLayouts.length]
   };
+
+  const currentLayout: SlideLayoutType = activeSlide.layout || defaultLayouts[currentSlideIndex % defaultLayouts.length];
 
   const handleUpdateActiveSlide = (partial: Partial<SlideItem>) => {
     const updatedSlide = { ...activeSlide, ...partial };
@@ -186,6 +232,7 @@ export const SlidesDeckRenderer: React.FC<SlidesDeckRendererProps> = ({
   };
 
   const handleAddSlide = () => {
+    const nextIdx = slides.length;
     const newSlide: SlideItem = {
       id: `slide-${Date.now()}`,
       title: '새로운 핵심 전략 슬라이드',
@@ -195,7 +242,8 @@ export const SlidesDeckRenderer: React.FC<SlidesDeckRendererProps> = ({
         '정량적 성과 지표(KPI) 및 데이터 검증 체계',
         '사내 변경 관리 및 단계적 확산 가이드라인'
       ],
-      badge: 'PHASE ' + (slides.length + 1)
+      badge: 'PHASE ' + (nextIdx + 1),
+      layout: defaultLayouts[nextIdx % defaultLayouts.length]
     };
     const updated = [...slides, newSlide];
     onChangeDocument({
@@ -245,7 +293,7 @@ export const SlidesDeckRenderer: React.FC<SlidesDeckRendererProps> = ({
     <div className={`w-full min-h-full py-6 px-3 sm:px-8 flex flex-col items-center justify-start ${slideTheme.containerBg} transition-all duration-300 select-text`}>
       
       {/* 1. 상단 슬라이드 덱 컨트롤 헤더 */}
-      <div className={`w-full max-w-[1040px] mb-4 flex flex-wrap items-center justify-between gap-3 p-3.5 rounded-2xl border shadow-sm transition-all duration-200 ${slideTheme.controlClass}`}>
+      <div className={`w-full max-w-[1040px] mb-3 flex flex-wrap items-center justify-between gap-3 p-3.5 rounded-2xl border shadow-sm transition-all duration-200 ${slideTheme.controlClass}`}>
         <div className="flex items-center space-x-2.5">
           <div className="p-2 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400">
             <Presentation className="w-5 h-5" />
@@ -293,8 +341,33 @@ export const SlidesDeckRenderer: React.FC<SlidesDeckRendererProps> = ({
         </div>
       </div>
 
+      {/* 📐 슬라이드 레이아웃 (10종) 선택 가로 스크롤 바 */}
+      <div className="w-full max-w-[1040px] mb-3 flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
+        <span className="font-bold text-zinc-400 shrink-0 text-[11px] mr-1 flex items-center gap-1">
+          <span>📐 레이아웃:</span>
+        </span>
+        {SLIDE_LAYOUTS.map(ly => {
+          const isSelected = currentLayout === ly.id;
+          return (
+            <button
+              key={ly.id}
+              onClick={() => handleUpdateActiveSlide({ layout: ly.id })}
+              className={`px-3 py-1.5 rounded-xl font-bold flex items-center gap-1.5 shrink-0 transition-all cursor-pointer ${
+                isSelected
+                  ? 'bg-blue-600 text-white shadow-md ring-2 ring-blue-400/40'
+                  : 'bg-zinc-900/80 text-zinc-300 border border-zinc-800 hover:border-zinc-700 hover:text-white'
+              }`}
+              title={ly.desc}
+            >
+              <span>{ly.emoji}</span>
+              <span>{ly.label}</span>
+            </button>
+          );
+        })}
+      </div>
+
       {/* 2. 중앙 16:9 와이드 메인 프레젠테이션 카드 뷰어 */}
-      <div className={`w-full max-w-[1040px] aspect-[16/9] min-h-[480px] flex flex-col justify-between p-6 sm:p-10 relative overflow-hidden transition-all duration-300 group ${slideTheme.frameClass}`}>
+      <div className={`w-full max-w-[1040px] aspect-[16/9] min-h-[500px] flex flex-col justify-between p-6 sm:p-10 relative overflow-hidden transition-all duration-300 group ${slideTheme.frameClass}`}>
         
         {/* 스타일 배경 오버레이 */}
         <div className={`absolute inset-0 pointer-events-none transition-all duration-300 ${slideTheme.overlayClass}`} />
@@ -306,7 +379,7 @@ export const SlidesDeckRenderer: React.FC<SlidesDeckRendererProps> = ({
               {activeSlide.badge || 'EXECUTIVE SUMMARY'}
             </span>
             <span className={`text-xs ${slideTheme.sectionTextClass}`}>
-              SECTION #{currentSlideIndex + 1}
+              SECTION #{currentSlideIndex + 1} • {SLIDE_LAYOUTS.find(l => l.id === currentLayout)?.label}
             </span>
           </div>
 
@@ -330,50 +403,395 @@ export const SlidesDeckRenderer: React.FC<SlidesDeckRendererProps> = ({
         </div>
 
         {/* 슬라이드 메인 헤드라인 및 서브타이틀 */}
-        <div className="relative z-10 my-auto py-4">
+        <div className="relative z-10 my-auto py-2 flex flex-col justify-center">
           <input
             type="text"
             value={activeSlide.title}
             onChange={(e) => handleUpdateActiveSlide({ title: e.target.value })}
-            className={`w-full text-2xl sm:text-4xl bg-transparent outline-none border-b border-transparent hover:border-black/20 dark:hover:border-white/20 focus:border-blue-500 transition-colors pb-1 ${slideTheme.titleClass}`}
+            className={`w-full text-2xl sm:text-3.5xl bg-transparent outline-none border-b border-transparent hover:border-black/20 dark:hover:border-white/20 focus:border-blue-500 transition-colors pb-1 ${slideTheme.titleClass}`}
             placeholder="슬라이드 대형 헤드라인을 입력하세요"
           />
           <input
             type="text"
             value={activeSlide.subtitle}
             onChange={(e) => handleUpdateActiveSlide({ subtitle: e.target.value })}
-            className={`w-full text-sm sm:text-base bg-transparent outline-none mt-2 ${slideTheme.subtitleClass}`}
+            className={`w-full text-xs sm:text-sm bg-transparent outline-none mt-1 ${slideTheme.subtitleClass}`}
             placeholder="핵심 메시지 서브타이틀을 입력하세요"
           />
 
-          {/* 3대 핵심 메시지 카드 그리드 */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mt-6">
-            {(activeSlide.bullets || []).slice(0, 3).map((bullet, bIdx) => (
-              <div
-                key={bIdx}
-                className={`p-3.5 sm:p-4 flex flex-col justify-between transition-all duration-200 ${slideTheme.cardClass}`}
-              >
-                <div className="flex items-center space-x-2 mb-2">
-                  <span className={`w-5 h-5 flex items-center justify-center text-xs shrink-0 ${slideTheme.cardBadgeClass}`}>
-                    {bIdx + 1}
+          {/* ========================================================================= */}
+          {/* 10대 레이아웃 동적 교체 렌더링 영역 */}
+          {/* ========================================================================= */}
+          <div className="mt-4">
+            
+            {/* 1. [막대 그래프 분석형] */}
+            {currentLayout === 'barchart' && (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-center">
+                <div className="sm:col-span-2">
+                  <InteractiveBarChart
+                    title="연도별 AI 행정 처리량 및 공수 절감 실측치"
+                    growthTag="+38% 성장"
+                    unit="k건"
+                    height={180}
+                  />
+                </div>
+                <div className={`p-4 flex flex-col justify-between ${slideTheme.cardClass}`}>
+                  <div>
+                    <span className="text-[11px] font-bold text-cyan-400 uppercase flex items-center gap-1 mb-1">
+                      <TrendingUp className="w-3.5 h-3.5" /> 통계 분석 브리프
+                    </span>
+                    <h5 className="text-xs font-bold text-white mb-2">기존 수기 작성 대비 생산성 3배</h5>
+                    <p className="text-[11px] text-zinc-300 leading-relaxed">
+                      2026년 하반기 전사 확대 시 연간 12만 건 이상의 반복 기안서와 수식 검증이 단일 골든 패스로 1초 자동화됩니다.
+                    </p>
+                  </div>
+                  <div className="mt-3 pt-2 border-t border-zinc-800 text-[10px] text-emerald-400 font-bold">
+                    ✓ 재무/감사 승인 리스크 0%
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* 2. [도넛 비중 차트형] */}
+            {currentLayout === 'donut' && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
+                <DonutProgressGauge
+                  value={84.5}
+                  size={160}
+                  title="2026 목표 달성률 (84.5%)"
+                  subtitle="전사 행정 디지털화 완수율"
+                  secondaryValue={68}
+                  secondaryLabel="예산 조기 집행률"
+                />
+                <div className="space-y-2.5">
+                  <div className={`p-3 rounded-xl border border-blue-500/30 bg-blue-950/20 ${slideTheme.cardClass}`}>
+                    <div className="flex items-center justify-between text-xs font-bold text-blue-300">
+                      <span>핵심 엔진 라이선스 (48M)</span>
+                      <span>56.4%</span>
+                    </div>
+                    <p className="text-[11px] text-zinc-400 mt-1">Gemini Pro API 및 엔터프라이즈 전사 시트</p>
+                  </div>
+                  <div className={`p-3 rounded-xl border border-purple-500/30 bg-purple-950/20 ${slideTheme.cardClass}`}>
+                    <div className="flex items-center justify-between text-xs font-bold text-purple-300">
+                      <span>온프레미스 보안 인프라 (25M)</span>
+                      <span>29.4%</span>
+                    </div>
+                    <p className="text-[11px] text-zinc-400 mt-1">정보보안 규정 제45조 연동 게이트웨이</p>
+                  </div>
+                  <div className={`p-3 rounded-xl border border-emerald-500/30 bg-emerald-950/20 ${slideTheme.cardClass}`}>
+                    <div className="flex items-center justify-between text-xs font-bold text-emerald-300">
+                      <span>파일럿 운영 & 예비비 (12M)</span>
+                      <span>14.2%</span>
+                    </div>
+                    <p className="text-[11px] text-zinc-400 mt-1">30인 실증 부서 피드백 리워드</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* 3. [대형 KPI 임팩트형] */}
+            {currentLayout === 'kpi-impact' && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className={`p-6 rounded-2xl flex flex-col justify-center items-center text-center ${slideTheme.cardClass}`}>
+                  <span className="text-xs font-bold text-zinc-400 uppercase tracking-widest mb-1">
+                    기안 수립 공수 절감
                   </span>
-                  <span className={`text-[11px] uppercase ${slideTheme.cardCategoryText}`}>
-                    핵심 전략 포인트
+                  <div className="text-5xl sm:text-6xl font-black font-mono text-cyan-400 tracking-tight my-2 drop-shadow-[0_0_20px_rgba(6,182,212,0.4)]">
+                    78%
+                  </div>
+                  <span className="text-xs font-bold text-emerald-400 bg-emerald-950/60 px-3 py-1 rounded-full border border-emerald-800">
+                    ▲ 4.2시간 ➔ 50분 단축
                   </span>
                 </div>
-                <textarea
+
+                <div className={`p-6 rounded-2xl flex flex-col justify-center items-center text-center ${slideTheme.cardClass}`}>
+                  <span className="text-xs font-bold text-zinc-400 uppercase tracking-widest mb-1">
+                    데이터 정합성 및 무결성
+                  </span>
+                  <div className="text-5xl sm:text-6xl font-black font-mono text-purple-400 tracking-tight my-2 drop-shadow-[0_0_20px_rgba(168,85,247,0.4)]">
+                    100%
+                  </div>
+                  <span className="text-xs font-bold text-blue-400 bg-blue-950/60 px-3 py-1 rounded-full border border-blue-800">
+                    =SUM 수식 자동 검증 통과
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* 4. [문제 vs 해결 2단 분할형] */}
+            {currentLayout === 'problem-solution' && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* 현재의 병목 (적색 테두리) */}
+                <div className="p-4 rounded-2xl bg-rose-950/20 border-2 border-rose-500/40 text-rose-100 flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center gap-1.5 text-xs font-black text-rose-400 mb-2">
+                      <AlertTriangle className="w-4 h-4" />
+                      <span>CURRENT BOTTLENECK (현재 문제점)</span>
+                    </div>
+                    <ul className="space-y-2 text-xs text-rose-200/90">
+                      <li className="flex items-start gap-1.5">
+                        <span className="text-rose-400 font-bold">•</span>
+                        <span>문서·엑셀·슬라이드 제각각 작성으로 데이터 불일치 빈발</span>
+                      </li>
+                      <li className="flex items-start gap-1.5">
+                        <span className="text-rose-400 font-bold">•</span>
+                        <span>수기 예산 집행 시 합계 오류로 재무팀 반려율 32% 달함</span>
+                      </li>
+                      <li className="flex items-start gap-1.5">
+                        <span className="text-rose-400 font-bold">•</span>
+                        <span>사내 보안 규정 검토에만 평균 2주 이상 소요되는 지연</span>
+                      </li>
+                    </ul>
+                  </div>
+                  <div className="text-[10px] text-rose-400/80 font-mono mt-3 pt-2 border-t border-rose-900/40">
+                    * 비효율 공수 연간 약 3.8억원 낭비
+                  </div>
+                </div>
+
+                {/* AI 도입 후 혁신 (청색 테두리) */}
+                <div className="p-4 rounded-2xl bg-blue-950/20 border-2 border-blue-500/50 text-blue-100 flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center gap-1.5 text-xs font-black text-cyan-400 mb-2">
+                      <CheckCircle2 className="w-4 h-4" />
+                      <span>INNOVATIVE SOLUTION (AI 오피스 혁신)</span>
+                    </div>
+                    <ul className="space-y-2 text-xs text-blue-100">
+                      <li className="flex items-start gap-1.5">
+                        <span className="text-cyan-400 font-bold">•</span>
+                        <span>단일 지식 소스 기반 4대 완제품 문서 0초 동시 출하</span>
+                      </li>
+                      <li className="flex items-start gap-1.5">
+                        <span className="text-cyan-400 font-bold">•</span>
+                        <span>사내 표준 결재선(4단) 및 예산 =SUM 공식 100% 무결성</span>
+                      </li>
+                      <li className="flex items-start gap-1.5">
+                        <span className="text-cyan-400 font-bold">•</span>
+                        <span>정보보안 규정 제45조 보안 프록시로 사전 적합성 통과</span>
+                      </li>
+                    </ul>
+                  </div>
+                  <div className="text-[10px] text-cyan-400 font-mono mt-3 pt-2 border-t border-blue-900/40 font-bold">
+                    * 대표이사 재가 상신 시간 70% 단축
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* 5. [3-Way 전략 비교 매트릭스형] */}
+            {currentLayout === 'triad-matrix' && (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className={`p-3.5 rounded-2xl border ${slideTheme.cardClass} relative`}>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-zinc-800 text-zinc-300 font-mono">
+                    OPTION A • 안정형
+                  </span>
+                  <h5 className="text-xs font-bold text-white mt-1.5 mb-1">사내 표준 온프레미스</h5>
+                  <p className="text-[11px] text-zinc-400 leading-relaxed">
+                    폐쇄망 격리 및 4단 결재 완벽 지원. 금융/공공 기관 필수 규격.
+                  </p>
+                  <div className="mt-3 pt-2 border-t border-zinc-800 text-[10px] font-mono text-zinc-400">
+                    예산: 8,500만원 / 4주 완료
+                  </div>
+                </div>
+
+                <div className={`p-3.5 rounded-2xl border-2 border-blue-500/50 bg-blue-950/30 ${slideTheme.cardClass} relative`}>
+                  <div className="absolute -top-2.5 right-3 px-2 py-0.5 rounded-full text-[9px] font-bold bg-blue-600 text-white">
+                    추천안
+                  </div>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-blue-900/60 text-blue-300 font-mono">
+                    OPTION B • 혁신형
+                  </span>
+                  <h5 className="text-xs font-bold text-cyan-300 mt-1.5 mb-1">하이브리드 AI 에이전트</h5>
+                  <p className="text-[11px] text-zinc-200 leading-relaxed">
+                    구글 웹 그라운딩 + 사내 위키 자동 연동. 생산성 3.2배 향상.
+                  </p>
+                  <div className="mt-3 pt-2 border-t border-blue-800/50 text-[10px] font-mono text-cyan-300 font-bold">
+                    예산: 1억 1,000만원 / 6주 완료
+                  </div>
+                </div>
+
+                <div className={`p-3.5 rounded-2xl border ${slideTheme.cardClass} relative`}>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-zinc-800 text-zinc-300 font-mono">
+                    OPTION C • MVP형
+                  </span>
+                  <h5 className="text-xs font-bold text-white mt-1.5 mb-1">초고속 파일럿 팩</h5>
+                  <p className="text-[11px] text-zinc-400 leading-relaxed">
+                    핵심 1개 부서 30인 즉시 적용. 2주 내 검증 보고서 도출.
+                  </p>
+                  <div className="mt-3 pt-2 border-t border-zinc-800 text-[10px] font-mono text-zinc-400">
+                    예산: 3,500만원 / 2주 완료
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* 6. [단계별 타임라인 로드맵형] */}
+            {currentLayout === 'timeline-roadmap' && (
+              <TimelineConnector
+                title="2026 하반기 오피스 스튜디오 도입 4단계 로드맵"
+              />
+            )}
+
+            {/* 7. [Bento Grid 복합 대시보드형] */}
+            {currentLayout === 'bento-dashboard' && (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className={`p-3.5 rounded-2xl sm:col-span-2 ${slideTheme.cardClass}`}>
+                  <span className="text-[10px] font-bold text-blue-400 uppercase tracking-wider block mb-1">
+                    핵심 추진 미션
+                  </span>
+                  <h5 className="text-xs font-bold text-white mb-1.5">문서 수립 단일 골든 패스 구축</h5>
+                  <p className="text-[11px] text-zinc-400 leading-relaxed">
+                    기안서-시트-장표 3대 산출물 간 데이터 정합성을 100% 보장하는 AI 오피스 파이프라인.
+                  </p>
+                </div>
+
+                <div className={`p-3.5 rounded-2xl flex flex-col justify-between ${slideTheme.cardClass}`}>
+                  <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider">
+                    보안 규정 준수
+                  </span>
+                  <div className="text-2xl font-black text-white font-mono my-1">
+                    100%
+                  </div>
+                  <span className="text-[10px] text-zinc-400">제45조 검증 통과</span>
+                </div>
+
+                <div className={`p-3.5 rounded-2xl flex flex-col justify-between ${slideTheme.cardClass}`}>
+                  <span className="text-[10px] font-bold text-purple-400 uppercase tracking-wider">
+                    총 소요 예산
+                  </span>
+                  <div className="text-xl font-black text-white font-mono my-1">
+                    8,500만
+                  </div>
+                  <span className="text-[10px] text-zinc-400">연간 운영 선지급</span>
+                </div>
+              </div>
+            )}
+
+            {/* 8. [시스템 파이프라인형] */}
+            {currentLayout === 'system-pipeline' && (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-center">
+                <div className={`p-4 rounded-2xl border text-center ${slideTheme.cardClass}`}>
+                  <div className="w-8 h-8 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center mx-auto mb-2">
+                    <Layers className="w-4 h-4" />
+                  </div>
+                  <h5 className="text-xs font-bold text-white mb-1">1. 멀티 소스 수집</h5>
+                  <p className="text-[11px] text-zinc-400">
+                    PDF, 노션 링크, 구글 실시간 검색 27개 출처 자동 그라운딩
+                  </p>
+                </div>
+
+                <div className={`p-4 rounded-2xl border-2 border-cyan-500/50 bg-cyan-950/20 text-center ${slideTheme.cardClass}`}>
+                  <div className="w-8 h-8 rounded-xl bg-cyan-500/20 text-cyan-300 flex items-center justify-center mx-auto mb-2">
+                    <Workflow className="w-4 h-4" />
+                  </div>
+                  <h5 className="text-xs font-bold text-cyan-300 mb-1">2. AI 지식 합성 코어</h5>
+                  <p className="text-[11px] text-zinc-300">
+                    3-Way 기획 생성, 사내 표준 결재선 및 =SUM 수식 자동 바인딩
+                  </p>
+                </div>
+
+                <div className={`p-4 rounded-2xl border text-center ${slideTheme.cardClass}`}>
+                  <div className="w-8 h-8 rounded-xl bg-purple-500/20 text-purple-400 flex items-center justify-center mx-auto mb-2">
+                    <Zap className="w-4 h-4" />
+                  </div>
+                  <h5 className="text-xs font-bold text-white mb-1">3. 완제품 동시 출하</h5>
+                  <p className="text-[11px] text-zinc-400">
+                    공문서(HWP/DOC), 정밀 시트(XLSX), 발표 장표(PPTX) 즉시 배포
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* 9. [경영진 1-Page 결론 인용형] */}
+            {currentLayout === 'executive-quote' && (
+              <div className={`p-6 rounded-2xl border ${slideTheme.cardClass} flex flex-col justify-between`}>
+                <div className="flex items-start gap-3">
+                  <div className="p-2 rounded-xl bg-amber-500/20 text-amber-400 shrink-0">
+                    <Quote className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h4 className="text-base sm:text-lg font-bold text-white leading-relaxed">
+                      "정보보안 규정 제45조를 완벽히 준수하면서 기안 작성 공수를 70% 단축하는 단 하나의 골든 패스입니다."
+                    </h4>
+                    <p className="text-xs text-zinc-400 mt-2">
+                      — 신사업전략본부 AI솔루션팀 및 전사 감사위원회 합동 검토 의견
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-4 pt-3 border-t border-zinc-800 flex items-center justify-between text-xs">
+                  <span className="text-zinc-400">결재 상신: 4단 승인 라인 완료 (대표이사 최종 재가 대기)</span>
+                  <span className="px-3 py-1 rounded-lg bg-emerald-950 text-emerald-300 font-bold border border-emerald-800">
+                    즉시 집행 가능 (Ready)
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* 10. [예산/비용 상세 그리드형] */}
+            {currentLayout === 'budget-grid' && (
+              <div className={`p-4 rounded-2xl border ${slideTheme.cardClass} space-y-3`}>
+                <div className="flex items-center justify-between text-xs pb-2 border-b border-zinc-800">
+                  <span className="font-bold text-white flex items-center gap-1.5">
+                    <Table className="w-4 h-4 text-cyan-400" />
+                    <span>소요 예산 표준 그리드 (단위: 원)</span>
+                  </span>
+                  <span className="font-mono text-cyan-400 font-bold">총 합계: 85,000,000원</span>
+                </div>
+
+                <div className="grid grid-cols-4 gap-2 text-center text-xs">
+                  <div className="p-2 rounded-xl bg-zinc-950/80 border border-zinc-800">
+                    <div className="text-[10px] text-zinc-400">SW 라이선스</div>
+                    <div className="font-bold text-white mt-1">48,000,000</div>
+                  </div>
+                  <div className="p-2 rounded-xl bg-zinc-950/80 border border-zinc-800">
+                    <div className="text-[10px] text-zinc-400">인프라 구축비</div>
+                    <div className="font-bold text-white mt-1">25,000,000</div>
+                  </div>
+                  <div className="p-2 rounded-xl bg-zinc-950/80 border border-zinc-800">
+                    <div className="text-[10px] text-zinc-400">파일럿 운영비</div>
+                    <div className="font-bold text-white mt-1">5,000,000</div>
+                  </div>
+                  <div className="p-2 rounded-xl bg-zinc-950/80 border border-zinc-800">
+                    <div className="text-[10px] text-zinc-400">예비비</div>
+                    <div className="font-bold text-white mt-1">7,000,000</div>
+                  </div>
+                </div>
+
+                {/* 프로그레스 바 */}
+                <div className="pt-2">
+                  <div className="flex justify-between text-[11px] text-zinc-400 mb-1">
+                    <span>예산 확정 진척률</span>
+                    <span className="font-mono font-bold text-emerald-400">100% 확보 완료</span>
+                  </div>
+                  <div className="w-full h-2.5 bg-zinc-800 rounded-full overflow-hidden">
+                    <div className="h-full bg-gradient-to-r from-blue-500 to-emerald-400 rounded-full w-full" />
+                  </div>
+                </div>
+              </div>
+            )}
+
+          </div>
+
+          {/* 슬라이드 불릿 포인트 직접 인라인 편집 바 */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-4">
+            {(activeSlide.bullets || []).slice(0, 3).map((bullet, bIdx) => (
+              <div key={bIdx} className="flex items-center gap-2 p-2 rounded-xl bg-zinc-950/50 border border-zinc-800/80 text-xs">
+                <span className="w-4 h-4 rounded-full bg-blue-600/80 text-white flex items-center justify-center text-[10px] font-bold shrink-0">
+                  {bIdx + 1}
+                </span>
+                <input
+                  type="text"
                   value={bullet}
                   onChange={(e) => handleBulletChange(bIdx, e.target.value)}
-                  rows={3}
-                  className={`w-full text-xs sm:text-sm bg-transparent outline-none resize-none leading-relaxed ${slideTheme.cardTextAreaClass}`}
-                  placeholder="세부 실행 내용을 입력하세요"
+                  className="w-full bg-transparent outline-none text-zinc-200 text-xs truncate"
+                  placeholder={`실행 항목 ${bIdx + 1}`}
                 />
               </div>
             ))}
           </div>
 
           {/* 비주얼 데이터 포인트 (KPI 3종 미니 지표 바) */}
-          <div className={`grid grid-cols-3 gap-3 mt-4 pt-4 border-t ${slideTheme.kpiBorderClass}`}>
+          <div className={`grid grid-cols-3 gap-3 mt-4 pt-3 border-t ${slideTheme.kpiBorderClass}`}>
             <div className={`flex items-center space-x-2.5 p-2 ${slideTheme.kpiBoxClass}`}>
               <div className="p-1.5 rounded-lg bg-emerald-500/20 text-emerald-400">
                 <TrendingUp className="w-4 h-4" />
