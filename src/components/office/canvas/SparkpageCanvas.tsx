@@ -23,6 +23,8 @@ import {
   Edit3 
 } from 'lucide-react';
 import { FactCitationPopover } from '../FactCitationPopover';
+import type { SparkVisualStyle } from '../../../types/visualStyle';
+import { VISUAL_STYLES } from '../../../types/visualStyle';
 
 export type SparkLayoutTemplate = 'bento' | 'executive' | 'pipeline';
 
@@ -34,6 +36,7 @@ interface SparkpageCanvasProps {
   isResearching?: boolean;
   researchStep?: number; // 1, 2, 3
   researchMessage?: string;
+  visualStyle?: SparkVisualStyle;
   onChangeDocument: (updated: OfficeDocument, actionName: string) => void;
   onApplyPlanToDoc?: (selectedKey: 'A' | 'B' | 'C', qaAnswers: { targetDetail: string; channelDetail: string }) => void;
   onSelectCitation?: (citation: OfficeCitation) => void;
@@ -47,6 +50,7 @@ export const SparkpageCanvas: React.FC<SparkpageCanvasProps> = ({
   isResearching = false,
   researchStep = 1,
   researchMessage = '실시간 구글 웹 인덱스 탐색 중...',
+  visualStyle = '3d-isometric',
   onChangeDocument,
   onApplyPlanToDoc,
   onSelectCitation
@@ -231,6 +235,9 @@ export const SparkpageCanvas: React.FC<SparkpageCanvasProps> = ({
           </span>
           <span className={`text-[11px] ${themeConfig.textMuted} hidden md:inline`}>
             (원하는 텍스트·수치를 클릭하여 직접 인라인 수정 가능)
+          </span>
+          <span className={`text-xs px-2 py-0.5 rounded-lg font-mono border ${themeConfig.pillBg} ${themeConfig.pillBorder} text-slate-600 dark:text-slate-300 font-semibold`}>
+            {VISUAL_STYLES[visualStyle]?.emoji} {VISUAL_STYLES[visualStyle]?.shortName}
           </span>
         </div>
 

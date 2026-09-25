@@ -30,6 +30,8 @@ interface CopilotMessage {
   appliedAction?: string;
 }
 
+import type { SparkVisualStyle } from '../../types/visualStyle';
+
 interface NotebookStudioPanelProps {
   isOpen: boolean;
   onClose: () => void;
@@ -43,6 +45,7 @@ interface NotebookStudioPanelProps {
   lastActionName?: string;
   onShowToast?: (message: string, type: 'info' | 'success' | 'error') => void;
   sources?: OfficeSource[];
+  onSelectStyle?: (style: SparkVisualStyle) => void;
 }
 
 export const NotebookStudioPanel: React.FC<NotebookStudioPanelProps> = ({
@@ -57,7 +60,8 @@ export const NotebookStudioPanel: React.FC<NotebookStudioPanelProps> = ({
   canUndo,
   lastActionName,
   onShowToast,
-  sources = []
+  sources = [],
+  onSelectStyle
 }) => {
   const [inputText, setInputText] = useState('');
   const [isListening, setIsListening] = useState(false);
@@ -202,6 +206,11 @@ export const NotebookStudioPanel: React.FC<NotebookStudioPanelProps> = ({
       // 6. 필요한 경우 포맷 자동 동기화
       if (result.targetFormat && result.targetFormat !== currentFormat) {
         onChangeFormat(result.targetFormat);
+      }
+
+      // 6-1. 자연어 지시에 의한 비주얼 스타일 즉시 변환
+      if (result.targetStyle && onSelectStyle) {
+        onSelectStyle(result.targetStyle);
       }
 
       // 7. 실무 브리핑 응답 메시지 반환

@@ -24,6 +24,7 @@ import { SparkStudioHeader } from './SparkStudioHeader';
 import { SparkThemeProvider, useSparkTheme } from '../../context/SparkThemeContext';
 import { fetchSparkpageResearch } from '../../services/sparkResearchService';
 import type { SparkpagePayload } from '../../types/spark';
+import type { SparkVisualStyle } from '../../types/visualStyle';
 import { useApp } from '../../context/AppContext';
 import { 
   Folder, 
@@ -88,6 +89,9 @@ const OfficeStudioInner: React.FC = () => {
 
   // 2. 캔버스 뷰 모드 ('triad' | 'canvas')
   const [viewMode, setViewMode] = useState<CanvasViewMode>('canvas');
+
+  // 2-1. 5대 프리미엄 비주얼 스타일 상태 ('3d-isometric' | 'storybook' | 'mckinsey' | 'cyber-glow' | 'swiss-minimal')
+  const [visualStyle, setVisualStyle] = useState<SparkVisualStyle>('3d-isometric');
 
   // 3. Undo 히스토리 스택
   const [historyStack, setHistoryStack] = useState<Array<{ action: string; docSnapshot: OfficeDocument }>>([]);
@@ -637,6 +641,8 @@ const OfficeStudioInner: React.FC = () => {
             researchStep={researchStep}
             researchMessage={researchMessage}
             viewMode={viewMode}
+            visualStyle={visualStyle}
+            onSelectStyle={setVisualStyle}
             onChangeViewMode={setViewMode}
             onChangeDocument={updateDocument}
             onUpdatePlanTriad={handleUpdatePlanTriad}
@@ -672,6 +678,7 @@ const OfficeStudioInner: React.FC = () => {
           lastActionName={historyStack[historyStack.length - 1]?.action}
           onShowToast={showToast}
           sources={activeProject.sources}
+          onSelectStyle={setVisualStyle}
         />
 
       </div>

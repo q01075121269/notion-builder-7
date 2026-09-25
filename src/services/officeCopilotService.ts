@@ -2,13 +2,15 @@
 // 실무급 Gemini 기반 공문서 실시간 재작문 및 캔버스 인플레이스 변이 서비스
 
 import type { OfficeDocument, OfficeSource, DocSection, SheetRow, SlideItem } from '../types/office';
+import type { SparkVisualStyle } from '../types/visualStyle';
 
 export interface CopilotGenerationResult {
   updatedDoc: OfficeDocument;
   replyText: string;
   actionName: string;
   highlightTarget?: string;
-  targetFormat?: 'docs' | 'sheets' | 'slides' | 'mindmap';
+  targetFormat?: 'docs' | 'sheets' | 'slides' | 'mindmap' | 'infographic' | 'briefing' | 'minutes';
+  targetStyle?: SparkVisualStyle;
 }
 
 /**

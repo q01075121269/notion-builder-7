@@ -1,4 +1,3 @@
-import React from 'react';
 import type { 
   OfficeDocument, 
   CanvasViewMode, 
@@ -9,15 +8,17 @@ import type {
 } from '../../types/office';
 import { TriOptionIdeator } from './TriOptionIdeator';
 import { SparkpageCanvas } from './canvas/SparkpageCanvas';
-import { SlidesCanvas } from './canvas/SlidesCanvas';
-import { SheetsCanvas } from './canvas/SheetsCanvas';
+import { SlidesDeckRenderer } from '../spark/artifacts/SlidesDeckRenderer';
+import { InfographicPosterRenderer } from '../spark/artifacts/InfographicPosterRenderer';
+import { DataSheetRenderer } from '../spark/artifacts/DataSheetRenderer';
+import { StyleGalleryToolbar } from '../spark/StyleGalleryToolbar';
 import { MinutesCanvas } from './canvas/MinutesCanvas';
 import { MindMapCanvas } from './canvas/MindMapCanvas';
-import { InfographicCanvas } from './canvas/InfographicCanvas';
 import { BriefingReportCanvas } from './canvas/BriefingReportCanvas';
 import { Sparkles, LayoutDashboard } from 'lucide-react';
 import { useSparkTheme } from '../../context/SparkThemeContext';
 import type { SparkpagePayload } from '../../types/spark';
+import type { SparkVisualStyle } from '../../types/visualStyle';
 
 interface UniversalSmartCanvasProps {
   document: OfficeDocument;
@@ -28,6 +29,8 @@ interface UniversalSmartCanvasProps {
   researchStep?: number;
   researchMessage?: string;
   viewMode: CanvasViewMode;
+  visualStyle?: SparkVisualStyle;
+  onSelectStyle?: (style: SparkVisualStyle) => void;
   onChangeViewMode: (mode: CanvasViewMode) => void;
   onChangeDocument: (updated: OfficeDocument, actionName: string) => void;
   onUpdatePlanTriad: (newTriad: PlanTriad) => void;
@@ -46,6 +49,8 @@ export const UniversalSmartCanvas: React.FC<UniversalSmartCanvasProps> = ({
   researchStep = 1,
   researchMessage = '',
   viewMode,
+  visualStyle = '3d-isometric',
+  onSelectStyle,
   onChangeViewMode,
   onChangeDocument,
   onUpdatePlanTriad,
@@ -102,7 +107,15 @@ export const UniversalSmartCanvas: React.FC<UniversalSmartCanvasProps> = ({
         </div>
       </div>
 
-      {/* 2. 본문 뷰 렌더러 (스크롤 가능) */}
+      {/* 2. 5대 프리미엄 비주얼 스타일 갤러리 툴바 */}
+      {onSelectStyle && (
+        <StyleGalleryToolbar
+          activeStyle={visualStyle}
+          onSelectStyle={onSelectStyle}
+        />
+      )}
+
+      {/* 3. 본문 뷰 렌더러 (스크롤 가능) */}
       <div className="flex-1 overflow-y-auto">
         {viewMode === 'triad' && planTriad ? (
           <TriOptionIdeator
@@ -121,6 +134,7 @@ export const UniversalSmartCanvas: React.FC<UniversalSmartCanvasProps> = ({
                 isResearching={isResearching}
                 researchStep={researchStep}
                 researchMessage={researchMessage}
+                visualStyle={visualStyle}
                 onChangeDocument={onChangeDocument}
                 onApplyPlanToDoc={(key, qa) => onApplyPlanToDoc(key, qa)}
                 onSelectCitation={onSelectCitation}
@@ -128,16 +142,20 @@ export const UniversalSmartCanvas: React.FC<UniversalSmartCanvasProps> = ({
             )}
 
             {document.format === 'slides' && (
-              <SlidesCanvas
+              <SlidesDeckRenderer
                 document={document}
+                visualStyle={visualStyle}
                 onChangeDocument={onChangeDocument}
+                onShowToast={onShowToast}
               />
             )}
 
             {document.format === 'sheets' && (
-              <SheetsCanvas
+              <DataSheetRenderer
                 document={document}
+                visualStyle={visualStyle}
                 onChangeDocument={onChangeDocument}
+                onShowToast={onShowToast}
               />
             )}
 
@@ -158,9 +176,10 @@ export const UniversalSmartCanvas: React.FC<UniversalSmartCanvasProps> = ({
             )}
 
             {document.format === 'infographic' && (
-              <InfographicCanvas
+              <InfographicPosterRenderer
                 document={document}
                 planTriad={planTriad}
+                visualStyle={visualStyle}
                 onChangeDocument={onChangeDocument}
                 onShowToast={onShowToast}
               />

@@ -3,11 +3,14 @@
 
 import type { OfficeDocument, OfficeSource, SheetRow } from '../../types/office';
 import { generateDocumentRewrite, type CopilotGenerationResult } from '../../services/officeCopilotService';
+import type { SparkVisualStyle } from '../../types/visualStyle';
+import { VISUAL_STYLES } from '../../types/visualStyle';
 
 export type OfficeIntentType =
   | 'REWRITE_DOCUMENT_TOPIC' // 특정 주제로 문서 전체 개편 (예: 스마트 시설 유지 관리, AI 에이전트 도입)
   | 'AUTO_GENERATE_TITLE'    // 본문 내용에 부합하는 전문적이고 타당한 정규 제목 자동 작문
   | 'MULTI_LINE_TITLE'       // 제목 줄바꿈(엔터/Multi-line) 적용
+  | 'CHANGE_VISUAL_STYLE'    // 5대 비주얼 스타일(3D 테크/동화 일러스트/맥킨지/사이버/스위스) 변경
   | 'UPDATE_SECTION'         // 추진 배경, 도입 방안, 세부 항목 등 본문 수정
   | 'UPDATE_APPROVERS'       // 결재선(기안/검토/결재) 또는 기안자/부서 메타데이터 변경
   | 'INSERT_TABLE_ROW'       // 데이터 표(시트)에 새 행 추가 및 =SUM 수식 정산
@@ -17,6 +20,7 @@ export type OfficeIntentType =
 export interface ClassifiedIntent {
   type: OfficeIntentType;
   extractedTopic?: string;
+  extractedStyle?: SparkVisualStyle;
   targetSection?: string;
   reasoning: string;
 }
@@ -51,6 +55,63 @@ export function classifyOfficeIntent(
   _currentDoc: OfficeDocument
 ): ClassifiedIntent {
   const text = rawPrompt.trim();
+
+  // 0. 비주얼 스타일 변환 지시 분석 (최우선 순위 체크)
+  const lowerText = text.toLowerCase();
+  if (
+    lowerText.includes('3d') || lowerText.includes('아이소메트릭') || 
+    (lowerText.includes('테크') && (lowerText.includes('스타일') || lowerText.includes('느낌') || lowerText.includes('디자인')))
+  ) {
+    return {
+      type: 'CHANGE_VISUAL_STYLE',
+      extractedStyle: '3d-isometric',
+      reasoning: '3D 테크 & 아이소메트릭 글래스모피즘 스타일 적용 요청'
+    };
+  }
+
+  if (
+    lowerText.includes('동화') || lowerText.includes('일러스트') || 
+    lowerText.includes('스토리북') || lowerText.includes('파스텔')
+  ) {
+    return {
+      type: 'CHANGE_VISUAL_STYLE',
+      extractedStyle: 'storybook',
+      reasoning: '동화 & 스토리북 일러스트 핸드드로잉 스타일 적용 요청'
+    };
+  }
+
+  if (
+    lowerText.includes('맥킨지') || lowerText.includes('컨설팅') || 
+    lowerText.includes('익제큐티브') || lowerText.includes('전략 펌')
+  ) {
+    return {
+      type: 'CHANGE_VISUAL_STYLE',
+      extractedStyle: 'mckinsey',
+      reasoning: '맥킨지 익제큐티브 전략 컨설팅 스타일 적용 요청'
+    };
+  }
+
+  if (
+    lowerText.includes('사이버') || lowerText.includes('hud') || 
+    lowerText.includes('네온') || lowerText.includes('글로우')
+  ) {
+    return {
+      type: 'CHANGE_VISUAL_STYLE',
+      extractedStyle: 'cyber-glow',
+      reasoning: '사이버 HUD 글로우 관제 대시보드 스타일 적용 요청'
+    };
+  }
+
+  if (
+    lowerText.includes('스위스') || lowerText.includes('미니멀') || 
+    lowerText.includes('모노크롬') || (lowerText.includes('흑백') && lowerText.includes('스타일'))
+  ) {
+    return {
+      type: 'CHANGE_VISUAL_STYLE',
+      extractedStyle: 'swiss-minimal',
+      reasoning: '모던 스위스 미니멀 모노크롬 스타일 적용 요청'
+    };
+  }
 
   // A. 제목 관련 메타 지시 분석 (단순 문자열 취득이 아닌 '의도' 판별)
   const isAutoTitleKeywords = [
@@ -196,6 +257,21 @@ export async function executeOfficeIntent(
         replyText: `제목을 가독성 높은 다중 라인으로 서식화했습니다:\n"${multiLineTitle.replace('\n', ' ↵ ')}"`,
         highlightTarget: 'title',
         targetFormat: 'docs'
+      };
+    }
+
+    // =========================================================================
+    // 3. CHANGE_VISUAL_STYLE: 5대 프리미엄 비주얼 스타일 즉각 변환
+    // =========================================================================
+    case 'CHANGE_VISUAL_STYLE': {
+      const targetStyle = intent.extractedStyle || '3d-isometric';
+      const styleMeta = VISUAL_STYLES[targetStyle];
+      return {
+        updatedDoc,
+        actionName: `디자인 스타일 [${styleMeta.name}] 적용`,
+        replyText: `캔버스의 시각 디자인을 [${styleMeta.name}]으로 즉시 변환하여 반영했습니다. 상단 갤러리 툴바에서 다른 스타일로도 언제든 전환하실 수 있습니다.`,
+        highlightTarget: 'canvas',
+        targetStyle
       };
     }
 
