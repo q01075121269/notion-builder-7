@@ -39,13 +39,14 @@ import {
   createCheckpoint,
   generateWaveformData
 } from '../../services/noaOrchestrator';
-import { optimizePrompt } from '../../lib/media/vpo';
 import type { VPOOptimizationResult } from '../../lib/media/vpo';
+
 import { generateBeatSyncMV } from '../../lib/media/videoPipeline';
 import type { MVPipelineResult } from '../../lib/media/videoPipeline';
 import { saveMediaItem, getRecentMediaItems, deleteMediaItem } from '../../lib/mediaStorage';
 import type { MediaItem } from '../../lib/mediaStorage';
 import { resolveVisualAssetByPrompt } from '../../lib/media/visualAssets';
+import { requestMediaGeneration } from '../../services/mediaApiService';
 
 export const MediaLabContainer: React.FC = () => {
   const { showToast, notionApiKey } = useApp();
@@ -128,8 +129,8 @@ export const MediaLabContainer: React.FC = () => {
     }
   };
 
-  // 아티팩트 생성 엔진 트리거 (VPO 및 실사 렌더러/MV 분기)
-  const triggerArtifactGeneration = (domain: MediaDomain, promptSummary: string) => {
+  // 아티팩트 생성 엔진 트리거 (백엔드 API 및 실시간 AI 생성 파이프라인 직결)
+  const triggerArtifactGeneration = async (domain: MediaDomain, promptSummary: string) => {
     setFsmState('GENERATING');
     setUserPromptText(promptSummary);
 
@@ -142,45 +143,30 @@ export const MediaLabContainer: React.FC = () => {
       promptSummary.toLowerCase().includes('쇼츠') ||
       promptSummary.toLowerCase().includes('릴스');
 
-    const is3D = promptSummary.toLowerCase().includes('3d') || promptSummary.toLowerCase().includes('헬리콥터') || promptSummary.toLowerCase().includes('렌더');
-
-    // 비주얼 인텐트(캐릭터, 실사, 이미지, 사진, 썸네일 등)는 절대 비디오/MV로 빠지지 않음!
     const effectiveDomain: MediaDomain = isExplicitVideo ? 'video' : 'visual';
     setCurrentDomain(effectiveDomain);
 
-    // 1) VPO 프롬프트 최적화 실행
-    const vpo = optimizePrompt(promptSummary, effectiveDomain, is3D ? '3d' : 'photo');
-    setVpoResult(vpo);
-
-    if (effectiveDomain === 'visual') {
-      // 실사 비주얼 렌더러 모드: 실시간 AI 생성 엔진(Pollinations Flux 8K) 직결
-      setMvPipelineResult(null);
-
-      const visualAsset = resolveVisualAssetByPrompt(promptSummary, visualRatio);
-      setNoaResponseText(
-        `요청하신 **[${visualAsset.title}]** 비주얼을 실시간 AI 신경망(Flux 8K)으로 정밀 렌더링하여 캔버스에 안착했습니다.\n\n> 🎯 **VPO 시맨틱 프롬프트**: *${visualAsset.semanticEnglish}*`
-      );
-    } else {
-      // 비디오/MV 모드
-      const mv = generateBeatSyncMV(promptSummary, 120);
-      setMvPipelineResult(mv);
-      setNoaResponseText('비트 타임스탬프에 맞춘 3개 씬 궤적 MV를 렌더링했습니다. (Spatial FaceID 99.4% Lock & 0s/4s/12s 비트 싱크 완료)');
-    }
-
     showToast('노아 PD가 실시간 AI 신경망(Flux 8K)으로 아티팩트를 렌더링 중입니다...', 'info');
 
-    setTimeout(() => {
-      const visualAsset = resolveVisualAssetByPrompt(promptSummary, visualRatio);
-      const initialArt = createInitialArtifact(effectiveDomain, visualAsset.title, visualRatio);
-      if (effectiveDomain === 'visual') {
-        initialArt.title = visualAsset.title;
-        initialArt.previewUrl = visualAsset.imageUrl;
-      }
+    if (effectiveDomain === 'visual') {
+      setMvPipelineResult(null);
+
+      // 백엔드 API /api/media/generate 호출
+      const apiResult = await requestMediaGeneration({
+        userPrompt: promptSummary,
+        aspectRatio: visualRatio
+      });
+
+      setNoaResponseText(apiResult.noaResponse);
+
+      const initialArt = createInitialArtifact(effectiveDomain, apiResult.displayTitle, visualRatio);
+      initialArt.title = apiResult.displayTitle;
+      initialArt.previewUrl = apiResult.imageUrl;
       initialArt.waveformData = generateWaveformData(48);
       initialArt.promptHistory = [
         {
           userRaw: promptSummary,
-          optimizedVPO: visualAsset.semanticEnglish
+          optimizedVPO: apiResult.vpoPrompt
         }
       ];
 
@@ -189,11 +175,24 @@ export const MediaLabContainer: React.FC = () => {
       setFsmState('REFINING');
       showToast('실시간 AI 렌더링이 완료되었습니다. 조종석에서 피드백을 지시해 주세요.', 'success');
       loadCachedAssets();
-    }, 800);
+    } else {
+      // 비디오/MV 모드
+      const mv = generateBeatSyncMV(promptSummary, 120);
+      setMvPipelineResult(mv);
+      setNoaResponseText('비트 타임스탬프에 맞춘 3개 씬 궤적 MV를 렌더링했습니다. (Spatial FaceID 99.4% Lock & 0s/4s/12s 비트 싱크 완료)');
+
+      const initialArt = createInitialArtifact(effectiveDomain, promptSummary, visualRatio);
+      initialArt.waveformData = generateWaveformData(48);
+      setArtifact(initialArt);
+      setHistory([createCheckpoint(initialArt)]);
+      setFsmState('REFINING');
+      showToast('비디오 파이프라인 연산이 완료되었습니다.', 'success');
+      loadCachedAssets();
+    }
   };
 
   // 듀얼 트랙 대화형 오케스트레이터 입력 핸들러
-  const handleDockSubmit = (rawInput: string, attachedFile?: { name: string; url: string; type: string }) => {
+  const handleDockSubmit = async (rawInput: string, attachedFile?: { name: string; url: string; type: string }) => {
     const trimmed = rawInput.trim();
     if (!trimmed && !attachedFile) return;
 
@@ -226,6 +225,10 @@ export const MediaLabContainer: React.FC = () => {
       trimmed.includes('패션') ||
       trimmed.includes('디렉터') ||
       trimmed.includes('인물') ||
+      trimmed.includes('노인') ||
+      trimmed.includes('할아버지') ||
+      trimmed.includes('아이') ||
+      trimmed.includes('소녀') ||
       trimmed.includes('3d') ||
       trimmed.includes('3D') ||
       trimmed.includes('만들어줘');
@@ -240,7 +243,7 @@ export const MediaLabContainer: React.FC = () => {
       trimmed.includes('MV');
 
     if (isVisualIntent && !isExplicitVideo && fsmState === 'IDLE') {
-      triggerArtifactGeneration('visual', trimmed);
+      await triggerArtifactGeneration('visual', trimmed);
       return;
     }
 
@@ -260,44 +263,47 @@ export const MediaLabContainer: React.FC = () => {
       setUserPromptText(trimmed);
       setCurrentDomain('visual');
       setMvPipelineResult(null);
+      setFsmState('GENERATING');
+      showToast('배경 교체 요청을 실시간 AI 신경망에 전달 중입니다...', 'info');
 
       // 이전 피사체 이름 추출하여 Character Lock 파라미터로 주입
       const previousSubject = artifact?.title ? artifact.title.split('(')[0].trim() : undefined;
-      const visualAsset = resolveVisualAssetByPrompt(trimmed, visualRatio, previousSubject);
+      const apiResult = await requestMediaGeneration({
+        userPrompt: trimmed,
+        currentContext: { lastSubject: previousSubject },
+        aspectRatio: visualRatio
+      });
 
       if (artifact) {
         const updatedPromptHistory = [
           ...artifact.promptHistory,
           {
             userRaw: trimmed,
-            optimizedVPO: visualAsset.semanticEnglish
+            optimizedVPO: apiResult.vpoPrompt
           }
         ];
         const updatedArt: MediaArtifact = {
           ...artifact,
           domain: 'visual',
-          title: visualAsset.title,
-          previewUrl: visualAsset.imageUrl,
+          title: apiResult.displayTitle,
+          previewUrl: apiResult.imageUrl,
           promptHistory: updatedPromptHistory,
           progressPercent: 95,
-          currentStepText: `배경 [${visualAsset.theme}] 실시간 AI 변환 완료`
+          currentStepText: `배경 실시간 AI 변환 완료`
         };
         setArtifact(updatedArt);
         setHistory((prev) => [...prev, createCheckpoint(updatedArt)]);
       } else {
-        const newArt = createInitialArtifact('visual', visualAsset.title, visualRatio);
-        newArt.title = visualAsset.title;
-        newArt.previewUrl = visualAsset.imageUrl;
+        const newArt = createInitialArtifact('visual', apiResult.displayTitle, visualRatio);
+        newArt.title = apiResult.displayTitle;
+        newArt.previewUrl = apiResult.imageUrl;
         setArtifact(newArt);
         setHistory([createCheckpoint(newArt)]);
       }
 
       setFsmState('REFINING');
-
-      setNoaResponseText(
-        `피사체의 정체성과 스타일을 유지한 채, 배경을 **[${visualAsset.theme}]**(으)로 실시간 AI 생성하여 캔버스에 안착했습니다.\n\n> 🎯 **VPO 시맨틱 프롬프트**: *${visualAsset.semanticEnglish}*`
-      );
-      showToast(`배경을 "${visualAsset.theme}"(으)로 실시간 AI 교체했습니다.`, 'success');
+      setNoaResponseText(apiResult.noaResponse);
+      showToast(`배경을 실시간 AI 교체했습니다.`, 'success');
 
       loadCachedAssets();
       return;
@@ -306,33 +312,38 @@ export const MediaLabContainer: React.FC = () => {
     // 5. 인플레이스 변환 분기: 인물 피사체 정밀 치환 (Subject Swap with Composition Lock)
     if ((trimmed.includes('인물') || trimmed.includes('피사체') || trimmed.includes('사람') || trimmed.includes('할아버지') || trimmed.includes('아이') || trimmed.includes('소녀') || trimmed.includes('디렉터') || trimmed.includes('ceo')) && (trimmed.includes('바꿔') || trimmed.includes('치환') || trimmed.includes('변경'))) {
       setUserPromptText(trimmed);
-      const visualAsset = resolveVisualAssetByPrompt(trimmed, visualRatio);
       setCurrentDomain('visual');
       setMvPipelineResult(null);
+      setFsmState('GENERATING');
+      showToast('피사체 치환 요청을 실시간 AI 신경망에 전달 중입니다...', 'info');
+
+      const apiResult = await requestMediaGeneration({
+        userPrompt: trimmed,
+        aspectRatio: visualRatio
+      });
 
       if (artifact) {
         const updatedArt: MediaArtifact = {
           ...artifact,
           domain: 'visual',
-          title: visualAsset.title,
-          previewUrl: visualAsset.imageUrl,
+          title: apiResult.displayTitle,
+          previewUrl: apiResult.imageUrl,
           progressPercent: 95,
-          currentStepText: `피사체 [${visualAsset.title}] 실시간 AI 치환 완료`
+          currentStepText: `피사체 실시간 AI 치환 완료`
         };
         setArtifact(updatedArt);
         setHistory((prev) => [...prev, createCheckpoint(updatedArt)]);
       }
 
-      setNoaResponseText(
-        `구도와 앵커를 정밀 고정한 채, 피사체를 **[${visualAsset.title}]** 속성으로 실시간 AI 치환했습니다.\n\n> 🎯 **VPO 시맨틱 프롬프트**: *${visualAsset.semanticEnglish}*`
-      );
-      showToast(`피사체를 "${visualAsset.title}"(으)로 실시간 AI 치환했습니다.`, 'success');
+      setFsmState('REFINING');
+      setNoaResponseText(apiResult.noaResponse);
+      showToast(`피사체를 실시간 AI 치환했습니다.`, 'success');
       return;
     }
 
     // 6. 파일 첨부 후 "뮤직비디오 만들어줘" 요청 분기
     if (attachedFile || trimmed.includes('뮤직비디오') || trimmed.includes('mv') || trimmed.includes('MV')) {
-      triggerArtifactGeneration('video', trimmed || '비트 싱크 뮤직비디오');
+      await triggerArtifactGeneration('video', trimmed || '비트 싱크 뮤직비디오');
       return;
     }
 
@@ -354,25 +365,28 @@ export const MediaLabContainer: React.FC = () => {
       }
 
       if (artifact) {
-        const vpo = optimizePrompt(trimmed, artifact.domain);
-        setVpoResult(vpo);
+        setFsmState('GENERATING');
+        showToast('피드백을 반영하여 실시간 AI 렌더링 중입니다...', 'info');
 
-        const visualAsset = artifact.domain === 'visual'
-          ? resolveVisualAssetByPrompt(`${artifact.title}, ${trimmed}`, visualRatio)
-          : null;
+        const previousSubject = artifact?.title ? artifact.title.split('(')[0].trim() : undefined;
+        const apiResult = await requestMediaGeneration({
+          userPrompt: `${artifact.title}, ${trimmed}`,
+          currentContext: { lastSubject: previousSubject },
+          aspectRatio: visualRatio
+        });
 
         const updatedPromptHistory = [
           ...artifact.promptHistory,
           {
             userRaw: trimmed,
-            optimizedVPO: visualAsset ? visualAsset.semanticEnglish : vpo.optimizedPrompt
+            optimizedVPO: apiResult.vpoPrompt
           }
         ];
 
         const updated: MediaArtifact = {
           ...artifact,
-          title: visualAsset ? visualAsset.title : `${artifact.title} (수정본)`,
-          previewUrl: visualAsset ? visualAsset.imageUrl : artifact.previewUrl,
+          title: apiResult.displayTitle,
+          previewUrl: apiResult.imageUrl,
           promptHistory: updatedPromptHistory,
           progressPercent: 95,
           currentStepText: `피드백 반영: "${trimmed}"`
@@ -380,9 +394,8 @@ export const MediaLabContainer: React.FC = () => {
 
         setArtifact(updated);
         setHistory((prev) => [...prev, createCheckpoint(updated)]);
-        setNoaResponseText(
-          `피드백을 반영하여 실시간 AI 캔버스를 갱신했습니다.\n\n> 🎯 **반영된 VPO 키워드**: *${visualAsset?.semanticEnglish || vpo.optimizedPrompt}*`
-        );
+        setFsmState('REFINING');
+        setNoaResponseText(apiResult.noaResponse);
         showToast(`피드백 "${trimmed}"을(를) 반영하여 캔버스를 갱신했습니다.`, 'success');
       }
       return;

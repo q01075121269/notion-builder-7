@@ -141,6 +141,61 @@ function geminiApiProxyPlugin(): Plugin {
           return
         }
 
+        // /api/media/generate 실시간 AI 미디어 생성 백엔드 엔드포인트
+        if (req.url && req.url.startsWith('/api/media/generate')) {
+          if (req.method === 'OPTIONS') {
+            res.statusCode = 204
+            res.setHeader('Access-Control-Allow-Origin', '*')
+            res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
+            res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+            res.end()
+            return
+          }
+
+          let bodyBuffer = ''
+          req.on('data', (chunk) => {
+            bodyBuffer += chunk
+          })
+
+          req.on('end', async () => {
+            try {
+              const mediaHandler = (await import('./api/media/generate.ts')).default
+              const mockRes: any = {
+                statusCode: 200,
+                headers: {},
+                setHeader(k: string, v: string) {
+                  this.headers[k] = v
+                  res.setHeader(k, v)
+                },
+                status(code: number) {
+                  this.statusCode = code
+                  res.statusCode = code
+                  return this
+                },
+                json(data: any) {
+                  res.setHeader('Content-Type', 'application/json')
+                  res.end(JSON.stringify(data))
+                },
+                end(data?: any) {
+                  if (data) res.write(data)
+                  res.end()
+                }
+              }
+              const mockReq: any = {
+                method: req.method,
+                headers: req.headers,
+                body: bodyBuffer
+              }
+              await mediaHandler(mockReq, mockRes)
+            } catch (err: any) {
+              res.statusCode = 500
+              res.setHeader('Content-Type', 'application/json')
+              res.end(JSON.stringify({ success: false, error: err.message || 'Media generation failed' }))
+            }
+          })
+          return
+        }
+
         // /api/office/copilot 로컬 개발 서버 프록시 및 실시간 공문서 재작문 핸들러
         if (req.url && req.url.startsWith('/api/office/copilot')) {
           if (req.method === 'OPTIONS') {
