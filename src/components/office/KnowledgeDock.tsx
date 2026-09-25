@@ -303,12 +303,12 @@ export const KnowledgeDock: React.FC<KnowledgeDockProps> = ({
       </div>
 
       {/* 2. 빠른 소스 추가 액션 버튼들 */}
-      <div className="p-3 border-b border-slate-200 dark:border-zinc-800 bg-slate-100/60 dark:bg-zinc-800/40 shrink-0 space-y-2">
+      <div className="p-3 border-b border-[var(--border-color)] bg-[var(--bg-app)] shrink-0 space-y-2">
         <div className="grid grid-cols-3 gap-1.5">
           {/* 파일 업로드 버튼 */}
           <button
             onClick={() => fileInputRef.current?.click()}
-            className="flex items-center justify-center space-x-1 py-2 px-2 rounded-xl bg-white dark:bg-zinc-800 hover:bg-slate-50 dark:hover:bg-zinc-700 border border-slate-200 dark:border-zinc-700 text-slate-700 dark:text-zinc-200 text-xs font-bold transition shadow-2xs cursor-pointer"
+            className="flex items-center justify-center space-x-1 py-2 px-2 rounded-xl bg-[var(--bg-card)] hover:opacity-90 border border-[var(--border-color)] text-[var(--text-primary)] text-xs font-bold transition shadow-xs cursor-pointer"
             title="PDF, XLSX 파일 드래그앤드롭 업로드"
           >
             <FileUp className="w-3.5 h-3.5 text-blue-500" />
@@ -326,10 +326,10 @@ export const KnowledgeDock: React.FC<KnowledgeDockProps> = ({
           {/* URL 추가 버튼 */}
           <button
             onClick={() => setActiveInputTab(activeInputTab === 'url' ? 'none' : 'url')}
-            className={`flex items-center justify-center space-x-1 py-2 px-2 rounded-xl border text-xs font-bold transition shadow-2xs cursor-pointer ${
+            className={`flex items-center justify-center space-x-1 py-2 px-2 rounded-xl border text-xs font-bold transition shadow-xs cursor-pointer ${
               activeInputTab === 'url'
-                ? 'bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-950/80 dark:text-emerald-300'
-                : 'bg-white dark:bg-zinc-800 hover:bg-slate-50 dark:hover:bg-zinc-700 border-slate-200 dark:border-zinc-700 text-slate-700 dark:text-zinc-200'
+                ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30'
+                : 'bg-[var(--bg-card)] hover:opacity-90 border-[var(--border-color)] text-[var(--text-primary)]'
             }`}
             title="웹페이지 URL 소스 등록"
           >
@@ -340,10 +340,10 @@ export const KnowledgeDock: React.FC<KnowledgeDockProps> = ({
           {/* 음성 녹음 버튼 */}
           <button
             onClick={() => setActiveInputTab(activeInputTab === 'voice' ? 'none' : 'voice')}
-            className={`flex items-center justify-center space-x-1 py-2 px-2 rounded-xl border text-xs font-bold transition shadow-2xs cursor-pointer ${
+            className={`flex items-center justify-center space-x-1 py-2 px-2 rounded-xl border text-xs font-bold transition shadow-xs cursor-pointer ${
               activeInputTab === 'voice'
-                ? 'bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-950/80 dark:text-amber-300'
-                : 'bg-white dark:bg-zinc-800 hover:bg-slate-50 dark:hover:bg-zinc-700 border-slate-200 dark:border-zinc-700 text-slate-700 dark:text-zinc-200'
+                ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30'
+                : 'bg-[var(--bg-card)] hover:opacity-90 border-[var(--border-color)] text-[var(--text-primary)]'
             }`}
             title="음성 메모 실시간 STT"
           >
@@ -354,8 +354,8 @@ export const KnowledgeDock: React.FC<KnowledgeDockProps> = ({
 
         {/* 지식 창고 리서치 입력창 & 마이크 & 다중 웹/문서 소스 일괄 탐색 버튼 */}
         <div className="relative">
-          <div className="flex items-center rounded-xl bg-white dark:bg-zinc-800 border border-purple-300 dark:border-purple-800 shadow-xs overflow-hidden focus-within:ring-2 focus-within:ring-purple-400">
-            <Search className="w-4 h-4 text-purple-600 dark:text-purple-400 ml-2.5 shrink-0" />
+          <div className="flex items-center rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] shadow-xs overflow-hidden focus-within:ring-2 focus-within:ring-[var(--accent-color)]/30">
+            <Search className="w-4 h-4 text-[var(--accent-color)] ml-2.5 shrink-0" />
             <input
               type="text"
               value={researchKeyword}
@@ -364,7 +364,7 @@ export const KnowledgeDock: React.FC<KnowledgeDockProps> = ({
                 if (e.key === 'Enter') handleOpenMultiSourceModal();
               }}
               placeholder='"스마트 시설물 유지관리 및 AI 에이전트 행정 자동화"...'
-              className="w-full py-2 px-2 text-xs bg-transparent outline-none text-slate-800 dark:text-zinc-100 placeholder-slate-400 dark:placeholder-zinc-500 font-medium"
+              className="w-full py-2 px-2 text-xs bg-transparent outline-none text-[var(--text-primary)] placeholder-[var(--text-secondary)]/60 font-medium"
             />
             {/* 음성(STT) 마이크 토글 버튼 */}
             <button
@@ -373,7 +373,7 @@ export const KnowledgeDock: React.FC<KnowledgeDockProps> = ({
               className={`p-1.5 mr-1 rounded-lg transition cursor-pointer shrink-0 ${
                 isResearchMicActive
                   ? 'bg-rose-500 text-white animate-pulse shadow-xs'
-                  : 'text-slate-400 hover:text-purple-600 dark:hover:text-purple-300 hover:bg-slate-100 dark:hover:bg-zinc-700'
+                  : 'text-[var(--text-secondary)] hover:text-[var(--accent-color)] hover:bg-[var(--bg-app)]'
               }`}
               title={isResearchMicActive ? '음성 듣는 중... 클릭하여 중지' : '음성(STT)으로 리서치 주제 말하기'}
             >
@@ -383,7 +383,7 @@ export const KnowledgeDock: React.FC<KnowledgeDockProps> = ({
             <button
               type="button"
               onClick={handleOpenMultiSourceModal}
-              className="px-2.5 py-1.5 mr-1 rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-[11px] font-bold transition cursor-pointer shrink-0 shadow-xs flex items-center space-x-1"
+              className="px-2.5 py-1.5 mr-1 rounded-lg bg-[var(--accent-color)] hover:opacity-90 text-white text-[11px] font-bold transition cursor-pointer shrink-0 shadow-xs flex items-center space-x-1"
               title="다중 웹/문서 소스 일괄 탐색 모달 열기"
             >
               <Sparkles className="w-3 h-3" />
@@ -392,27 +392,27 @@ export const KnowledgeDock: React.FC<KnowledgeDockProps> = ({
           </div>
         </div>
 
-          {/* 사내 서식 스캔 & 캔버스 복제 주입 퀵 버튼 */}
-          <button
-            type="button"
-            onClick={() => onOpenTemplateInjector && onOpenTemplateInjector()}
-            className="w-full mt-2 py-1.5 px-2.5 rounded-xl border border-dashed border-slate-300 dark:border-zinc-700 hover:border-slate-400 dark:hover:border-zinc-600 bg-white/60 dark:bg-zinc-850/60 hover:bg-slate-50 dark:hover:bg-zinc-800 text-[11px] font-bold text-slate-700 dark:text-zinc-300 flex items-center justify-center space-x-1.5 transition cursor-pointer shadow-2xs"
-            title="사내 결재선·문서번호·표 그리드 서식 스캔 및 캔버스 주입"
-          >
-            <Building2 className="w-3.5 h-3.5 text-slate-500" />
-            <span>사내 고유 서식 스캔 & 캔버스 복제 주입</span>
-          </button>
+        {/* 사내 서식 스캔 & 캔버스 복제 주입 퀵 버튼 */}
+        <button
+          type="button"
+          onClick={() => onOpenTemplateInjector && onOpenTemplateInjector()}
+          className="w-full mt-2 py-1.5 px-2.5 rounded-xl border border-dashed border-[var(--border-color)] hover:border-[var(--accent-color)]/50 bg-[var(--bg-card)] hover:opacity-90 text-[11px] font-bold text-[var(--text-primary)] flex items-center justify-center space-x-1.5 transition cursor-pointer shadow-xs"
+          title="사내 결재선·문서번호·표 그리드 서식 스캔 및 캔버스 주입"
+        >
+          <Building2 className="w-3.5 h-3.5 text-[var(--accent-color)]" />
+          <span>사내 고유 서식 스캔 & 캔버스 복제 주입</span>
+        </button>
 
         {/* URL 인라인 입력창 */}
         {activeInputTab === 'url' && (
-          <form onSubmit={handleAddUrl} className="flex items-center gap-1.5 p-2 rounded-xl bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 animate-fadeIn">
+          <form onSubmit={handleAddUrl} className="flex items-center gap-1.5 p-2 rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] animate-fadeIn">
             <input
               type="url"
               required
               value={urlInput}
               onChange={(e) => setUrlInput(e.target.value)}
               placeholder="https://example.com/report"
-              className="flex-1 py-1 px-2 text-xs bg-transparent outline-none text-slate-800 dark:text-white"
+              className="flex-1 py-1 px-2 text-xs bg-transparent outline-none text-[var(--text-primary)]"
             />
             <button
               type="submit"
@@ -425,9 +425,9 @@ export const KnowledgeDock: React.FC<KnowledgeDockProps> = ({
 
         {/* 음성 녹음 제어 패널 */}
         {activeInputTab === 'voice' && (
-          <div className="p-3 rounded-xl bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 space-y-2 animate-fadeIn">
+          <div className="p-3 rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] space-y-2 animate-fadeIn">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-700 dark:text-zinc-200">
+              <span className="text-xs font-bold text-[var(--text-primary)]">
                 {isRecording ? '실시간 음성 수신 중...' : '마이크를 켜고 아이디어를 말하세요'}
               </span>
               <button
@@ -440,7 +440,7 @@ export const KnowledgeDock: React.FC<KnowledgeDockProps> = ({
               </button>
             </div>
             {voiceText && (
-              <p className="text-[11px] text-slate-600 dark:text-zinc-300 italic bg-slate-50 dark:bg-zinc-900 p-2 rounded-lg">
+              <p className="text-[11px] text-[var(--text-secondary)] italic bg-[var(--bg-app)] p-2 rounded-lg">
                 "{voiceText}"
               </p>
             )}
@@ -469,20 +469,20 @@ export const KnowledgeDock: React.FC<KnowledgeDockProps> = ({
                 className={`
                   group p-3 rounded-2xl border transition-all duration-300 relative flex flex-col justify-between
                   ${isHighlighted 
-                    ? 'ring-2 ring-indigo-500 bg-indigo-50/80 dark:bg-indigo-950/80 border-indigo-400 dark:border-indigo-600 shadow-md scale-[1.01]' 
+                    ? 'ring-2 ring-[var(--accent-color)] bg-[var(--accent-color)]/10 border-[var(--accent-color)] shadow-md scale-[1.01]' 
                     : src.isSelected 
-                      ? 'bg-white dark:bg-zinc-850 border-slate-300 dark:border-zinc-700 shadow-xs' 
-                      : 'bg-slate-100/50 dark:bg-zinc-900/60 border-slate-200 dark:border-zinc-800 opacity-60'
+                      ? 'bg-[var(--bg-card)] border-[var(--border-color)] shadow-xs' 
+                      : 'bg-[var(--bg-app)] border-[var(--border-color)] opacity-60'
                   }
                 `}
               >
                 <div>
                   <div className="flex items-start justify-between gap-2 mb-1.5">
                     <div className="flex items-center space-x-2 min-w-0">
-                      <span className="p-1 rounded-lg bg-slate-100 dark:bg-zinc-800 shrink-0">
+                      <span className="p-1 rounded-lg bg-[var(--bg-app)] shrink-0">
                         {getSourceIcon(src.type)}
                       </span>
-                      <h4 className="text-xs font-bold text-slate-800 dark:text-zinc-200 truncate" title={src.title}>
+                      <h4 className="text-xs font-bold text-[var(--text-primary)] truncate" title={src.title}>
                         {src.title}
                       </h4>
                     </div>
@@ -490,28 +490,28 @@ export const KnowledgeDock: React.FC<KnowledgeDockProps> = ({
                     {/* 기획/문서 반영 체크박스 */}
                     <button
                       onClick={() => onToggleSelectSource(src.id)}
-                      className="text-indigo-600 dark:text-indigo-400 hover:scale-110 transition cursor-pointer shrink-0"
+                      className="text-[var(--accent-color)] hover:scale-110 transition cursor-pointer shrink-0"
                       title={src.isSelected ? '문서 반영 해제' : '문서 반영 포함'}
                     >
                       {src.isSelected ? (
-                        <CheckSquare className="w-4 h-4 fill-indigo-500 text-white" />
+                        <CheckSquare className="w-4 h-4 fill-[var(--accent-color)] text-[var(--bg-card)]" />
                       ) : (
-                        <Square className="w-4 h-4 text-slate-400" />
+                        <Square className="w-4 h-4 text-[var(--text-secondary)]" />
                       )}
                     </button>
                   </div>
 
                   {/* 요약문 */}
                   {src.summary && (
-                    <p className="text-[11px] text-slate-600 dark:text-zinc-400 leading-snug line-clamp-2 mb-2">
+                    <p className="text-[11px] text-[var(--text-secondary)] leading-snug line-clamp-2 mb-2">
                       {src.summary}
                     </p>
                   )}
                 </div>
 
                 {/* 하단 메타 & 사내 양식 적용 & 원문보기/삭제 버튼 */}
-                <div className="space-y-1.5 pt-2 border-t border-slate-100 dark:border-zinc-800">
-                  <div className="flex items-center justify-between text-[10px] text-slate-400 dark:text-zinc-500">
+                <div className="space-y-1.5 pt-2 border-t border-[var(--border-color)]">
+                  <div className="flex items-center justify-between text-[10px] text-[var(--text-secondary)]">
                     <span className="font-mono">
                       {src.tokenCount.toLocaleString()} tkn {src.fileSize ? `• ${src.fileSize}` : ''}
                     </span>
@@ -519,14 +519,14 @@ export const KnowledgeDock: React.FC<KnowledgeDockProps> = ({
                     <div className="flex items-center space-x-1.5">
                       <button
                         onClick={() => setPreviewSource(src)}
-                        className="p-1 hover:text-indigo-600 dark:hover:text-indigo-400 transition cursor-pointer"
+                        className="p-1 hover:text-[var(--accent-color)] transition cursor-pointer"
                         title="원문 및 요약 내용 보기"
                       >
                         <Eye className="w-3.5 h-3.5" />
                       </button>
                       <button
                         onClick={() => onDeleteSource(src.id)}
-                        className="p-1 hover:text-red-600 dark:hover:text-red-400 transition cursor-pointer"
+                        className="p-1 hover:text-red-500 transition cursor-pointer"
                         title="소스 삭제"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
@@ -538,10 +538,10 @@ export const KnowledgeDock: React.FC<KnowledgeDockProps> = ({
                   <button
                     type="button"
                     onClick={() => onOpenTemplateInjector && onOpenTemplateInjector(src)}
-                    className="w-full py-1 px-2 rounded-lg bg-slate-50 hover:bg-slate-100 dark:bg-zinc-800 dark:hover:bg-zinc-750 text-slate-700 dark:text-zinc-200 border border-slate-200 dark:border-zinc-700 text-[10px] font-bold flex items-center justify-center space-x-1 transition cursor-pointer"
+                    className="w-full py-1 px-2 rounded-lg bg-[var(--bg-app)] hover:opacity-80 text-[var(--text-primary)] border border-[var(--border-color)] text-[10px] font-bold flex items-center justify-center space-x-1 transition cursor-pointer"
                     title="이 소스의 서식/표 구조를 사내 표준 양식으로 캔버스에 복제 적용"
                   >
-                    <Building2 className="w-3 h-3 text-slate-500" />
+                    <Building2 className="w-3 h-3 text-[var(--accent-color)]" />
                     <span>사내 양식으로 적용</span>
                   </button>
                 </div>
@@ -555,37 +555,37 @@ export const KnowledgeDock: React.FC<KnowledgeDockProps> = ({
       {/* 원천 소스 상세 뷰어 모달 */}
       {previewSource && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn">
-          <div className="bg-white dark:bg-zinc-900 rounded-3xl max-w-xl w-full p-6 shadow-2xl border border-slate-200 dark:border-zinc-800 space-y-4 max-h-[85vh] flex flex-col">
-            <div className="flex items-center justify-between border-b border-slate-200 dark:border-zinc-800 pb-3 shrink-0">
+          <div className="bg-[var(--bg-card)] text-[var(--text-primary)] rounded-3xl max-w-xl w-full p-6 shadow-2xl border border-[var(--border-color)] space-y-4 max-h-[85vh] flex flex-col">
+            <div className="flex items-center justify-between border-b border-[var(--border-color)] pb-3 shrink-0">
               <div className="flex items-center space-x-2 truncate pr-2">
                 {getSourceIcon(previewSource.type)}
-                <h3 className="text-sm font-black text-slate-900 dark:text-white truncate">
+                <h3 className="text-sm font-black text-[var(--text-primary)] truncate">
                   {previewSource.title}
                 </h3>
               </div>
-              <button onClick={() => setPreviewSource(null)} className="text-slate-400 hover:text-slate-600 p-1">
+              <button onClick={() => setPreviewSource(null)} className="text-[var(--text-secondary)] hover:opacity-80 p-1">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             <div className="flex-1 overflow-y-auto space-y-3 pr-1 text-xs">
-              <div className="p-3 rounded-xl bg-slate-50 dark:bg-zinc-800/60 border border-slate-200 dark:border-zinc-700">
-                <span className="font-bold text-indigo-600 dark:text-indigo-400 block mb-1">AI 팩트 요약</span>
-                <p className="text-slate-700 dark:text-zinc-300 leading-relaxed">{previewSource.summary || '요약 정보 없음'}</p>
+              <div className="p-3 rounded-xl bg-[var(--bg-app)] border border-[var(--border-color)]">
+                <span className="font-bold text-[var(--accent-color)] block mb-1">AI 팩트 요약</span>
+                <p className="text-[var(--text-secondary)] leading-relaxed">{previewSource.summary || '요약 정보 없음'}</p>
               </div>
 
               <div className="space-y-1">
-                <span className="font-bold text-slate-500 dark:text-zinc-400 block">원문 텍스트 데이터</span>
-                <pre className="p-3 rounded-xl bg-slate-100 dark:bg-zinc-950 font-mono text-[11px] leading-relaxed whitespace-pre-wrap text-slate-800 dark:text-zinc-200 border border-slate-200 dark:border-zinc-800">
+                <span className="font-bold text-[var(--text-secondary)] block">원문 텍스트 데이터</span>
+                <pre className="p-3 rounded-xl bg-[var(--bg-app)] font-mono text-[11px] leading-relaxed whitespace-pre-wrap text-[var(--text-primary)] border border-[var(--border-color)]">
                   {previewSource.content}
                 </pre>
               </div>
             </div>
 
-            <div className="pt-2 border-t border-slate-200 dark:border-zinc-800 flex justify-end shrink-0">
+            <div className="pt-2 border-t border-[var(--border-color)] flex justify-end shrink-0">
               <button
                 onClick={() => setPreviewSource(null)}
-                className="px-4 py-2 rounded-xl bg-slate-900 text-white dark:bg-zinc-100 dark:text-zinc-900 text-xs font-bold"
+                className="px-4 py-2 rounded-xl bg-[var(--accent-color)] text-white text-xs font-bold hover:opacity-90 transition"
               >
                 닫기
               </button>

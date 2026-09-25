@@ -382,8 +382,8 @@ export const NotebookStudioPanel: React.FC<NotebookStudioPanelProps> = ({
                   onClick={gen.onClick}
                   className={`p-1.5 rounded-lg border transition cursor-pointer shrink-0 ${
                     isActive 
-                      ? 'bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 border-indigo-300 dark:border-indigo-700 shadow-2xs font-bold ring-1 ring-indigo-400' 
-                      : 'bg-white dark:bg-zinc-850 text-slate-600 dark:text-zinc-400 border-slate-200 dark:border-zinc-750 hover:bg-slate-50 dark:hover:bg-zinc-800 hover:text-slate-900 dark:hover:text-white'
+                      ? 'bg-[var(--accent-color)]/15 text-[var(--accent-color)] border-[var(--accent-color)] shadow-xs font-bold ring-1 ring-[var(--accent-color)]/30' 
+                      : 'bg-[var(--bg-card)] text-[var(--text-secondary)] border-[var(--border-color)] hover:bg-[var(--bg-app)] hover:text-[var(--text-primary)]'
                   }`}
                   title={`${gen.label} (${gen.desc})`}
                 >
@@ -407,8 +407,8 @@ export const NotebookStudioPanel: React.FC<NotebookStudioPanelProps> = ({
                     className={`
                       p-2.5 rounded-2xl border text-left transition-all duration-200 cursor-pointer flex flex-col justify-between group relative overflow-hidden
                       ${isActive
-                        ? gen.activeColor + ' shadow-sm font-bold border-indigo-300 dark:border-indigo-700'
-                        : 'bg-white dark:bg-zinc-900 border-slate-200 dark:border-zinc-800 hover:border-slate-300 dark:hover:border-zinc-700 hover:shadow-xs'
+                        ? 'bg-[var(--accent-color)]/15 text-[var(--accent-color)] border-[var(--accent-color)] shadow-sm font-bold'
+                        : 'bg-[var(--bg-card)] border-[var(--border-color)] hover:border-[var(--accent-color)]/40 hover:shadow-xs'
                       }
                     `}
                   >
@@ -417,15 +417,15 @@ export const NotebookStudioPanel: React.FC<NotebookStudioPanelProps> = ({
                         <Icon className="w-4 h-4" />
                       </div>
                       {isActive && (
-                        <span className="w-2 h-2 rounded-full bg-indigo-500 ring-2 ring-indigo-300" />
+                        <span className="w-2 h-2 rounded-full bg-[var(--accent-color)] ring-2 ring-[var(--accent-color)]/30" />
                       )}
                     </div>
 
                     <div>
-                      <div className={`text-xs font-bold truncate ${isActive ? 'text-slate-900 dark:text-white' : 'text-slate-800 dark:text-zinc-200'}`}>
+                      <div className={`text-xs font-bold truncate ${isActive ? 'text-[var(--accent-color)]' : 'text-[var(--text-primary)]'}`}>
                         {gen.label}
                       </div>
-                      <div className="text-[10px] text-slate-400 dark:text-zinc-500 truncate mt-0.5">
+                      <div className="text-[10px] text-[var(--text-secondary)] truncate mt-0.5">
                         {gen.desc}
                       </div>
                     </div>
@@ -441,16 +441,16 @@ export const NotebookStudioPanel: React.FC<NotebookStudioPanelProps> = ({
       <div className="flex-1 flex flex-col min-h-0">
         
         {/* 상단 액션바: 되돌리기 & 자동 저장 상태 */}
-        <div className="px-3 py-1.5 border-b border-slate-100 dark:border-zinc-800/60 bg-slate-50/50 dark:bg-zinc-900/50 flex items-center justify-between text-xs shrink-0">
-          <div className="flex items-center space-x-1.5 text-[11px] text-slate-400 dark:text-zinc-500">
-            <Bot className="w-3.5 h-3.5 text-indigo-500" />
+        <div className="px-3 py-1.5 border-b border-[var(--border-color)] bg-[var(--bg-app)] flex items-center justify-between text-xs shrink-0">
+          <div className="flex items-center space-x-1.5 text-[11px] text-[var(--text-secondary)]">
+            <Bot className="w-3.5 h-3.5 text-[var(--accent-color)]" />
             <span>실시간 캔버스 편집 조율</span>
           </div>
 
           {canUndo && (
             <button
               onClick={onUndo}
-              className="flex items-center space-x-1 px-2 py-0.5 rounded-md text-[11px] font-semibold text-slate-600 dark:text-zinc-300 hover:bg-slate-200 dark:hover:bg-zinc-800 transition cursor-pointer"
+              className="flex items-center space-x-1 px-2 py-0.5 rounded-md text-[11px] font-semibold text-[var(--text-secondary)] hover:bg-[var(--bg-card)] hover:text-[var(--text-primary)] transition cursor-pointer"
               title={`되돌리기: ${lastActionName || ''}`}
             >
               <Undo2 className="w-3 h-3" />
@@ -469,8 +469,8 @@ export const NotebookStudioPanel: React.FC<NotebookStudioPanelProps> = ({
               <div
                 className={`max-w-[90%] p-2.5 rounded-2xl leading-relaxed ${
                   msg.sender === 'user'
-                    ? 'bg-indigo-600 text-white rounded-br-xs shadow-xs'
-                    : 'bg-slate-100 dark:bg-zinc-800 text-slate-800 dark:text-zinc-200 rounded-bl-xs border border-slate-200 dark:border-zinc-700/80 shadow-2xs'
+                    ? 'bg-[var(--accent-color)] text-white rounded-br-xs shadow-xs'
+                    : 'bg-[var(--bg-card)] text-[var(--text-primary)] rounded-bl-xs border border-[var(--border-color)] shadow-xs'
                 }`}
               >
                 {msg.text}
@@ -484,8 +484,8 @@ export const NotebookStudioPanel: React.FC<NotebookStudioPanelProps> = ({
             </div>
           ))}
           {isThinking && (
-            <div className="flex items-center space-x-2 p-2.5 bg-slate-100 dark:bg-zinc-800 rounded-2xl rounded-bl-xs text-xs text-slate-500 dark:text-zinc-400 w-fit animate-pulse border border-slate-200 dark:border-zinc-700/80 shadow-2xs">
-              <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-500 shrink-0" />
+            <div className="flex items-center space-x-2 p-2.5 bg-[var(--bg-card)] text-[var(--text-secondary)] rounded-2xl rounded-bl-xs text-xs w-fit animate-pulse border border-[var(--border-color)] shadow-xs">
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-[var(--accent-color)] shrink-0" />
               <span>캔버스 상태 분석 및 실시간 변이 중...</span>
             </div>
           )}
@@ -493,7 +493,7 @@ export const NotebookStudioPanel: React.FC<NotebookStudioPanelProps> = ({
         </div>
 
         {/* 빠른 추천 프롬프트 칩들 */}
-        <div className="px-3 py-1.5 border-t border-slate-100 dark:border-zinc-800/80 flex items-center space-x-1.5 overflow-x-auto scrollbar-none shrink-0 bg-slate-50/30 dark:bg-zinc-950/20">
+        <div className="px-3 py-1.5 border-t border-[var(--border-color)] flex items-center space-x-1.5 overflow-x-auto scrollbar-none shrink-0 bg-[var(--bg-app)]">
           {[
             '지금 서류 내용을 스마트 시설 유지 관리로 바꿔줘',
             '지금 내용을 AI 에이전트 도입으로 바꿔봐',
@@ -505,7 +505,7 @@ export const NotebookStudioPanel: React.FC<NotebookStudioPanelProps> = ({
             <button
               key={idx}
               onClick={() => handleSendMessage(prompt)}
-              className="px-2 py-1 rounded-lg text-[10px] font-medium bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-400 hover:text-indigo-600 dark:hover:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 transition cursor-pointer whitespace-nowrap shrink-0 border border-slate-200 dark:border-zinc-700/80"
+              className="px-2 py-1 rounded-lg text-[10px] font-medium bg-[var(--bg-card)] text-[var(--text-secondary)] hover:text-[var(--accent-color)] hover:border-[var(--accent-color)]/40 transition cursor-pointer whitespace-nowrap shrink-0 border border-[var(--border-color)]"
             >
               {prompt}
             </button>
@@ -513,7 +513,7 @@ export const NotebookStudioPanel: React.FC<NotebookStudioPanelProps> = ({
         </div>
 
         {/* 입력 및 음성 컨트롤 풋터 */}
-        <div className="p-3 border-t border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shrink-0">
+        <div className="p-3 border-t border-[var(--border-color)] bg-[var(--bg-surface)] shrink-0">
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -528,7 +528,7 @@ export const NotebookStudioPanel: React.FC<NotebookStudioPanelProps> = ({
               className={`p-2 rounded-xl transition cursor-pointer shrink-0 border ${
                 isListening
                   ? 'bg-rose-500 text-white border-rose-600 animate-pulse shadow-sm'
-                  : 'bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 text-slate-600 dark:text-zinc-300 border-slate-200 dark:border-zinc-700'
+                  : 'bg-[var(--bg-card)] hover:opacity-80 text-[var(--text-secondary)] border-[var(--border-color)]'
               }`}
               title={isListening ? '음성 듣는 중... 클릭하여 중지' : '음성(STT)으로 말하기'}
             >
@@ -548,14 +548,14 @@ export const NotebookStudioPanel: React.FC<NotebookStudioPanelProps> = ({
               }}
               placeholder={isThinking ? '캔버스 변이 진행 중...' : '스튜디오에 질문하거나 캔버스 변경 요청...'}
               disabled={isThinking}
-              className="flex-1 bg-slate-100 dark:bg-zinc-800/90 text-slate-900 dark:text-zinc-100 text-xs px-3 py-2 rounded-xl border border-slate-200 dark:border-zinc-700 focus:outline-none focus:border-indigo-500 dark:focus:border-indigo-400 disabled:opacity-60"
+              className="flex-1 bg-[var(--bg-card)] text-[var(--text-primary)] placeholder-[var(--text-secondary)]/60 text-xs px-3 py-2 rounded-xl border border-[var(--border-color)] focus:outline-none focus:border-[var(--accent-color)] disabled:opacity-60"
             />
 
             {/* 전송 버튼 */}
             <button
               type="submit"
               disabled={!inputText.trim() || isThinking}
-              className="p-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-30 text-white transition cursor-pointer shrink-0 shadow-sm flex items-center justify-center min-w-[36px] min-h-[36px]"
+              className="p-2 rounded-xl bg-[var(--accent-color)] hover:opacity-90 disabled:opacity-30 text-white transition cursor-pointer shrink-0 shadow-xs flex items-center justify-center min-w-[36px] min-h-[36px]"
               title="전송"
             >
               {isThinking ? (

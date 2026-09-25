@@ -512,13 +512,13 @@ const OfficeStudioInner: React.FC = () => {
               className={`
                 flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition whitespace-nowrap cursor-pointer shrink-0 border
                 ${activeProjectId === proj.id
-                  ? `${themeConfig.pillBg} ${themeConfig.pillBorder} ${themeConfig.textPrimary} font-bold shadow-2xs`
-                  : `bg-transparent text-slate-400 hover:${themeConfig.textPrimary} border-transparent hover:bg-white/5`
+                  ? `${themeConfig.pillBg} ${themeConfig.pillBorder} ${themeConfig.textPrimary} font-bold shadow-xs`
+                  : `bg-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)] border-transparent hover:bg-black/5 dark:hover:bg-white/5`
                 }
               `}
               title={proj.title}
             >
-              <Folder className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+              <Folder className="w-3.5 h-3.5 text-[var(--text-secondary)] shrink-0" />
               <span className="truncate max-w-[200px] sm:max-w-[280px]">{proj.title}</span>
             </button>
           ))}
@@ -526,38 +526,38 @@ const OfficeStudioInner: React.FC = () => {
           {/* 새 프로젝트 생성 버튼 */}
           <button
             onClick={handleCreateNewProject}
-            className={`flex items-center space-x-1 px-2.5 py-1.5 rounded-lg bg-transparent text-slate-400 hover:text-white text-xs font-medium transition cursor-pointer shrink-0 border border-dashed ${themeConfig.panelBorder} hover:bg-white/5`}
+            className={`flex items-center space-x-1 px-2.5 py-1.5 rounded-lg bg-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)] text-xs font-medium transition cursor-pointer shrink-0 border border-dashed border-[var(--border-color)] hover:bg-black/5 dark:hover:bg-white/5`}
             title="새 프로젝트 생성"
           >
-            <Plus className="w-3.5 h-3.5 text-slate-400" />
+            <Plus className="w-3.5 h-3.5 text-[var(--text-secondary)]" />
             <span className="hidden sm:inline">새 프로젝트</span>
           </button>
         </div>
 
         {/* 우측: 자동 저장 상태 + 되돌리기 + 스튜디오 토글 + [ 🚀 최종 저장 및 출하 ] */}
         <div className="flex items-center space-x-2 shrink-0">
-          <div className="hidden lg:flex items-center space-x-1 text-[11px] text-slate-400">
-            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+          <div className="hidden lg:flex items-center space-x-1 text-[11px] text-[var(--text-secondary)]">
+            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
             <span>자동 저장됨</span>
           </div>
 
           <button
             onClick={handleUndo}
             disabled={historyStack.length === 0}
-            className={`flex items-center space-x-1 px-2.5 py-1.5 rounded-lg disabled:opacity-30 border text-xs font-semibold transition cursor-pointer shadow-2xs ${themeConfig.pillBg} ${themeConfig.pillBorder} ${themeConfig.textPrimary}`}
+            className={`flex items-center space-x-1 px-2.5 py-1.5 rounded-lg disabled:opacity-30 border text-xs font-semibold transition cursor-pointer shadow-xs ${themeConfig.pillBg} ${themeConfig.pillBorder} ${themeConfig.textPrimary}`}
             title={historyStack.length > 0 ? `되돌리기: ${historyStack[historyStack.length - 1].action}` : '되돌릴 작업 없음'}
           >
-            <Undo2 className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+            <Undo2 className="w-3.5 h-3.5 text-[var(--text-secondary)] shrink-0" />
             <span className="hidden sm:inline">되돌리기</span>
           </button>
 
           {!isStudioOpen && (
             <button
               onClick={() => setIsStudioOpen(true)}
-              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 dark:hover:bg-indigo-900 text-xs font-bold transition cursor-pointer shadow-2xs"
+              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-[var(--accent-color)]/10 text-[var(--accent-color)] border border-[var(--accent-color)]/30 hover:bg-[var(--accent-color)]/20 text-xs font-bold transition cursor-pointer shadow-xs"
               title="스튜디오 패널 펼치기"
             >
-              <Sparkles className="w-3.5 h-3.5 text-indigo-500" />
+              <Sparkles className="w-3.5 h-3.5 text-[var(--accent-color)]" />
               <span>스튜디오 열기</span>
             </button>
           )}
@@ -565,10 +565,10 @@ const OfficeStudioInner: React.FC = () => {
           {/* [ 🚀 최종 저장 및 출하 ] 버튼 */}
           <button
             onClick={() => setIsExportDrawerOpen(true)}
-            className="flex items-center space-x-2 px-4 py-1.5 rounded-xl bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 hover:from-slate-800 hover:to-indigo-900 text-white dark:from-zinc-100 dark:to-zinc-200 dark:text-zinc-900 text-xs font-extrabold transition cursor-pointer whitespace-nowrap shadow-md"
+            className="flex items-center space-x-2 px-4 py-1.5 rounded-xl bg-[var(--accent-color)] hover:opacity-90 text-white text-xs font-extrabold transition cursor-pointer whitespace-nowrap shadow-xs"
             title="우측 옴니 출하 서랍 열기"
           >
-            <Share2 className="w-4 h-4 text-indigo-300 dark:text-indigo-600 shrink-0" />
+            <Share2 className="w-4 h-4 text-white shrink-0" />
             <span>🚀 최종 저장 및 출하</span>
           </button>
         </div>

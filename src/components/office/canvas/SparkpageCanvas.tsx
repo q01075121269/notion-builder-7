@@ -216,7 +216,7 @@ export const SparkpageCanvas: React.FC<SparkpageCanvasProps> = ({
   };
 
   return (
-    <div className={`w-full h-full overflow-y-auto p-4 sm:p-6 lg:p-8 space-y-6 relative ${themeConfig.canvasBg} ${themeConfig.appText} transition-colors duration-200`}>
+    <div className={`w-full h-full overflow-y-auto p-4 sm:p-6 lg:p-8 space-y-6 relative bg-[var(--bg-app)] text-[var(--text-primary)] transition-colors duration-200`}>
       
       {/* ========================================================================= */}
       {/* 0. 📐 [3대 프리미엄 레이아웃 템플릿 선택기] 상단 액션바 */}
@@ -252,7 +252,7 @@ export const SparkpageCanvas: React.FC<SparkpageCanvasProps> = ({
             <div className={`absolute right-0 mt-2 w-72 rounded-2xl border shadow-xl p-2 z-50 ${themeConfig.panelBg} ${themeConfig.panelBorder} animate-fadeIn`}>
               <button
                 onClick={() => { setTemplate('bento'); setIsTemplateDropdownOpen(false); }}
-                className={`w-full flex items-center space-x-3 p-2.5 rounded-xl text-left text-xs font-semibold transition cursor-pointer ${template === 'bento' ? 'bg-[#a8c7fa]/15 text-[#a8c7fa] font-bold' : `${themeConfig.textPrimary} hover:bg-white/5`}`}
+                className={`w-full flex items-center space-x-3 p-2.5 rounded-xl text-left text-xs font-semibold transition cursor-pointer ${template === 'bento' ? 'bg-[#a8c7fa]/15 text-[#a8c7fa] font-bold' : `${themeConfig.textPrimary} hover:bg-black/5 dark:hover:bg-white/5`}`}
               >
                 <LayoutGrid className="w-4 h-4 text-[#a8c7fa] shrink-0" />
                 <div>
@@ -263,7 +263,7 @@ export const SparkpageCanvas: React.FC<SparkpageCanvasProps> = ({
 
               <button
                 onClick={() => { setTemplate('executive'); setIsTemplateDropdownOpen(false); }}
-                className={`w-full flex items-center space-x-3 p-2.5 rounded-xl text-left text-xs font-semibold transition cursor-pointer mt-1 ${template === 'executive' ? 'bg-[#a8c7fa]/15 text-[#a8c7fa] font-bold' : `${themeConfig.textPrimary} hover:bg-white/5`}`}
+                className={`w-full flex items-center space-x-3 p-2.5 rounded-xl text-left text-xs font-semibold transition cursor-pointer mt-1 ${template === 'executive' ? 'bg-[#a8c7fa]/15 text-[#a8c7fa] font-bold' : `${themeConfig.textPrimary} hover:bg-black/5 dark:hover:bg-white/5`}`}
               >
                 <FileSpreadsheet className="w-4 h-4 text-[#78d9ec] shrink-0" />
                 <div>
@@ -274,7 +274,7 @@ export const SparkpageCanvas: React.FC<SparkpageCanvasProps> = ({
 
               <button
                 onClick={() => { setTemplate('pipeline'); setIsTemplateDropdownOpen(false); }}
-                className={`w-full flex items-center space-x-3 p-2.5 rounded-xl text-left text-xs font-semibold transition cursor-pointer mt-1 ${template === 'pipeline' ? 'bg-[#a8c7fa]/15 text-[#a8c7fa] font-bold' : `${themeConfig.textPrimary} hover:bg-white/5`}`}
+                className={`w-full flex items-center space-x-3 p-2.5 rounded-xl text-left text-xs font-semibold transition cursor-pointer mt-1 ${template === 'pipeline' ? 'bg-[#a8c7fa]/15 text-[#a8c7fa] font-bold' : `${themeConfig.textPrimary} hover:bg-black/5 dark:hover:bg-white/5`}`}
               >
                 <GitCommit className="w-4 h-4 text-emerald-400 shrink-0" />
                 <div>
@@ -595,7 +595,7 @@ export const SparkpageCanvas: React.FC<SparkpageCanvasProps> = ({
             <div className={`col-span-1 md:col-span-4 rounded-3xl border p-6 sm:p-8 ${themeConfig.cardBg} ${themeConfig.cardBorder} ${themeConfig.cardShadow}`}>
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
                 <div>
-                  <h3 className={`text-base sm:text-lg font-extrabold ${themeConfig.textPrimary}`}>
+                  <h3 className={`text-base sm:text-lg font-extrabold break-keep text-balance leading-tight ${themeConfig.textPrimary}`}>
                     3-Way 실행 전략 비교 및 맞춤형 채택 (Strategy Triad)
                   </h3>
                   <p className={`text-xs sm:text-sm mt-1 ${themeConfig.textSecondary}`}>
@@ -704,7 +704,7 @@ export const SparkpageCanvas: React.FC<SparkpageCanvasProps> = ({
             <div className={`lg:col-span-6 rounded-3xl border p-6 sm:p-7 space-y-6 ${themeConfig.cardBg} ${themeConfig.cardBorder} ${themeConfig.cardShadow}`}>
               <div className="flex items-center space-x-2 pb-3 border-b border-[#333537]/30">
                 <FileSpreadsheet className="w-5 h-5 text-[#a8c7fa]" />
-                <h3 className={`text-base font-extrabold ${themeConfig.textPrimary}`}>
+                <h3 className={`text-base font-extrabold break-keep text-balance leading-tight ${themeConfig.textPrimary}`}>
                   Executive Strategic Overview (핵심 결론)
                 </h3>
               </div>
@@ -743,7 +743,7 @@ export const SparkpageCanvas: React.FC<SparkpageCanvasProps> = ({
             <div className={`lg:col-span-6 rounded-3xl border p-6 sm:p-7 space-y-6 ${themeConfig.cardBg} ${themeConfig.cardBorder} ${themeConfig.cardShadow}`}>
               <div className="flex items-center space-x-2 pb-3 border-b border-[#333537]/30">
                 <TrendingUp className="w-5 h-5 text-emerald-400" />
-                <h3 className={`text-base font-extrabold ${themeConfig.textPrimary}`}>
+                <h3 className={`text-base font-extrabold break-keep text-balance leading-tight ${themeConfig.textPrimary}`}>
                   정량적 기대 효과 및 지표 달성 계획
                 </h3>
               </div>
@@ -760,7 +760,7 @@ export const SparkpageCanvas: React.FC<SparkpageCanvasProps> = ({
                   </thead>
                   <tbody className="divide-y divide-[#333537]/30">
                     {kpis.map((k, idx) => (
-                      <tr key={idx} className="hover:bg-white/5">
+                      <tr key={idx} className="hover:bg-black/5 dark:hover:bg-white/5">
                         <td className={`p-3 font-semibold ${themeConfig.textPrimary}`}>{k.label}</td>
                         <td className="p-3 text-center font-black text-sm text-[#78d9ec]">{k.value}</td>
                         <td className={`p-3 text-right font-medium ${themeConfig.textMuted}`}>{k.change}</td>
@@ -805,7 +805,7 @@ export const SparkpageCanvas: React.FC<SparkpageCanvasProps> = ({
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center space-x-2">
                   <GitCommit className="w-5 h-5 text-emerald-400" />
-                  <h3 className={`text-base sm:text-lg font-extrabold ${themeConfig.textPrimary}`}>
+                  <h3 className={`text-base sm:text-lg font-extrabold break-keep text-balance leading-tight ${themeConfig.textPrimary}`}>
                     End-to-End 추진 프로세스 파이프라인 (2026 연간 플로우)
                   </h3>
                 </div>
@@ -899,7 +899,7 @@ export const SparkpageCanvas: React.FC<SparkpageCanvasProps> = ({
               <div className={`p-2 rounded-xl ${themeConfig.accentBg} ${themeConfig.accentBorder} border`}>
                 <Globe className={`w-4 h-4 ${themeConfig.accentText}`} />
               </div>
-              <h3 className={`text-sm sm:text-base font-bold ${themeConfig.textPrimary}`}>
+              <h3 className={`text-sm sm:text-base font-bold break-keep text-balance leading-tight ${themeConfig.textPrimary}`}>
                 구글 웹 검색 검증된 {displaySources.length}대 기술 및 공공 출처 (Google Search Grounding)
               </h3>
             </div>

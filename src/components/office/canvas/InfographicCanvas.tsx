@@ -1,5 +1,6 @@
 import React, { useRef, useState } from 'react';
 import type { OfficeDocument, PlanTriad } from '../../../types/office';
+import { useSparkTheme } from '../../../context/SparkThemeContext';
 import { 
   Download, 
   Printer, 
@@ -11,9 +12,9 @@ import {
   ShieldCheck, 
   Milestone, 
   Scale, 
-  LayoutGrid,
-  Clock,
-  Award
+  LayoutGrid, 
+  Clock, 
+  Award 
 } from 'lucide-react';
 
 interface InfographicCanvasProps {
@@ -28,6 +29,7 @@ export const InfographicCanvas: React.FC<InfographicCanvasProps> = ({
   planTriad,
   onShowToast
 }) => {
+  useSparkTheme();
   const [selectedTheme, setSelectedTheme] = useState<'midnight' | 'emerald' | 'sunset'>('midnight');
   const [isExporting, setIsExporting] = useState<boolean>(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -155,33 +157,33 @@ export const InfographicCanvas: React.FC<InfographicCanvasProps> = ({
   };
 
   return (
-    <div className="w-full h-full flex flex-col bg-slate-950 text-slate-100 select-none overflow-y-auto">
+    <div className="w-full h-full flex flex-col bg-[var(--bg-app)] text-[var(--text-primary)] select-none overflow-y-auto">
       
       {/* 1. 상단 인포그래픽 툴바 */}
-      <div className="h-12 px-6 bg-slate-900/90 backdrop-blur border-b border-slate-800 flex items-center justify-between shrink-0 sticky top-0 z-20">
+      <div className="h-12 px-6 bg-[var(--bg-surface)] backdrop-blur border-b border-[var(--border-color)] flex items-center justify-between shrink-0 sticky top-0 z-20">
         <div className="flex items-center space-x-2.5">
-          <div className="p-1.5 rounded-lg bg-purple-500/20 text-purple-400 border border-purple-500/30">
+          <div className="p-1.5 rounded-lg bg-[var(--accent-color)]/10 text-[var(--accent-color)] border border-[var(--accent-color)]/20">
             <LayoutGrid className="w-4 h-4" />
           </div>
           <div>
             <div className="flex items-center space-x-2">
-              <span className="text-xs font-bold text-white tracking-wide">비주얼 요약 인포그래픽 (Bento Grid)</span>
-              <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-purple-950 text-purple-300 border border-purple-800">
+              <span className="text-xs font-bold text-[var(--text-primary)] tracking-wide">비주얼 요약 인포그래픽 (Bento Grid)</span>
+              <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-[var(--accent-color)]/15 text-[var(--accent-color)] border border-[var(--accent-color)]/30">
                 16:9 프레젠테이션 최적화
               </span>
             </div>
-            <p className="text-[11px] text-slate-400">문서의 핵심 수치와 로드맵이 한눈에 파악되는 인포그래픽 카드로 시각화됩니다.</p>
+            <p className="text-[11px] text-[var(--text-secondary)]">문서의 핵심 수치와 로드맵이 한눈에 파악되는 인포그래픽 카드로 시각화됩니다.</p>
           </div>
         </div>
 
         {/* 우측 테마 스위처 & 저장 버튼 */}
         <div className="flex items-center space-x-2">
           {/* 테마 버튼들 */}
-          <div className="flex items-center bg-slate-800 p-0.5 rounded-lg border border-slate-700">
+          <div className="flex items-center bg-[var(--bg-app)] p-0.5 rounded-lg border border-[var(--border-color)]">
             <button
               onClick={() => setSelectedTheme('midnight')}
               className={`px-2.5 py-1 text-xs rounded font-medium transition cursor-pointer ${
-                selectedTheme === 'midnight' ? 'bg-indigo-600 text-white font-bold' : 'text-slate-400 hover:text-white'
+                selectedTheme === 'midnight' ? 'bg-[#1a73e8] text-white font-bold' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
               }`}
             >
               미드나잇
@@ -189,7 +191,7 @@ export const InfographicCanvas: React.FC<InfographicCanvasProps> = ({
             <button
               onClick={() => setSelectedTheme('emerald')}
               className={`px-2.5 py-1 text-xs rounded font-medium transition cursor-pointer ${
-                selectedTheme === 'emerald' ? 'bg-emerald-600 text-white font-bold' : 'text-slate-400 hover:text-white'
+                selectedTheme === 'emerald' ? 'bg-emerald-600 text-white font-bold' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
               }`}
             >
               에메랄드
@@ -197,19 +199,19 @@ export const InfographicCanvas: React.FC<InfographicCanvasProps> = ({
             <button
               onClick={() => setSelectedTheme('sunset')}
               className={`px-2.5 py-1 text-xs rounded font-medium transition cursor-pointer ${
-                selectedTheme === 'sunset' ? 'bg-pink-600 text-white font-bold' : 'text-slate-400 hover:text-white'
+                selectedTheme === 'sunset' ? 'bg-pink-600 text-white font-bold' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
               }`}
             >
               선셋
             </button>
           </div>
 
-          <div className="h-4 w-px bg-slate-800 mx-1" />
+          <div className="h-4 w-px bg-[var(--border-color)] mx-1" />
 
           <button
             onClick={handleDownloadPng}
             disabled={isExporting}
-            className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white text-xs font-bold transition cursor-pointer shadow-md disabled:opacity-50"
+            className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-[var(--accent-color)] hover:opacity-90 text-white text-xs font-bold transition cursor-pointer shadow-xs disabled:opacity-50"
             title="고해상도 인포그래픽 이미지 저장"
           >
             <Download className="w-3.5 h-3.5" />
@@ -218,7 +220,7 @@ export const InfographicCanvas: React.FC<InfographicCanvasProps> = ({
 
           <button
             onClick={handlePrint}
-            className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition cursor-pointer"
+            className="p-1.5 rounded-lg bg-[var(--bg-app)] hover:opacity-80 text-[var(--text-primary)] border border-[var(--border-color)] transition cursor-pointer"
             title="인쇄 / PDF 저장"
           >
             <Printer className="w-4 h-4" />
@@ -232,45 +234,37 @@ export const InfographicCanvas: React.FC<InfographicCanvasProps> = ({
         className="flex-1 p-6 sm:p-8 max-w-[1300px] mx-auto w-full space-y-6"
       >
         {/* 상단 헤더 배너 카드 */}
-        <div className={`
-          p-6 sm:p-8 rounded-3xl border transition-all duration-300 relative overflow-hidden shadow-2xl
-          ${selectedTheme === 'midnight' 
-            ? 'bg-gradient-to-br from-slate-900 via-indigo-950/60 to-slate-900 border-indigo-500/30' 
-            : selectedTheme === 'emerald'
-              ? 'bg-gradient-to-br from-slate-900 via-emerald-950/60 to-slate-900 border-emerald-500/30'
-              : 'bg-gradient-to-br from-slate-900 via-pink-950/60 to-slate-900 border-pink-500/30'
-          }
-        `}>
-          <div className="absolute top-0 right-0 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="p-6 sm:p-8 rounded-3xl border transition-all duration-300 relative overflow-hidden shadow-xs bg-[var(--bg-card)] border-[var(--border-color)] text-[var(--text-primary)]">
+          <div className="absolute top-0 right-0 w-96 h-96 bg-[var(--accent-color)]/5 rounded-full blur-3xl pointer-events-none" />
 
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-10">
             <div>
               <div className="flex items-center space-x-2 mb-2">
-                <span className="px-2.5 py-1 rounded-full text-[10px] font-bold tracking-wider uppercase bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 flex items-center space-x-1">
+                <span className="px-2.5 py-1 rounded-full text-[10px] font-bold tracking-wider uppercase bg-[var(--accent-color)]/10 text-[var(--accent-color)] border border-[var(--accent-color)]/30 flex items-center space-x-1">
                   <Sparkles className="w-3 h-3 mr-1" />
                   <span>Executive Infographic Poster</span>
                 </span>
-                <span className="text-xs text-slate-400 font-mono">
+                <span className="text-xs text-[var(--text-secondary)] font-mono">
                   {document.metadata.date || new Date().toISOString().slice(0, 10)}
                 </span>
               </div>
-              <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight leading-snug">
+              <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight break-keep text-balance leading-tight text-[var(--text-primary)]">
                 {document.title}
               </h1>
-              <p className="text-sm text-slate-300 mt-2 max-w-2xl">
+              <p className="text-sm text-[var(--text-secondary)] mt-2 max-w-2xl break-keep text-balance leading-relaxed">
                 {document.metadata.department} 소속 {document.metadata.author} 기안 • 전사 표준 서식 및 핵심 성과 지표 종합 인포그래픽
               </p>
             </div>
 
             <div className="flex items-center space-x-3 shrink-0">
-              <div className="px-4 py-2.5 rounded-2xl bg-white/5 border border-white/10 backdrop-blur text-right">
-                <div className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">문서 관리 번호</div>
-                <div className="text-xs font-mono font-bold text-indigo-300">{document.metadata.docNumber}</div>
+              <div className="px-4 py-2.5 rounded-2xl bg-[var(--bg-app)] border border-[var(--border-color)] text-right">
+                <div className="text-[10px] uppercase font-bold text-[var(--text-secondary)] tracking-wider">문서 관리 번호</div>
+                <div className="text-xs font-mono font-bold text-[var(--accent-color)]">{document.metadata.docNumber}</div>
               </div>
-              <div className="px-4 py-2.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 backdrop-blur text-right">
-                <div className="text-[10px] uppercase font-bold text-emerald-400 tracking-wider">결재선 상태</div>
-                <div className="text-xs font-bold text-emerald-300 flex items-center justify-end space-x-1">
-                  <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+              <div className="px-4 py-2.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-right">
+                <div className="text-[10px] uppercase font-bold text-emerald-600 dark:text-emerald-400 tracking-wider">결재선 상태</div>
+                <div className="text-xs font-bold text-emerald-600 dark:text-emerald-400 flex items-center justify-end space-x-1">
+                  <CheckCircle2 className="w-3 h-3 text-emerald-500" />
                   <span>3단 결재 통과</span>
                 </div>
               </div>
@@ -281,67 +275,67 @@ export const InfographicCanvas: React.FC<InfographicCanvasProps> = ({
         {/* 핵심 4대 KPI 카드 그리드 */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* KPI 1 */}
-          <div className="p-5 rounded-2xl bg-slate-900/90 border border-slate-800 hover:border-indigo-500/50 transition shadow-lg group">
-            <div className="flex items-center justify-between text-slate-400 mb-3">
+          <div className="p-5 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-color)] shadow-xs hover:border-[var(--accent-color)]/50 transition group">
+            <div className="flex items-center justify-between text-[var(--text-secondary)] mb-3">
               <span className="text-xs font-bold">총 소요 예산</span>
-              <div className="p-2 rounded-xl bg-indigo-500/10 text-indigo-400 group-hover:scale-110 transition">
+              <div className="p-2 rounded-xl bg-[var(--accent-color)]/10 text-[var(--accent-color)] group-hover:scale-110 transition">
                 <DollarSign className="w-4 h-4" />
               </div>
             </div>
-            <div className="text-2xl font-black text-white font-mono tracking-tight">
+            <div className="text-2xl font-black text-[var(--text-primary)] font-mono tracking-tight">
               ₩{totalBudget.toLocaleString()}
             </div>
-            <p className="text-[11px] text-emerald-400 mt-2 flex items-center font-medium">
+            <p className="text-[11px] text-emerald-600 dark:text-emerald-400 mt-2 flex items-center font-medium">
               <TrendingUp className="w-3 h-3 mr-1" />
               <span>=SUM 공식 자동 정산 검증</span>
             </p>
           </div>
 
           {/* KPI 2 */}
-          <div className="p-5 rounded-2xl bg-slate-900/90 border border-slate-800 hover:border-emerald-500/50 transition shadow-lg group">
-            <div className="flex items-center justify-between text-slate-400 mb-3">
+          <div className="p-5 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-color)] shadow-xs hover:border-emerald-500/50 transition group">
+            <div className="flex items-center justify-between text-[var(--text-secondary)] mb-3">
               <span className="text-xs font-bold">생산성 향상 지표</span>
-              <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400 group-hover:scale-110 transition">
+              <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-500 group-hover:scale-110 transition">
                 <TrendingUp className="w-4 h-4" />
               </div>
             </div>
-            <div className="text-2xl font-black text-white font-mono tracking-tight">
+            <div className="text-2xl font-black text-[var(--text-primary)] font-mono tracking-tight">
               +320%
             </div>
-            <p className="text-[11px] text-slate-400 mt-2 flex items-center">
+            <p className="text-[11px] text-[var(--text-secondary)] mt-2 flex items-center">
               <span>기존 수작업 대비 단축율</span>
             </p>
           </div>
 
           {/* KPI 3 */}
-          <div className="p-5 rounded-2xl bg-slate-900/90 border border-slate-800 hover:border-purple-500/50 transition shadow-lg group">
-            <div className="flex items-center justify-between text-slate-400 mb-3">
+          <div className="p-5 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-color)] shadow-xs hover:border-purple-500/50 transition group">
+            <div className="flex items-center justify-between text-[var(--text-secondary)] mb-3">
               <span className="text-xs font-bold">컴플라이언스 준수</span>
-              <div className="p-2 rounded-xl bg-purple-500/10 text-purple-400 group-hover:scale-110 transition">
+              <div className="p-2 rounded-xl bg-purple-500/10 text-purple-500 group-hover:scale-110 transition">
                 <ShieldCheck className="w-4 h-4" />
               </div>
             </div>
-            <div className="text-2xl font-black text-white font-mono tracking-tight">
+            <div className="text-2xl font-black text-[var(--text-primary)] font-mono tracking-tight">
               100%
             </div>
-            <p className="text-[11px] text-purple-400 mt-2 flex items-center">
+            <p className="text-[11px] text-purple-600 dark:text-purple-400 mt-2 flex items-center">
               <CheckCircle2 className="w-3 h-3 mr-1" />
               <span>행안부 표준 개조식 완비</span>
             </p>
           </div>
 
           {/* KPI 4 */}
-          <div className="p-5 rounded-2xl bg-slate-900/90 border border-slate-800 hover:border-amber-500/50 transition shadow-lg group">
-            <div className="flex items-center justify-between text-slate-400 mb-3">
+          <div className="p-5 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-color)] shadow-xs hover:border-amber-500/50 transition group">
+            <div className="flex items-center justify-between text-[var(--text-secondary)] mb-3">
               <span className="text-xs font-bold">구축 마일스톤</span>
-              <div className="p-2 rounded-xl bg-amber-500/10 text-amber-400 group-hover:scale-110 transition">
+              <div className="p-2 rounded-xl bg-amber-500/10 text-amber-500 group-hover:scale-110 transition">
                 <Clock className="w-4 h-4" />
               </div>
             </div>
-            <div className="text-2xl font-black text-white font-mono tracking-tight">
+            <div className="text-2xl font-black text-[var(--text-primary)] font-mono tracking-tight">
               4개 분기
             </div>
-            <p className="text-[11px] text-amber-400 mt-2 flex items-center">
+            <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-2 flex items-center">
               <span>총 {sectionsCount}개 전략 섹션 가동</span>
             </p>
           </div>
@@ -351,53 +345,53 @@ export const InfographicCanvas: React.FC<InfographicCanvasProps> = ({
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           
           {/* 좌측 2열: 핵심 추진 가치 및 타깃 전략 */}
-          <div className="lg:col-span-2 p-6 rounded-3xl bg-slate-900/90 border border-slate-800 shadow-xl space-y-5">
+          <div className="lg:col-span-2 p-6 rounded-3xl bg-[var(--bg-card)] border border-[var(--border-color)] shadow-xs space-y-5">
             <div className="flex items-center space-x-2">
-              <Target className="w-5 h-5 text-indigo-400" />
-              <h3 className="text-base font-bold text-white">핵심 타깃 및 추진 아키텍처</h3>
+              <Target className="w-5 h-5 text-[var(--accent-color)]" />
+              <h3 className="text-base font-bold text-[var(--text-primary)] break-keep text-balance leading-tight">핵심 타깃 및 추진 아키텍처</h3>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="p-4 rounded-2xl bg-slate-800/80 border border-slate-700/80">
-                <div className="text-xs font-semibold text-indigo-300 mb-1">목표 타깃 사용자</div>
-                <div className="text-sm font-bold text-white mb-2">{targetAudience}</div>
-                <p className="text-xs text-slate-400 leading-relaxed">
+              <div className="p-4 rounded-2xl bg-[var(--bg-app)] border border-[var(--border-color)]">
+                <div className="text-xs font-semibold text-[var(--accent-color)] mb-1">목표 타깃 사용자</div>
+                <div className="text-sm font-bold text-[var(--text-primary)] mb-2">{targetAudience}</div>
+                <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
                   전사 부서장 및 실무진이 단일 캔버스에서 공문서, 발표 슬라이드, 예산 시트를 즉시 동기화합니다.
                 </p>
               </div>
 
-              <div className="p-4 rounded-2xl bg-slate-800/80 border border-slate-700/80">
-                <div className="text-xs font-semibold text-emerald-300 mb-1">핵심 전략 컨셉</div>
-                <div className="text-sm font-bold text-white mb-2">{primaryConcept}</div>
-                <p className="text-xs text-slate-400 leading-relaxed">
+              <div className="p-4 rounded-2xl bg-[var(--bg-app)] border border-[var(--border-color)]">
+                <div className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 mb-1">핵심 전략 컨셉</div>
+                <div className="text-sm font-bold text-[var(--text-primary)] mb-2">{primaryConcept}</div>
+                <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
                   RAG 팩트 기반 검증과 결재선 양식 1:1 복제 파이프라인으로 행정 오탈자 0%를 유지합니다.
                 </p>
               </div>
             </div>
 
             {/* 비교 매트릭스 카드 */}
-            <div className="p-4 rounded-2xl bg-slate-800/50 border border-slate-700/60">
+            <div className="p-4 rounded-2xl bg-[var(--bg-app)] border border-[var(--border-color)]">
               <div className="flex items-center justify-between mb-3">
-                <span className="text-xs font-bold text-slate-300 flex items-center space-x-1.5">
-                  <Scale className="w-4 h-4 text-purple-400" />
+                <span className="text-xs font-bold text-[var(--text-primary)] flex items-center space-x-1.5">
+                  <Scale className="w-4 h-4 text-purple-500" />
                   <span>도입 전 vs 도입 후 성과 비교</span>
                 </span>
-                <span className="text-[11px] text-purple-400 font-semibold">정량적 효과 입증</span>
+                <span className="text-[11px] text-purple-600 dark:text-purple-400 font-semibold">정량적 효과 입증</span>
               </div>
 
               <div className="grid grid-cols-2 gap-3 text-xs">
-                <div className="p-3 rounded-xl bg-red-950/20 border border-red-900/30 text-slate-300">
-                  <div className="font-bold text-red-400 mb-1">기존 수작업 기안</div>
-                  <ul className="space-y-1 text-[11px] text-slate-400">
+                <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-[var(--text-primary)]">
+                  <div className="font-bold text-red-600 dark:text-red-400 mb-1">기존 수작업 기안</div>
+                  <ul className="space-y-1 text-[11px] text-[var(--text-secondary)]">
                     <li>• 평균 문서 작성 4.5시간 소요</li>
                     <li>• 포맷 변환 시 서식 깨짐 빈번</li>
                     <li>• 예산 수기 계산 오류 발생 가능성</li>
                   </ul>
                 </div>
 
-                <div className="p-3 rounded-xl bg-emerald-950/20 border border-emerald-900/30 text-slate-300">
-                  <div className="font-bold text-emerald-400 mb-1">스튜디오 도입 후</div>
-                  <ul className="space-y-1 text-[11px] text-slate-300">
+                <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-[var(--text-primary)]">
+                  <div className="font-bold text-emerald-600 dark:text-emerald-400 mb-1">스튜디오 도입 후</div>
+                  <ul className="space-y-1 text-[11px] text-[var(--text-primary)]">
                     <li>• AI 원클릭 다중 포맷 파이핑 (10초)</li>
                     <li>• 행안부 규격 HWPX 100% 호환</li>
                     <li>• =SUM 자동 바인딩 및 320% 생산성</li>
@@ -408,43 +402,43 @@ export const InfographicCanvas: React.FC<InfographicCanvasProps> = ({
           </div>
 
           {/* 우측 1열: 컴플라이언스 & 배포 현황 */}
-          <div className="p-6 rounded-3xl bg-slate-900/90 border border-slate-800 shadow-xl flex flex-col justify-between space-y-6">
+          <div className="p-6 rounded-3xl bg-[var(--bg-card)] border border-[var(--border-color)] shadow-xs flex flex-col justify-between space-y-6">
             <div>
               <div className="flex items-center space-x-2 mb-4">
-                <Award className="w-5 h-5 text-amber-400" />
-                <h3 className="text-base font-bold text-white">공식 규격 무결성 인증</h3>
+                <Award className="w-5 h-5 text-amber-500" />
+                <h3 className="text-base font-bold text-[var(--text-primary)] break-keep text-balance leading-tight">공식 규격 무결성 인증</h3>
               </div>
 
               <div className="space-y-3">
-                <div className="flex items-start space-x-3 p-3 rounded-xl bg-slate-800/80 border border-slate-700/80">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" />
+                <div className="flex items-start space-x-3 p-3 rounded-xl bg-[var(--bg-app)] border border-[var(--border-color)]">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-500 mt-0.5 shrink-0" />
                   <div className="text-xs">
-                    <strong className="text-white block">행정안전부 OWPML 표준</strong>
-                    <span className="text-slate-400">한컴 2014~2026 공문서 파일 완전 호환</span>
+                    <strong className="text-[var(--text-primary)] block">행정안전부 OWPML 표준</strong>
+                    <span className="text-[var(--text-secondary)]">한컴 2014~2026 공문서 파일 완전 호환</span>
                   </div>
                 </div>
 
-                <div className="flex items-start space-x-3 p-3 rounded-xl bg-slate-800/80 border border-slate-700/80">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" />
+                <div className="flex items-start space-x-3 p-3 rounded-xl bg-[var(--bg-app)] border border-[var(--border-color)]">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-500 mt-0.5 shrink-0" />
                   <div className="text-xs">
-                    <strong className="text-white block">스프레드시트 수식 무결성</strong>
-                    <span className="text-slate-400">OpenXML 규격 =SUM 공식 완벽 바인딩</span>
+                    <strong className="text-[var(--text-primary)] block">스프레드시트 수식 무결성</strong>
+                    <span className="text-[var(--text-secondary)]">OpenXML 규격 =SUM 공식 완벽 바인딩</span>
                   </div>
                 </div>
 
-                <div className="flex items-start space-x-3 p-3 rounded-xl bg-slate-800/80 border border-slate-700/80">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" />
+                <div className="flex items-start space-x-3 p-3 rounded-xl bg-[var(--bg-app)] border border-[var(--border-color)]">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-500 mt-0.5 shrink-0" />
                   <div className="text-xs">
-                    <strong className="text-white block">라이프 Hub [Tasks DB] 연동</strong>
-                    <span className="text-slate-400">실행 과제 및 일정 마일스톤 양방향 직결</span>
+                    <strong className="text-[var(--text-primary)] block">라이프 Hub [Tasks DB] 연동</strong>
+                    <span className="text-[var(--text-secondary)]">실행 과제 및 일정 마일스톤 양방향 직결</span>
                   </div>
                 </div>
               </div>
             </div>
 
-            <div className="p-4 rounded-2xl bg-indigo-950/40 border border-indigo-800/40 text-center">
-              <div className="text-[11px] text-indigo-300 font-semibold mb-1">인포그래픽 실시간 편집 지원</div>
-              <p className="text-[10px] text-slate-400">
+            <div className="p-4 rounded-2xl bg-[var(--accent-color)]/10 border border-[var(--accent-color)]/20 text-center">
+              <div className="text-[11px] text-[var(--accent-color)] font-semibold mb-1">인포그래픽 실시간 편집 지원</div>
+              <p className="text-[10px] text-[var(--text-secondary)]">
                 우측 스튜디오 패널에서 "예산 수치 강조해줘"라고 입력하시면 벤토 카드가 실시간 갱신됩니다.
               </p>
             </div>
@@ -453,13 +447,13 @@ export const InfographicCanvas: React.FC<InfographicCanvasProps> = ({
         </div>
 
         {/* 하단 가로 로드맵 타임라인 */}
-        <div className="p-6 sm:p-8 rounded-3xl bg-slate-900/90 border border-slate-800 shadow-xl space-y-4">
+        <div className="p-6 sm:p-8 rounded-3xl bg-[var(--bg-card)] border border-[var(--border-color)] shadow-xs space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
-              <Milestone className="w-5 h-5 text-indigo-400" />
-              <h3 className="text-base font-bold text-white">단계별 실행 로드맵 타임라인</h3>
+              <Milestone className="w-5 h-5 text-[var(--accent-color)]" />
+              <h3 className="text-base font-bold text-[var(--text-primary)] break-keep text-balance leading-tight">단계별 실행 로드맵 타임라인</h3>
             </div>
-            <span className="text-xs text-slate-400">2026 연간 추진 일정</span>
+            <span className="text-xs text-[var(--text-secondary)]">2026 연간 추진 일정</span>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-2">
@@ -471,16 +465,16 @@ export const InfographicCanvas: React.FC<InfographicCanvasProps> = ({
             ].map((step, idx) => (
               <div 
                 key={idx}
-                className="p-4 rounded-2xl bg-slate-800/60 border border-slate-700/60 relative overflow-hidden group hover:border-indigo-500/50 transition"
+                className="p-4 rounded-2xl bg-[var(--bg-app)] border border-[var(--border-color)] relative overflow-hidden group hover:border-[var(--accent-color)]/50 transition"
               >
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-black font-mono text-indigo-400">PHASE {step.phase}</span>
-                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-700 text-slate-300">
+                  <span className="text-xs font-black font-mono text-[var(--accent-color)]">PHASE {step.phase}</span>
+                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[var(--border-color)] text-[var(--text-secondary)]">
                     {step.badge}
                   </span>
                 </div>
-                <div className="text-sm font-bold text-white mb-1.5">{step.title}</div>
-                <div className="text-xs text-slate-400 leading-relaxed">{step.desc}</div>
+                <div className="text-sm font-bold text-[var(--text-primary)] mb-1.5 break-keep text-balance leading-tight">{step.title}</div>
+                <div className="text-xs text-[var(--text-secondary)] leading-relaxed break-keep">{step.desc}</div>
               </div>
             ))}
           </div>
