@@ -1,7 +1,7 @@
 // src/components/media/MediaLabContainer.tsx
 // 제4챕터 AI 미디어 랩(AI Media Lab 2026) 2단계 - 초격차 비주얼 & 옴니모달 영상 엔진 (VPO·MV 합성·세이프존)
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Film, 
   RotateCcw, 
@@ -48,6 +48,21 @@ import type { MediaItem } from '../../lib/mediaStorage';
 import { resolveVisualAssetByPrompt } from '../../lib/media/visualAssets';
 import { requestMediaGeneration } from '../../services/mediaApiService';
 
+export interface MediaMessage {
+  id: string;
+  role: 'user' | 'noa';
+  text: string;
+  timestamp: string;
+  artifact?: {
+    version: number;
+    title: string;
+    imageUrl: string;
+    prompt: string;
+    aspectRatio?: '16:9' | '9:16' | '1:1';
+    activeSubject?: string;
+  };
+}
+
 export const MediaLabContainer: React.FC = () => {
   const { showToast, notionApiKey } = useApp();
 
@@ -64,13 +79,16 @@ export const MediaLabContainer: React.FC = () => {
   const [artifact, setArtifact] = useState<MediaArtifact | null>(null);
   const [history, setHistory] = useState<MediaCheckpoint[]>([]);
 
+  // 영구 대화 및 아티팩트 스트림 상태
+  const [messages, setMessages] = useState<MediaMessage[]>([]);
+  const [activeSubject, setActiveSubject] = useState<string>('');
+  const [activeVersion, setActiveVersion] = useState<number>(1);
+  const chatEndRef = useRef<HTMLDivElement | null>(null);
+
   // VPO 및 MV 파이프라인 엔진 데이터 상태
   const [vpoResult, setVpoResult] = useState<VPOOptimizationResult | null>(null);
   const [mvPipelineResult, setMvPipelineResult] = useState<MVPipelineResult | null>(null);
 
-  // 대화 스트림: 사용자 원문 & 노아 피드백 메시지 (박스 없이 시원한 텍스트 형태)
-  const [userPromptText, setUserPromptText] = useState<string>('');
-  const [noaResponseText, setNoaResponseText] = useState<string>('');
 
   // 비주얼 전용 상태 (비율 전환 16:9 / 9:16 / 1:1)
   const [visualRatio, setVisualRatio] = useState<'16:9' | '9:16' | '1:1'>('16:9');
@@ -103,6 +121,11 @@ export const MediaLabContainer: React.FC = () => {
     loadCachedAssets();
   }, []);
 
+  // 메시지 누적 시 최신 턴으로 스크롤 이동
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, fsmState]);
+
   // 세션 초기화 및 새 세션 시작
   const handleStartNewSession = () => {
     setSessionCount((prev) => prev + 1);
@@ -113,9 +136,38 @@ export const MediaLabContainer: React.FC = () => {
     setVpoResult(null);
     setMvPipelineResult(null);
     setHistory([]);
-    setUserPromptText('');
-    setNoaResponseText('');
+    setMessages([]);
+    setActiveSubject('');
+    setActiveVersion(1);
     showToast('새로운 미디어 세션을 백지 캔버스에서 시작합니다.', 'info');
+  };
+
+  // 특정 아티팩트 버전으로 롤백 (Undo / Restore Version)
+  const handleRollbackVersion = (targetArtifact: NonNullable<MediaMessage['artifact']>) => {
+    if (!artifact) return;
+    const rolledBack: MediaArtifact = {
+      ...artifact,
+      title: targetArtifact.title,
+      previewUrl: targetArtifact.imageUrl,
+      promptHistory: [
+        ...artifact.promptHistory,
+        {
+          userRaw: `[v${targetArtifact.version} 롤백 복원] ${targetArtifact.title}`,
+          optimizedVPO: targetArtifact.prompt
+        }
+      ],
+      progressPercent: 95,
+      currentStepText: `v${targetArtifact.version} 버전으로 복원 완료`
+    };
+    setArtifact(rolledBack);
+    setActiveVersion(targetArtifact.version);
+    if (targetArtifact.activeSubject) {
+      setActiveSubject(targetArtifact.activeSubject);
+    }
+    if (targetArtifact.aspectRatio) {
+      setVisualRatio(targetArtifact.aspectRatio);
+    }
+    showToast(`v${targetArtifact.version} [${targetArtifact.title}] 버전으로 캔버스를 복원했습니다.`, 'success');
   };
 
   // 인터뷰 단계 스킵 처리
@@ -132,7 +184,14 @@ export const MediaLabContainer: React.FC = () => {
   // 아티팩트 생성 엔진 트리거 (백엔드 API 및 실시간 AI 생성 파이프라인 직결)
   const triggerArtifactGeneration = async (domain: MediaDomain, promptSummary: string) => {
     setFsmState('GENERATING');
-    setUserPromptText(promptSummary);
+
+    const userMsg: MediaMessage = {
+      id: `msg-u-${Date.now()}`,
+      role: 'user',
+      text: promptSummary,
+      timestamp: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
+    };
+    setMessages((prev) => [...prev, userMsg]);
 
     const isExplicitVideo = 
       domain === 'video' ||
@@ -151,13 +210,35 @@ export const MediaLabContainer: React.FC = () => {
     if (effectiveDomain === 'visual') {
       setMvPipelineResult(null);
 
-      // 백엔드 API /api/media/generate 호출
+      // 백엔드 API /api/media/generate 호출 (주어 락 및 부정형 정제기 탑재)
       const apiResult = await requestMediaGeneration({
         userPrompt: promptSummary,
+        history: [{ role: 'user', content: promptSummary }],
+        activeSubject: activeSubject || undefined,
+        activeTitle: artifact?.title,
         aspectRatio: visualRatio
       });
 
-      setNoaResponseText(apiResult.noaResponse);
+      if (apiResult.activeSubject) {
+        setActiveSubject(apiResult.activeSubject);
+      }
+      setActiveVersion(1);
+
+      const noaMsg: MediaMessage = {
+        id: `msg-n-${Date.now()}`,
+        role: 'noa',
+        text: apiResult.noaResponse,
+        timestamp: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }),
+        artifact: {
+          version: 1,
+          title: apiResult.displayTitle,
+          imageUrl: apiResult.imageUrl,
+          prompt: apiResult.vpoPrompt,
+          aspectRatio: visualRatio,
+          activeSubject: apiResult.activeSubject
+        }
+      };
+      setMessages((prev) => [...prev, noaMsg]);
 
       const initialArt = createInitialArtifact(effectiveDomain, apiResult.displayTitle, visualRatio);
       initialArt.title = apiResult.displayTitle;
@@ -179,7 +260,15 @@ export const MediaLabContainer: React.FC = () => {
       // 비디오/MV 모드
       const mv = generateBeatSyncMV(promptSummary, 120);
       setMvPipelineResult(mv);
-      setNoaResponseText('비트 타임스탬프에 맞춘 3개 씬 궤적 MV를 렌더링했습니다. (Spatial FaceID 99.4% Lock & 0s/4s/12s 비트 싱크 완료)');
+      const respText = '비트 타임스탬프에 맞춘 3개 씬 궤적 MV를 렌더링했습니다. (Spatial FaceID 99.4% Lock & 0s/4s/12s 비트 싱크 완료)';
+
+      const noaMsg: MediaMessage = {
+        id: `msg-n-${Date.now()}`,
+        role: 'noa',
+        text: respText,
+        timestamp: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
+      };
+      setMessages((prev) => [...prev, noaMsg]);
 
       const initialArt = createInitialArtifact(effectiveDomain, promptSummary, visualRatio);
       initialArt.waveformData = generateWaveformData(48);
@@ -214,71 +303,59 @@ export const MediaLabContainer: React.FC = () => {
       }
     }
 
-    // 3. 비주얼 인텐트 감지 (캐릭터, 실사, 이미지, 사진, 썸네일, 패션, 디렉터, 3D 등) -> 즉각 실사 비주얼 렌더러로 직결!
-    const isVisualIntent = 
-      trimmed.includes('캐릭터') ||
-      trimmed.includes('실사') ||
-      trimmed.includes('이미지') ||
-      trimmed.includes('사진') ||
-      trimmed.includes('썸네일') ||
-      trimmed.includes('포트레이트') ||
-      trimmed.includes('패션') ||
-      trimmed.includes('디렉터') ||
-      trimmed.includes('인물') ||
-      trimmed.includes('노인') ||
-      trimmed.includes('할아버지') ||
-      trimmed.includes('아이') ||
-      trimmed.includes('소녀') ||
-      trimmed.includes('3d') ||
-      trimmed.includes('3D') ||
-      trimmed.includes('만들어줘');
+    // 사용자 메시지 스트림에 즉시 영구 누적
+    const userMsg: MediaMessage = {
+      id: `msg-u-${Date.now()}`,
+      role: 'user',
+      text: trimmed,
+      timestamp: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
+    };
+    setMessages((prev) => [...prev, userMsg]);
 
-    const isExplicitVideo = 
-      trimmed.includes('영상') || 
-      trimmed.includes('비디오') || 
-      trimmed.includes('쇼츠') || 
-      trimmed.includes('릴스') || 
-      trimmed.includes('뮤직비디오') || 
-      trimmed.includes('mv') || 
-      trimmed.includes('MV');
+    const historyPayload = [...messages, userMsg].map((m) => ({ role: m.role, content: m.text }));
 
-    if (isVisualIntent && !isExplicitVideo && fsmState === 'IDLE') {
-      await triggerArtifactGeneration('visual', trimmed);
-      return;
-    }
-
-    // 4. 실시간 배경 교체 인텐트 직결 (Inpainting State Mutation & Character Lock)
-    const isBackgroundIntent = 
-      trimmed.includes('배경') || 
-      trimmed.includes('바닷가') ||
-      trimmed.includes('해변') ||
-      trimmed.includes('숲속') || 
-      trimmed.includes('숲') || 
-      trimmed.includes('설산') || 
-      trimmed.includes('사막') || 
-      trimmed.includes('도시') || 
-      (trimmed.includes('바꿔') && (trimmed.includes('뒤') || trimmed.includes('환경') || trimmed.includes('보이게')));
-
-    if (isBackgroundIntent) {
-      setUserPromptText(trimmed);
+    // 공통 비주얼 프로세서 (주어 락 & 한국어 부정형 정제기 & 스트림 누적)
+    const handleVisualProcess = async (promptText: string) => {
       setCurrentDomain('visual');
       setMvPipelineResult(null);
       setFsmState('GENERATING');
-      showToast('배경 교체 요청을 실시간 AI 신경망에 전달 중입니다...', 'info');
+      showToast('실시간 AI 신경망(FLUX 8K)에 요청을 전달하여 렌더링 중입니다...', 'info');
 
-      // 이전 피사체 이름 추출하여 Character Lock 파라미터로 주입
-      const previousSubject = artifact?.title ? artifact.title.split('(')[0].trim() : undefined;
       const apiResult = await requestMediaGeneration({
-        userPrompt: trimmed,
-        currentContext: { lastSubject: previousSubject },
+        userPrompt: promptText,
+        history: historyPayload,
+        activeSubject: activeSubject || (artifact?.title ? artifact.title.split('(')[0].trim() : undefined),
+        activeTitle: artifact?.title,
         aspectRatio: visualRatio
       });
+
+      const nextVersion = (artifact?.promptHistory.length || 0) + 1;
+      setActiveVersion(nextVersion);
+      if (apiResult.activeSubject) {
+        setActiveSubject(apiResult.activeSubject);
+      }
+
+      const noaMsg: MediaMessage = {
+        id: `msg-n-${Date.now()}`,
+        role: 'noa',
+        text: apiResult.noaResponse,
+        timestamp: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }),
+        artifact: {
+          version: nextVersion,
+          title: apiResult.displayTitle,
+          imageUrl: apiResult.imageUrl,
+          prompt: apiResult.vpoPrompt,
+          aspectRatio: visualRatio,
+          activeSubject: apiResult.activeSubject
+        }
+      };
+      setMessages((prev) => [...prev, noaMsg]);
 
       if (artifact) {
         const updatedPromptHistory = [
           ...artifact.promptHistory,
           {
-            userRaw: trimmed,
+            userRaw: promptText,
             optimizedVPO: apiResult.vpoPrompt
           }
         ];
@@ -289,67 +366,38 @@ export const MediaLabContainer: React.FC = () => {
           previewUrl: apiResult.imageUrl,
           promptHistory: updatedPromptHistory,
           progressPercent: 95,
-          currentStepText: `배경 실시간 AI 변환 완료`
+          currentStepText: `v${nextVersion} 갱신: ${apiResult.displayTitle}`
         };
         setArtifact(updatedArt);
         setHistory((prev) => [...prev, createCheckpoint(updatedArt)]);
       } else {
-        const newArt = createInitialArtifact('visual', apiResult.displayTitle, visualRatio);
-        newArt.title = apiResult.displayTitle;
-        newArt.previewUrl = apiResult.imageUrl;
-        setArtifact(newArt);
-        setHistory([createCheckpoint(newArt)]);
+        const initialArt = createInitialArtifact('visual', apiResult.displayTitle, visualRatio);
+        initialArt.title = apiResult.displayTitle;
+        initialArt.previewUrl = apiResult.imageUrl;
+        initialArt.waveformData = generateWaveformData(48);
+        initialArt.promptHistory = [
+          {
+            userRaw: promptText,
+            optimizedVPO: apiResult.vpoPrompt
+          }
+        ];
+        setArtifact(initialArt);
+        setHistory([createCheckpoint(initialArt)]);
       }
 
       setFsmState('REFINING');
-      setNoaResponseText(apiResult.noaResponse);
-      showToast(`배경을 실시간 AI 교체했습니다.`, 'success');
-
+      showToast(`v${nextVersion} [${apiResult.displayTitle}] 생성이 완료되었습니다.`, 'success');
       loadCachedAssets();
-      return;
-    }
+    };
 
-    // 5. 인플레이스 변환 분기: 인물 피사체 정밀 치환 (Subject Swap with Composition Lock)
-    if ((trimmed.includes('인물') || trimmed.includes('피사체') || trimmed.includes('사람') || trimmed.includes('할아버지') || trimmed.includes('아이') || trimmed.includes('소녀') || trimmed.includes('디렉터') || trimmed.includes('ceo')) && (trimmed.includes('바꿔') || trimmed.includes('치환') || trimmed.includes('변경'))) {
-      setUserPromptText(trimmed);
-      setCurrentDomain('visual');
-      setMvPipelineResult(null);
-      setFsmState('GENERATING');
-      showToast('피사체 치환 요청을 실시간 AI 신경망에 전달 중입니다...', 'info');
-
-      const apiResult = await requestMediaGeneration({
-        userPrompt: trimmed,
-        aspectRatio: visualRatio
-      });
-
-      if (artifact) {
-        const updatedArt: MediaArtifact = {
-          ...artifact,
-          domain: 'visual',
-          title: apiResult.displayTitle,
-          previewUrl: apiResult.imageUrl,
-          progressPercent: 95,
-          currentStepText: `피사체 실시간 AI 치환 완료`
-        };
-        setArtifact(updatedArt);
-        setHistory((prev) => [...prev, createCheckpoint(updatedArt)]);
-      }
-
-      setFsmState('REFINING');
-      setNoaResponseText(apiResult.noaResponse);
-      showToast(`피사체를 실시간 AI 치환했습니다.`, 'success');
-      return;
-    }
-
-    // 6. 파일 첨부 후 "뮤직비디오 만들어줘" 요청 분기
+    // 3. 파일 첨부 후 "뮤직비디오 만들어줘" 요청 분기
     if (attachedFile || trimmed.includes('뮤직비디오') || trimmed.includes('mv') || trimmed.includes('MV')) {
       await triggerArtifactGeneration('video', trimmed || '비트 싱크 뮤직비디오');
       return;
     }
 
-    // 7. REFINING 또는 COMPLETED 상태에서의 피드백 적용
+    // 4. REFINING 또는 COMPLETED 상태에서의 피드백 적용
     if (fsmState === 'REFINING' || fsmState === 'COMPLETED') {
-      setUserPromptText(trimmed);
       if (trimmed === '최종 완성 확정' || trimmed.includes('완성')) {
         setFsmState('COMPLETED');
         if (artifact) {
@@ -359,76 +407,67 @@ export const MediaLabContainer: React.FC = () => {
             currentStepText: '최종 마스터링 완료'
           });
         }
-        setNoaResponseText('축하합니다! 미디어 아티팩트의 최종 완성이 확정되었습니다.');
+        const completionMsg = '축하합니다! 미디어 아티팩트의 최종 완성이 확정되었습니다.';
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `msg-n-${Date.now()}`,
+            role: 'noa',
+            text: completionMsg,
+            timestamp: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
+          }
+        ]);
         showToast('축하합니다! 미디어 아티팩트 최종 완성이 확정되었습니다.', 'success');
         return;
       }
 
-      if (artifact) {
-        setFsmState('GENERATING');
-        showToast('피드백을 반영하여 실시간 AI 렌더링 중입니다...', 'info');
-
-        const previousSubject = artifact?.title ? artifact.title.split('(')[0].trim() : undefined;
-        const apiResult = await requestMediaGeneration({
-          userPrompt: `${artifact.title}, ${trimmed}`,
-          currentContext: { lastSubject: previousSubject },
-          aspectRatio: visualRatio
-        });
-
-        const updatedPromptHistory = [
-          ...artifact.promptHistory,
-          {
-            userRaw: trimmed,
-            optimizedVPO: apiResult.vpoPrompt
-          }
-        ];
-
-        const updated: MediaArtifact = {
-          ...artifact,
-          title: apiResult.displayTitle,
-          previewUrl: apiResult.imageUrl,
-          promptHistory: updatedPromptHistory,
-          progressPercent: 95,
-          currentStepText: `피드백 반영: "${trimmed}"`
-        };
-
-        setArtifact(updated);
-        setHistory((prev) => [...prev, createCheckpoint(updated)]);
-        setFsmState('REFINING');
-        setNoaResponseText(apiResult.noaResponse);
-        showToast(`피드백 "${trimmed}"을(를) 반영하여 캔버스를 갱신했습니다.`, 'success');
-      }
+      await handleVisualProcess(trimmed);
       return;
     }
 
-    // 8. IDLE 상태에서의 분기 (초보자 vs 숙련자 패턴)
+    // 5. IDLE 상태에서의 분기 (초보자 vs 숙련자 패턴)
     if (fsmState === 'IDLE') {
       const detectedDomain = detectDomainFromPrompt(trimmed);
       setCurrentDomain(detectedDomain);
       if (detectedDomain === 'video') setVisualRatio('9:16');
       if (detectedDomain === 'visual') setVisualRatio('16:9');
 
-      setUserPromptText(trimmed);
-
       const mode = determineSessionMode(trimmed);
       if (mode === 'interview') {
         setFsmState('INTERVIEWING');
         setCurrentStepIndex(0);
-        setNoaResponseText(`노아 총괄 PD의 ${detectedDomain.toUpperCase()} 큐레이션 질문입니다.`);
+        const introMsg = `노아 총괄 PD의 ${detectedDomain.toUpperCase()} 큐레이션 질문입니다.`;
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `msg-n-${Date.now()}`,
+            role: 'noa',
+            text: introMsg,
+            timestamp: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
+          }
+        ]);
         showToast(`노아 총괄 PD와의 ${detectedDomain.toUpperCase()} 디렉팅 인터뷰를 시작합니다.`, 'info');
       } else {
-        triggerArtifactGeneration(detectedDomain, trimmed);
+        await handleVisualProcess(trimmed);
       }
       return;
     }
 
-    // 9. INTERVIEWING 상태에서 질문 응답
+    // 6. INTERVIEWING 상태에서 질문 응답
     if (fsmState === 'INTERVIEWING') {
-      setUserPromptText(trimmed);
       const steps = DOMAIN_INTERVIEW_STEPS[currentDomain] || DOMAIN_INTERVIEW_STEPS.video;
       if (currentStepIndex + 1 < steps.length) {
         setCurrentStepIndex((prev) => prev + 1);
-        setNoaResponseText(`"${trimmed}" 세부 설정을 적용했습니다. 다음 단계 질문입니다.`);
+        const nextStepMsg = `"${trimmed}" 세부 설정을 적용했습니다. 다음 단계 질문입니다.`;
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `msg-n-${Date.now()}`,
+            role: 'noa',
+            text: nextStepMsg,
+            timestamp: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
+          }
+        ]);
         showToast(`"${trimmed}" 설정이 적용되었습니다. 다음 단계로 이동합니다.`, 'info');
       } else {
         triggerArtifactGeneration(currentDomain, `${currentDomain} 인터뷰 기반 통합 아티팩트`);
@@ -789,29 +828,84 @@ export const MediaLabContainer: React.FC = () => {
         <main className="flex-1 overflow-y-auto px-4 sm:px-8 py-6 flex flex-col items-center">
           <div className="w-full max-w-[1400px] flex-1 flex flex-col space-y-6">
             
-            {/* 대화 스트림: 사용자 원문 텍스트 (박스 없이 시원한 텍스트) */}
-            {userPromptText && (
-              <div className="space-y-1 animate-fadeIn">
-                <div className="flex items-center space-x-2 text-xs font-semibold text-zinc-500 dark:text-zinc-400">
-                  <User className="w-3.5 h-3.5 text-zinc-400" strokeWidth={1.5} />
-                  <span>사용자</span>
-                </div>
-                <p className="text-base sm:text-lg font-medium text-zinc-800 dark:text-zinc-100 pl-5.5 leading-relaxed">
-                  "{userPromptText}"
-                </p>
-              </div>
-            )}
+            {/* 영구 대화 스트림: 사용자 원문 & 노아 피드백 & 버전별 아티팩트 카드 */}
+            {messages.length > 0 && (
+              <div className="space-y-6 w-full animate-fadeIn">
+                {messages.map((msg) => (
+                  <div key={msg.id} className="space-y-2">
+                    {msg.role === 'user' ? (
+                      <div className="space-y-1">
+                        <div className="flex items-center space-x-2 text-xs font-semibold text-zinc-500 dark:text-zinc-400">
+                          <User className="w-3.5 h-3.5 text-zinc-400" strokeWidth={1.5} />
+                          <span>사용자</span>
+                          <span className="text-[10px] text-zinc-400 font-normal">{msg.timestamp}</span>
+                        </div>
+                        <p className="text-base sm:text-lg font-medium text-zinc-800 dark:text-zinc-100 pl-5.5 leading-relaxed">
+                          "{msg.text}"
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        <div className="flex items-center space-x-2 text-xs font-semibold text-zinc-900 dark:text-zinc-200">
+                          <Bot className="w-3.5 h-3.5 text-zinc-900 dark:text-zinc-100" strokeWidth={1.5} />
+                          <span>노아(NOA) 총괄 PD</span>
+                          <span className="text-[10px] text-zinc-400 font-normal">{msg.timestamp}</span>
+                          {msg.artifact && (
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 font-bold border border-zinc-200 dark:border-zinc-700">
+                              v{msg.artifact.version}
+                            </span>
+                          )}
+                        </div>
+                        <div className="pl-5.5 space-y-3">
+                          <p className="text-sm sm:text-base text-zinc-600 dark:text-zinc-300 leading-relaxed whitespace-pre-line">
+                            {msg.text}
+                          </p>
 
-            {/* 대화 스트림: 노아(NOA) 총괄 PD 피드백 (박스 없이 시원한 텍스트) */}
-            {noaResponseText && (
-              <div className="space-y-1 animate-fadeIn">
-                <div className="flex items-center space-x-2 text-xs font-semibold text-zinc-900 dark:text-zinc-200">
-                  <Bot className="w-3.5 h-3.5 text-zinc-900 dark:text-zinc-100" strokeWidth={1.5} />
-                  <span>노아(NOA)</span>
-                </div>
-                <p className="text-sm sm:text-base text-zinc-600 dark:text-zinc-300 pl-5.5 leading-relaxed">
-                  "{noaResponseText}"
-                </p>
+                          {/* 해당 턴에서 생성된 아티팩트 버전 카드 및 롤백(Undo) 버튼 */}
+                          {msg.artifact && (
+                            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-3 rounded-xl bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 shadow-xs max-w-2xl">
+                              <div className="flex items-center space-x-3 min-w-0">
+                                <img
+                                  src={msg.artifact.imageUrl}
+                                  alt={msg.artifact.title}
+                                  className="w-16 h-10 object-cover rounded-lg border border-slate-200 dark:border-zinc-800 shrink-0 bg-zinc-950"
+                                />
+                                <div className="min-w-0">
+                                  <div className="flex items-center space-x-2">
+                                    <span className="text-xs font-bold text-zinc-900 dark:text-zinc-100 truncate">
+                                      {msg.artifact.title}
+                                    </span>
+                                    <span className="text-[10px] px-1.5 py-0.2 rounded font-mono bg-zinc-100 dark:bg-zinc-800 text-zinc-500">
+                                      v{msg.artifact.version}
+                                    </span>
+                                    {activeVersion === msg.artifact.version && (
+                                      <span className="text-[9px] px-1.5 py-0.2 rounded font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                                        현재 캔버스
+                                      </span>
+                                    )}
+                                  </div>
+                                  <p className="text-[11px] text-zinc-400 truncate max-w-md">
+                                    {msg.artifact.prompt}
+                                  </p>
+                                </div>
+                              </div>
+
+                              <button
+                                onClick={() => handleRollbackVersion(msg.artifact!)}
+                                className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-800 hover:bg-slate-100 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-200 text-xs font-semibold transition cursor-pointer shrink-0 active:scale-95"
+                                title="이 버전의 이미지를 메인 캔버스에 복원합니다"
+                              >
+                                <RotateCcw className="w-3.5 h-3.5 text-zinc-500" strokeWidth={1.5} />
+                                <span>이 버전 복원 (Undo)</span>
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+                <div ref={chatEndRef} />
               </div>
             )}
 

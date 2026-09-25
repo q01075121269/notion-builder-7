@@ -30,5 +30,12 @@ export async function requestMediaGeneration(
   }
 
   // 로컬 지능형 오케스트레이터 0ms 안전망 (네트워크 단절 시에도 100% 정상 작동 보장)
-  return generateMediaData(params.userPrompt, params.currentContext, params.aspectRatio);
+  const activeSub = params.activeSubject || params.currentContext?.lastSubject;
+  return generateMediaData(
+    params.userPrompt,
+    params.history,
+    activeSub,
+    params.activeTitle,
+    params.aspectRatio
+  );
 }

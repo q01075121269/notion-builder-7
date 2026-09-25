@@ -20,8 +20,9 @@ export default async function handler(req: any, res: any) {
         body = JSON.parse(body);
       } catch (e) {}
     }
-    const { userPrompt = '', currentContext, aspectRatio = '16:9' } = body || {};
-    const result = generateMediaData(userPrompt, currentContext, aspectRatio);
+    const { userPrompt = '', history, activeSubject, activeTitle, currentContext, aspectRatio = '16:9' } = body || {};
+    const activeSub = activeSubject || currentContext?.lastSubject;
+    const result = generateMediaData(userPrompt, history, activeSub, activeTitle, aspectRatio);
 
     res.statusCode = 200;
     res.setHeader('Content-Type', 'application/json');
