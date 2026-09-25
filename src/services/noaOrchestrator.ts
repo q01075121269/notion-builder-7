@@ -170,21 +170,120 @@ export function isInspectCommand(prompt: string): boolean {
   );
 }
 
-// 초보자/숙련자 모드 판별
-// 길이가 짧거나 포괄적 키워드만 있으면 초보자(interview),
-// 구체적인 세부 조건(배경, 인물, 분위기, 15자 이상 등)이 있으면 숙련자(oneshot)
+// 취소/중단 명령인지 확인 (FSM 탈출용)
+export function isCancelCommand(prompt: string): boolean {
+  const p = prompt.trim().toLowerCase();
+  return (
+    p === '취소' ||
+    p === '중단' ||
+    p === '그만' ||
+    p === '그만해' ||
+    p === '나가기' ||
+    p === '종료' ||
+    p === '처음으로' ||
+    p === '리셋' ||
+    p.includes('취소해') ||
+    p.includes('그만할래')
+  );
+}
+
+// 질문, 대화, 기능 문의, 항의인지 감지 (좀비 FSM 방어용)
+export function isConversationalOrQuestion(prompt: string): boolean {
+  const p = prompt.trim().toLowerCase();
+
+  // 1. 제작/생성 요청 명령어가 명시적인 경우 제외
+  const isGenerationTrigger = 
+    p.includes('만들어') ||
+    p.includes('생성해') ||
+    p.includes('그려줘') ||
+    p.includes('작곡해') ||
+    p.includes('렌더링') ||
+    p.includes('변환해') ||
+    p.includes('바꿔줘');
+
+  if (isGenerationTrigger) {
+    return false;
+  }
+
+  // 2. 인사 / 정체 / 기능 / 사용법 문의 / 질문 어미
+  const conversationalKeywords = [
+    '누구', '뭐해', '뭐야', '뭘 할 수', '기능', '도움말', '어떤 거', '어떤거',
+    '사용법', '어떻게 써', '어떻게 쓰', '어떻게 해', '설명해', '알려줘',
+    '안녕', '반가워', '노아', 'noa', '안되', '안돼', '버그', '에러', '왜 이래',
+    '왜 그래', '왜 안', '뭐하는', '할줄', '능력', '가이드', '질문'
+  ];
+
+  const hasConversationalKeyword = conversationalKeywords.some((kw) => p.includes(kw));
+
+  // 물음표가 있거나 대화형 키워드가 있는 경우
+  return hasConversationalKeyword || p.endsWith('?') || p.endsWith('??');
+}
+
+// 질문 및 대화에 대한 노아 총괄 PD의 지능형 응답 생성기
+export function generateNoaConversationalResponse(prompt: string): string {
+  const p = prompt.trim().toLowerCase();
+
+  if (p.includes('누구') || p.includes('노아') || p.includes('noa') || p.includes('정체')) {
+    return `안녕하세요! 저는 AI 미디어 랩의 총괄 크리에이티브 디렉터 **노아(NOA)**입니다. 🎬
+
+비주얼(이미지), 비트 싱크 비디오(MV/숏폼), 오디오(BGM) 등 창작물의 컨셉 기획부터 고해상도 생성 및 디렉팅까지 전 과정을 책임집니다.
+하단 만능 커맨드 독에 원하시는 분위기나 장면을 편하게 말씀해 주시면 즉시 캔버스에 구현해 드립니다!`;
+  }
+
+  if (p.includes('기능') || p.includes('뭘 할 수') || p.includes('할줄') || p.includes('어떤 거') || p.includes('능력')) {
+    return `총괄 PD 노아(NOA)가 지원하는 핵심 창작 파이프라인입니다:
+
+🎨 **1. FLUX 8K 비주얼 생성**
+- 시네마틱 화보, 하이엔드 인물 포트레이트, 유튜브 썸네일 등 초고화질 이미지 렌더링
+
+🎵 **2. 비트 싱크 숏폼 비디오 & MV**
+- 음악의 BPM 및 비트 피크에 맞춰 씬 컷 전환과 다이내믹 카메라 모션 자동 연출
+
+🎧 **3. 맞춤형 AI 사운드트랙 (BGM)**
+- 영상 및 무드에 어울리는 스템별 악기 믹싱 사운드 트랙 생성
+
+📁 **4. 만능 멀티모달 파일 투하**
+- 레퍼런스 이미지나 음악 파일을 커맨드 독에 드래그하거나 Ctrl+V로 붙여넣으면 즉시 분석하여 창작에 반영합니다.
+
+지금 원하시는 아이디어를 바로 말씀해 보세요!`;
+  }
+
+  if (p.includes('사용법') || p.includes('어떻게') || p.includes('도움말') || p.includes('가이드')) {
+    return `**만능 Noa 커맨드 독 이용 가이드** 💡
+
+1. **자유로운 텍스트 입력**: "네온사인이 번지는 사이버펑크 서울 밤거리", "차분한 로파이 비트" 등 원하는 장면을 편하게 말씀하세요.
+2. **음성 인식 (STT)**: 우측 마이크(🎙️) 버튼을 누르고 음성으로 직접 지시하실 수 있습니다.
+3. **파일 드래그 & 드롭**: 영감을 주는 이미지나 오디오 파일을 독 위에 끌어다 놓으시면 멀티모달 에셋으로 자동 결속됩니다.
+4. **실시간 캔버스 피드백**: 생성된 결과물을 보며 "조명을 더 어둡게", "배경을 설산으로"처럼 추가 수정을 이어갈 수 있습니다.`;
+  }
+
+  if (p.includes('안녕') || p.includes('반가워') || p.includes('하이')) {
+    return `반갑습니다! 🎬 오늘 노아와 함께 어떤 멋진 미디어를 만들어 볼까요? 생각하고 계신 컨셉이나 떠오르는 단어가 있다면 편하게 던져주세요!`;
+  }
+
+  if (p.includes('안되') || p.includes('안돼') || p.includes('버그') || p.includes('에러') || p.includes('왜')) {
+    return `불편을 드려 죄송합니다! 현재 시스템은 단일 골든 패스 및 실시간 복구 배관을 갖추고 있습니다.
+원하시는 이미지나 영상의 구체적인 키워드를 말씀해 주시거나, 상단 [새 세션] 버튼으로 깨끗하게 리셋 후 다시 시작하실 수도 있습니다.`;
+  }
+
+  // 기본 친절한 안내
+  return `노아 총괄 PD가 경청하고 있습니다. 🎙️
+궁금하신 점이 있다면 편하게 질문해 주시고, 새로운 미디어를 제작하고 싶으시다면 원하는 컨셉이나 스타일을 언제든 말씀해 주세요!`;
+}
+
+// 세션 모드 판별: 명시적 기획/인터뷰 요청이 있을 때만 interview 모드로 진입
 export function determineSessionMode(prompt: string): SessionMode {
-  const trimmed = prompt.trim();
-  if (trimmed.length < 14) {
+  const trimmed = prompt.trim().toLowerCase();
+  
+  const explicitInterviewKeywords = ['인터뷰', '단계별', '기획부터', '기획해줘', '차근차근', '가이드해줘', '설문'];
+  const wantsInterview = explicitInterviewKeywords.some((k) => trimmed.includes(k));
+
+  if (wantsInterview) {
     return 'interview';
   }
-  // 묘사적 단어 포함 여부
-  const complexKeywords = ['배경', '스타일', '비율', '서양', '동양', '분위기', '카메라', '조명', 'bpm', '4k', '시네마틱', '설산', 'ceo'];
-  const matchCount = complexKeywords.filter(k => trimmed.toLowerCase().includes(k)).length;
-  if (matchCount >= 2 || trimmed.length >= 25) {
-    return 'oneshot';
-  }
-  return 'interview';
+
+  // 기본은 원샷 직결 생성 (즉각적 창작 캔버스 피드백)
+  return 'oneshot';
 }
 
 // 더미 파형 데이터 생성기 (오디오용)

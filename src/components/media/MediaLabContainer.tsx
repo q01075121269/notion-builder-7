@@ -35,6 +35,9 @@ import {
   detectDomainFromPrompt, 
   isSkipCommand, 
   isInspectCommand, 
+  isCancelCommand,
+  isConversationalOrQuestion,
+  generateNoaConversationalResponse,
   determineSessionMode, 
   createInitialArtifact, 
   createCheckpoint,
@@ -288,6 +291,23 @@ export const MediaLabContainer: React.FC = () => {
     const trimmed = text.trim();
     if (!trimmed && attachments.length === 0) return;
 
+    // 0. 취소/중단 명령: 인터뷰 모드에서 즉시 탈출
+    if (isCancelCommand(trimmed)) {
+      if (fsmState === 'INTERVIEWING') {
+        setFsmState('IDLE');
+        setCurrentStepIndex(0);
+        const cancelMsg: MediaMessage = {
+          id: `msg-n-${Date.now()}`,
+          role: 'noa',
+          text: '진행 중이던 인터뷰를 종료하고 자유 창작 대기 상태로 복귀했습니다. 원하시는 이미지나 영상을 편하게 말씀해 주세요.',
+          timestamp: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
+        };
+        setMessages((prev) => [...prev, cancelMsg]);
+        showToast('인터뷰를 취소하고 초기 대기 상태로 복귀했습니다.', 'info');
+        return;
+      }
+    }
+
     // 1. 중간 점검/상태 확인 요청
     if (isInspectCommand(trimmed)) {
       if (artifact) {
@@ -320,6 +340,19 @@ export const MediaLabContainer: React.FC = () => {
       timestamp: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
     };
     setMessages((prev) => [...prev, userMsg]);
+
+    // 3. 질문 / 대화 / 기능 안내 / 항의 라우팅 (좀비 인터뷰 FSM 진입 완전 차단)
+    if (attachments.length === 0 && isConversationalOrQuestion(trimmed)) {
+      const conversationalAnswer = generateNoaConversationalResponse(trimmed);
+      const noaReplyMsg: MediaMessage = {
+        id: `msg-n-${Date.now()}`,
+        role: 'noa',
+        text: conversationalAnswer,
+        timestamp: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
+      };
+      setMessages((prev) => [...prev, noaReplyMsg]);
+      return;
+    }
 
     const historyPayload = [...messages, userMsg].map((m) => ({ role: m.role, content: m.text }));
 

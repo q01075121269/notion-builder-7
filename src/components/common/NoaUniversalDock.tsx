@@ -22,11 +22,14 @@ export const NoaUniversalDock: React.FC<NoaUniversalDockProps> = ({
   const [text, setText] = useState('');
   const [attachments, setAttachments] = useState<DockAttachment[]>([]);
   const [isDragging, setIsDragging] = useState(false);
-  const [isMicActive, setIsMicActive] = useState(false);
+  const [isListening, setIsListening] = useState(false);
 
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const dragCounterRef = useRef<number>(0);
+  const recognitionRef = useRef<any>(null);
+  const isListeningRef = useRef<boolean>(false);
+  const baseTextRef = useRef<string>('');
 
   // 자동 높이 조절 (24px ~ 120px)
   const adjustTextareaHeight = useCallback(() => {
@@ -40,6 +43,115 @@ export const NoaUniversalDock: React.FC<NoaUniversalDockProps> = ({
   useEffect(() => {
     adjustTextareaHeight();
   }, [text, adjustTextareaHeight]);
+
+  // Web Speech API 인스턴스 정지
+  const stopListening = useCallback(() => {
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.stop();
+      } catch (err) {
+        console.warn('[WebSpeech] Stop error:', err);
+      }
+    }
+    setIsListening(false);
+    isListeningRef.current = false;
+  }, []);
+
+  // Web Speech API 인스턴스 실제 연결 및 시작
+  const startListening = useCallback(() => {
+    const SpeechRecognition =
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+      alert('현재 브라우저에서는 음성 인식을 지원하지 않습니다. Chrome 또는 Edge 브라우저를 권장합니다.');
+      return;
+    }
+
+    try {
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.abort();
+        } catch (_) {}
+      }
+
+      const recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = 'ko-KR';
+
+      baseTextRef.current = text ? `${text.trim()} ` : '';
+
+      recognition.onstart = () => {
+        setIsListening(true);
+        isListeningRef.current = true;
+      };
+
+      recognition.onresult = (event: any) => {
+        let interimTranscript = '';
+        let finalTranscript = '';
+
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          const item = event.results[i];
+          const transcript = item[0]?.transcript || '';
+          if (item.isFinal) {
+            finalTranscript += transcript;
+          } else {
+            interimTranscript += transcript;
+          }
+        }
+
+        if (finalTranscript) {
+          baseTextRef.current = `${baseTextRef.current}${finalTranscript.trim()} `;
+        }
+
+        const combined = `${baseTextRef.current}${interimTranscript.trim()}`.trim();
+        if (combined) {
+          setText(combined);
+        }
+      };
+
+      recognition.onerror = (event: any) => {
+        console.warn('[WebSpeech] Recognition error:', event.error);
+        if (event.error === 'not-allowed') {
+          alert('마이크 사용 권한이 차단되었습니다. 브라우저 주소창 좌측의 자물쇠/사이트 설정에서 마이크를 허용해 주세요.');
+        }
+        setIsListening(false);
+        isListeningRef.current = false;
+      };
+
+      recognition.onend = () => {
+        setIsListening(false);
+        isListeningRef.current = false;
+      };
+
+      recognitionRef.current = recognition;
+      recognition.start();
+    } catch (err) {
+      console.error('[WebSpeech] Failed to start:', err);
+      setIsListening(false);
+      isListeningRef.current = false;
+    }
+  }, [text]);
+
+  // 마이크 토글
+  const toggleListening = useCallback(() => {
+    if (isListening) {
+      stopListening();
+    } else {
+      startListening();
+    }
+  }, [isListening, startListening, stopListening]);
+
+  // 언마운트 시 음성 인식 자원 안전 해제
+  useEffect(() => {
+    return () => {
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.abort();
+        } catch (_) {}
+      }
+    };
+  }, []);
 
   // 파일 파싱 및 DockAttachment 변환 유틸
   const processFiles = useCallback((files: FileList | File[]) => {
@@ -175,6 +287,11 @@ export const NoaUniversalDock: React.FC<NoaUniversalDockProps> = ({
       return;
     }
 
+    // 전송 시 음성 인식이 켜져 있으면 자동 정지
+    if (isListeningRef.current) {
+      stopListening();
+    }
+
     const payload: DockPayload = {
       text: trimmed,
       attachments: [...attachments],
@@ -190,7 +307,7 @@ export const NoaUniversalDock: React.FC<NoaUniversalDockProps> = ({
     if (textareaRef.current) {
       textareaRef.current.style.height = '24px';
     }
-  }, [text, attachments, isProcessing, onSubmit]);
+  }, [text, attachments, isProcessing, onSubmit, stopListening]);
 
   // 키보드 엔터 감지 (한글 조합 방어 및 Shift+Enter 개행)
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -291,18 +408,21 @@ export const NoaUniversalDock: React.FC<NoaUniversalDockProps> = ({
 
           {/* 우측 액션 군 */}
           <div className="flex items-center gap-1.5 shrink-0">
-            {/* 음성 마이크 버튼 (2단계 STT 연동을 위한 전용 슬롯) */}
+            {/* 음성 마이크 버튼 (진짜 작동하는 Web Speech STT 마이크 배선 직결) */}
             <button
               type="button"
-              onClick={() => setIsMicActive((prev) => !prev)}
-              className={`p-2 rounded-full transition cursor-pointer ${
-                isMicActive
-                  ? 'text-rose-400 bg-rose-500/10'
+              onClick={toggleListening}
+              className={`p-2 rounded-full transition cursor-pointer relative ${
+                isListening
+                  ? 'text-rose-400 bg-rose-500/20 ring-2 ring-rose-500/50 animate-pulse'
                   : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60'
               }`}
-              title="음성 입력 (STT 슬롯)"
+              title={isListening ? '음성 입력 중지' : '음성으로 말씀하세요 (Web Speech STT)'}
             >
               <Mic className="w-4 h-4" strokeWidth={1.5} />
+              {isListening && (
+                <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-rose-500 animate-ping" />
+              )}
             </button>
 
             {/* 전송 버튼: 텍스트나 첨부파일이 있을 때만 활성화 */}
