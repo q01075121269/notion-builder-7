@@ -1,8 +1,8 @@
 import React from 'react';
-import { MediaLabView } from '../../components/media/MediaLabView';
+import { MediaLabContainer } from '../../components/media/MediaLabContainer';
 
 export const MediaLabPage: React.FC = () => {
-  return <MediaLabView />;
+  return <MediaLabContainer />;
 };
 
 export default MediaLabPage;
