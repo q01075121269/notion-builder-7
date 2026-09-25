@@ -20,7 +20,8 @@ import {
   Trash2
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
-import { NoaMediaDock } from './NoaMediaDock';
+import { NoaUniversalDock } from '../common/NoaUniversalDock';
+import type { DockPayload } from '../../types/dock';
 import { MediaArtifactStage } from './MediaArtifactStage';
 import type { 
   MediaDomain, 
@@ -280,10 +281,12 @@ export const MediaLabContainer: React.FC = () => {
     }
   };
 
-  // 듀얼 트랙 대화형 오케스트레이터 입력 핸들러
-  const handleDockSubmit = async (rawInput: string, attachedFile?: { name: string; url: string; type: string }) => {
-    const trimmed = rawInput.trim();
-    if (!trimmed && !attachedFile) return;
+  // 듀얼 트랙 대화형 오케스트레이터 입력 핸들러 (만능 Noa 커맨드 독)
+  const handleDockSubmit = async (payload: DockPayload) => {
+    console.log('[NoaUniversalDock] Received payload:', payload);
+    const { text, attachments } = payload;
+    const trimmed = text.trim();
+    if (!trimmed && attachments.length === 0) return;
 
     // 1. 중간 점검/상태 확인 요청
     if (isInspectCommand(trimmed)) {
@@ -303,11 +306,17 @@ export const MediaLabContainer: React.FC = () => {
       }
     }
 
+    // 첨부파일 요약 텍스트 구성
+    const attachmentSummary = attachments.length > 0 
+      ? ` [첨부 ${attachments.length}건: ${attachments.map((a) => a.name).join(', ')}]` 
+      : '';
+    const userDisplayText = trimmed ? `${trimmed}${attachmentSummary}` : attachmentSummary.trim();
+
     // 사용자 메시지 스트림에 즉시 영구 누적
     const userMsg: MediaMessage = {
       id: `msg-u-${Date.now()}`,
       role: 'user',
-      text: trimmed,
+      text: userDisplayText,
       timestamp: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
     };
     setMessages((prev) => [...prev, userMsg]);
@@ -391,8 +400,9 @@ export const MediaLabContainer: React.FC = () => {
     };
 
     // 3. 파일 첨부 후 "뮤직비디오 만들어줘" 요청 분기
-    if (attachedFile || trimmed.includes('뮤직비디오') || trimmed.includes('mv') || trimmed.includes('MV')) {
-      await triggerArtifactGeneration('video', trimmed || '비트 싱크 뮤직비디오');
+    const hasAudio = attachments.some((a) => a.type === 'audio');
+    if (attachments.length > 0 || trimmed.includes('뮤직비디오') || trimmed.includes('mv') || trimmed.includes('MV')) {
+      await triggerArtifactGeneration('video', trimmed || (hasAudio ? '오디오 비트 싱크 뮤직비디오' : '멀티모달 씬 생성'));
       return;
     }
 
@@ -974,13 +984,13 @@ export const MediaLabContainer: React.FC = () => {
           </div>
         </main>
 
-        {/* [하단 중앙 와이드 플로팅 Noa 독 (Gemini 순정 알약형 바)] */}
+        {/* [하단 만능 Noa 커맨드 독 (Google Gemini 순정 알약형 바)] */}
         <footer className="shrink-0 z-30">
-          <NoaMediaDock
+          <NoaUniversalDock
             onSubmit={handleDockSubmit}
             isProcessing={fsmState === 'GENERATING'}
             onToolSelect={handleToolSelect}
-            placeholder="편하게 말씀하시거나 사진/음악을 올려주세요..."
+            placeholder="노아(NOA)에게 편하게 말씀하시거나 파일/이미지를 올려주세요..."
           />
         </footer>
 
